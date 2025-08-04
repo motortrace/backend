@@ -10,8 +10,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const authSupabaseService = {
-  async signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  async signUp(email: string, password: string, role?: string) {
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: {
+          role: role || 'customer' // Default to customer if no role specified
+        }
+      }
+    });
     if (error) throw new Error(error.message);
     return data.user;
   },
@@ -19,7 +27,12 @@ export const authSupabaseService = {
   async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
-    return data.user;
+    
+    // Return both user and session data
+    return {
+      user: data.user,
+      session: data.session
+    };
   },
 
   async getUser(token: string) {
@@ -32,5 +45,49 @@ export const authSupabaseService = {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
     return true;
+  },
+
+  // New method to validate and refresh tokens
+  async validateToken(token: string) {
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error) throw new Error(error.message);
+      return data.user;
+    } catch (error: any) {
+      // Try to refresh the token if it's expired
+      if (error.message?.includes('JWT')) {
+        try {
+          const { data, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) throw new Error(refreshError.message);
+          return data.user;
+        } catch (refreshErr: any) {
+          throw new Error('Token is invalid and cannot be refreshed');
+        }
+      }
+      throw error;
+    }
+  },
+
+  // Method to get session info (useful for debugging)
+  async getSession() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw new Error(error.message);
+    return data.session;
+  },
+
+  // Method to get current access token
+  async getAccessToken() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw new Error(error.message);
+    return data.session?.access_token;
+  },
+
+  // Method to update user role
+  async updateUserRole(userId: string, role: string) {
+    const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: { role }
+    });
+    if (error) throw new Error(error.message);
+    return data.user;
   }
 };
