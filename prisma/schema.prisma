@@ -31,6 +31,8 @@ model StaffMember {
   updatedAt      DateTime      @updatedAt
 
   workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
+  appointments   Appointment[] @relation("CreatedAppointments")
+  assignedAppointments Appointment[] @relation("AssignedAppointments")
 }
 
 // Customer table supports both app users and walk-ins
@@ -48,6 +50,7 @@ model Customer {
 
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
+  appointments  Appointment[]
 }
 
 model Vehicle {
@@ -63,6 +66,7 @@ model Vehicle {
   updatedAt    DateTime      @updatedAt
 
   workOrders   WorkOrder[]
+  appointments Appointment[]
 }
 
 model WorkOrder {
@@ -79,6 +83,7 @@ model WorkOrder {
   updatedAt     DateTime      @updatedAt
 
   serviceItems  ServiceItem[]
+  appointment   Appointment?
 }
 
 model ServiceCatalog {
@@ -136,4 +141,45 @@ enum WorkOrderStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+// Appointment management
+model Appointment {
+  id           String            @id @default(cuid())
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  customerId   String
+  vehicle      Vehicle           @relation(fields: [vehicleId], references: [id])
+  vehicleId    String
+  requestedAt  DateTime
+  startTime    DateTime?
+  endTime      DateTime?
+  status       AppointmentStatus @default(PENDING)
+  notes        String?
+  serviceType  String?           // e.g., "Oil Change", "Brake Inspection", "General Service"
+  priority     AppointmentPriority @default(NORMAL)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Relations
+  workOrder    WorkOrder?
+  createdBy    StaffMember?      @relation("CreatedAppointments", fields: [createdById], references: [id])
+  createdById  String?
+  assignedTo   StaffMember?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
+  assignedToId String?
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
