@@ -38,6 +38,8 @@ model StaffMember {
   createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
   approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
   approvals      WorkOrderApproval[] @relation("Approvals")
+  labourItems     WorkOrderLabour[] @relation("LabourWork")
+  partInstallations WorkOrderPart[] @relation("PartInstallations")
 }
 
 // Customer table supports both app users and walk-ins
@@ -133,6 +135,7 @@ model ServiceCatalog {
   updatedAt   DateTime       @updatedAt
 
   serviceItems ServiceItem[]
+  partsUsed    WorkOrderPart[]
 }
 
 model ServiceItem {
@@ -395,4 +398,51 @@ enum ApprovalMethod {
   APP
   SMS
   DIGITAL_SIGNATURE
+}
+
+// Labour & Parts Usage
+model WorkOrderLabour {
+  id           String     @id @default(cuid())
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  description  String     // Description of the labour performed
+  hours        Decimal    @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
+  rate         Decimal    @db.Decimal(10,2) // Hourly rate
+  technician   StaffMember? @relation("LabourWork", fields: [technicianId], references: [id])
+  technicianId String?
+  subtotal     Decimal    @db.Decimal(10,2) // hours * rate
+  startTime    DateTime?  // When the work started
+  endTime      DateTime?  // When the work ended
+  notes        String?    // Additional notes about the labour
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model WorkOrderPart {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
+  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  source           PartSource    @default(INVENTORY)
+  supplierName     String?       // Supplier name if not from inventory
+  supplierInvoice  String?       // Supplier invoice number
+  warrantyInfo     String?       // Warranty information for the part
+  notes            String?       // Additional notes about the part usage
+  installedAt      DateTime?     // When the part was installed
+  installedBy      StaffMember?  @relation("PartInstallations", fields: [installedById], references: [id])
+  installedById    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+enum PartSource {
+  INVENTORY        // From shop inventory
+  SUPPLIER         // Ordered from supplier
+  CUSTOMER_SUPPLIED // Customer provided the part
+  WARRANTY         // Warranty replacement
+  SALVAGE          // Used/salvage part
 }
