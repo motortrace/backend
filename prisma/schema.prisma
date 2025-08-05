@@ -34,6 +34,7 @@ model StaffMember {
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   appointments   Appointment[] @relation("CreatedAppointments")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
+  inspections    WorkOrderInspection[] @relation("Inspections")
 }
 
 // Customer table supports both app users and walk-ins
@@ -245,4 +246,71 @@ enum AppointmentPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+// Inspection & Diagnostic Reports
+model WorkOrderInspection {
+  id           String     @id @default(cuid())
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  inspector    StaffMember @relation("Inspections", fields: [inspectorId], references: [id])
+  inspectorId  String
+  date         DateTime   @default(now())
+  notes        String?
+  
+  // Relations
+  checklistItems InspectionChecklistItem[]
+  tireChecks    TireInspection[]
+  attachments   WorkOrderInspectionAttachment[]
+}
+
+model InspectionChecklistItem {
+  id           String     @id @default(cuid())
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspectionId String
+  category     String     // e.g., "Engine", "Brakes", "Electrical", "Safety"
+  item         String     // e.g., "Oil Level", "Brake Pads", "Battery"
+  status       ChecklistStatus
+  notes        String?    // Additional notes for the item
+  createdAt    DateTime   @default(now())
+}
+
+enum ChecklistStatus {
+  GREEN    // Good condition
+  YELLOW   // Needs attention
+  RED      // Critical issue
+}
+
+model TireInspection {
+  id           String     @id @default(cuid())
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspectionId String
+  position     TirePosition
+  brand        String?    // Tire brand
+  model        String?    // Tire model
+  size         String?    // Tire size (e.g., "205/55R16")
+  psi          Int?       // Current PSI
+  treadDepth   Decimal?   @db.Decimal(4,2) // Tread depth in mm
+  damageNotes  String?    // Any damage or wear notes
+  createdAt    DateTime   @default(now())
+}
+
+enum TirePosition {
+  LF      // Left Front
+  RF      // Right Front
+  LR      // Left Rear
+  RR      // Right Rear
+  SPARE   // Spare Tire
+}
+
+model WorkOrderInspectionAttachment {
+  id           String     @id @default(cuid())
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspectionId String
+  fileUrl      String
+  fileName     String?    // Original filename
+  fileType     String?    // e.g., "image/jpeg", "application/pdf"
+  fileSize     Int?       // File size in bytes
+  description  String?    // Description of what the attachment shows
+  uploadedAt   DateTime   @default(now())
 }
