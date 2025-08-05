@@ -35,6 +35,9 @@ model StaffMember {
   appointments   Appointment[] @relation("CreatedAppointments")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
   inspections    WorkOrderInspection[] @relation("Inspections")
+  createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
+  approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
+  approvals      WorkOrderApproval[] @relation("Approvals")
 }
 
 // Customer table supports both app users and walk-ins
@@ -313,4 +316,83 @@ model WorkOrderInspectionAttachment {
   fileSize     Int?       // File size in bytes
   description  String?    // Description of what the attachment shows
   uploadedAt   DateTime   @default(now())
+}
+
+// Estimates & Approvals
+model WorkOrderEstimate {
+  id           String    @id @default(cuid())
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  version      Int       @default(1) // Track estimate versions
+  description  String?   // Brief description of what this estimate covers
+  totalAmount  Decimal   @db.Decimal(10,2)
+  labourAmount Decimal?  @db.Decimal(10,2) // Labour portion
+  partsAmount  Decimal?  @db.Decimal(10,2) // Parts portion
+  taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
+  discountAmount Decimal? @db.Decimal(10,2) // Any discounts
+  notes        String?   // Additional notes about the estimate
+  createdBy    StaffMember? @relation("CreatedEstimates", fields: [createdById], references: [id])
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  approved     Boolean   @default(false)
+  approvedAt   DateTime?
+  approvedBy   StaffMember? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
+  approvedById String?
+  
+  // Relations
+  estimateItems WorkOrderEstimateItem[]
+}
+
+model WorkOrderEstimateItem {
+  id           String    @id @default(cuid())
+  estimate     WorkOrderEstimate @relation(fields: [estimateId], references: [id])
+  estimateId   String
+  description  String    // Item description
+  quantity     Int       @default(1)
+  unitPrice    Decimal   @db.Decimal(10,2)
+  totalPrice   Decimal   @db.Decimal(10,2)
+  itemType     EstimateItemType @default(LABOUR)
+  notes        String?   // Additional notes for this item
+  createdAt    DateTime  @default(now())
+}
+
+enum EstimateItemType {
+  LABOUR
+  PART
+  SERVICE
+  OTHER
+}
+
+model WorkOrderApproval {
+  id           String       @id @default(cuid())
+  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  estimate     WorkOrderEstimate? @relation(fields: [estimateId], references: [id])
+  estimateId   String?
+  status       ApprovalStatus
+  requestedAt  DateTime     @default(now())
+  approvedAt   DateTime?
+  approvedBy   StaffMember? @relation("Approvals", fields: [approvedById], references: [id])
+  approvedById String?
+  method       ApprovalMethod?
+  notes        String?      // Notes from the approval process
+  customerSignature String? // URL to signature file or signature data
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
+enum ApprovalMethod {
+  IN_PERSON
+  PHONE
+  EMAIL
+  APP
+  SMS
+  DIGITAL_SIGNATURE
 }
