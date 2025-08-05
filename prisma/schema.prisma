@@ -31,6 +31,7 @@ model StaffMember {
   updatedAt      DateTime      @updatedAt
 
   workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
+  advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   appointments   Appointment[] @relation("CreatedAppointments")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
 }
@@ -70,20 +71,52 @@ model Vehicle {
 }
 
 model WorkOrder {
-  id            String        @id @default(cuid())
-  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
-  vehicleId     String
-  customer      Customer      @relation(fields: [customerId], references: [id])
-  customerId    String
-  technician    StaffMember?  @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
-  technicianId  String?
-  status        WorkOrderStatus
-  description   String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              String         @id @default(cuid())
+  workOrderNumber String         @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  serviceItems  ServiceItem[]
-  appointment   Appointment?
+  customer        Customer       @relation(fields: [customerId], references: [id])
+  customerId      String
+  vehicle         Vehicle        @relation(fields: [vehicleId], references: [id])
+  vehicleId       String
+
+  appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
+  appointmentId   String?
+
+  serviceAdvisor  StaffMember?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
+  advisorId       String?
+  technician      StaffMember?   @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
+  technicianId    String?
+
+  status          WorkOrderStatus
+  jobType         JobType        @default(REPAIR)
+  priority        JobPriority    @default(NORMAL)
+  source          JobSource      @default(WALK_IN)
+  complaint       String?
+  odometerReading Int?
+  warrantyStatus  WarrantyStatus @default(NONE)
+
+  estimatedTotal  Decimal?       @db.Decimal(10,2)
+  estimateNotes   String?
+  estimateApproved Boolean       @default(false)
+
+  subtotalLabour  Decimal?       @db.Decimal(10,2)
+  subtotalParts   Decimal?       @db.Decimal(10,2)
+  discountAmount  Decimal?       @db.Decimal(10,2)
+  taxAmount       Decimal?       @db.Decimal(10,2)
+  totalAmount     Decimal?       @db.Decimal(10,2)
+  paidAmount      Decimal?       @db.Decimal(10,2) @default(0)
+
+  // Relations to be defined
+  serviceItems    ServiceItem[]
+  inspections     WorkOrderInspection[]
+  labourItems     WorkOrderLabour[]
+  partsUsed       WorkOrderPart[]
+  approvals       WorkOrderApproval[]
+  qcChecks        WorkOrderQC[]
+  attachments     WorkOrderAttachment[]
+  payments        Payment[]
 }
 
 model ServiceCatalog {
@@ -139,8 +172,38 @@ enum StaffRole {
 enum WorkOrderStatus {
   PENDING
   IN_PROGRESS
+  WAITING_FOR_PARTS
+  QC_PENDING
   COMPLETED
   CANCELLED
+}
+
+enum JobType {
+  REPAIR
+  MAINTENANCE
+  INSPECTION
+  WARRANTY
+  RECALL
+}
+
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum JobSource {
+  WALK_IN
+  APPOINTMENT
+  PHONE
+  ROADSIDE_ASSIST
+}
+
+enum WarrantyStatus {
+  NONE
+  MANUFACTURER
+  EXTENDED
 }
 
 // Appointment management
