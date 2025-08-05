@@ -40,6 +40,9 @@ model StaffMember {
   approvals      WorkOrderApproval[] @relation("Approvals")
   labourItems     WorkOrderLabour[] @relation("LabourWork")
   partInstallations WorkOrderPart[] @relation("PartInstallations")
+  qcChecks       WorkOrderQC[] @relation("QCInspections")
+  uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
+  processedPayments Payment[] @relation("ProcessedPayments")
 }
 
 // Customer table supports both app users and walk-ins
@@ -136,6 +139,7 @@ model ServiceCatalog {
 
   serviceItems ServiceItem[]
   partsUsed    WorkOrderPart[]
+  labourItems  WorkOrderLabour[]
 }
 
 model ServiceItem {
@@ -402,20 +406,22 @@ enum ApprovalMethod {
 
 // Labour & Parts Usage
 model WorkOrderLabour {
-  id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
-  workOrderId  String
-  description  String     // Description of the labour performed
-  hours        Decimal    @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
-  rate         Decimal    @db.Decimal(10,2) // Hourly rate
-  technician   StaffMember? @relation("LabourWork", fields: [technicianId], references: [id])
-  technicianId String?
-  subtotal     Decimal    @db.Decimal(10,2) // hours * rate
-  startTime    DateTime?  // When the work started
-  endTime      DateTime?  // When the work ended
-  notes        String?    // Additional notes about the labour
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id               String          @id @default(cuid())
+  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  serviceCatalog   ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
+  serviceCatalogId String?         // Optional - for catalog-based labour
+  description      String          // Description of the labour performed (manual or from catalog)
+  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
+  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  technician       StaffMember?    @relation("LabourWork", fields: [technicianId], references: [id])
+  technicianId     String?
+  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  startTime        DateTime?       // When the work started
+  endTime          DateTime?       // When the work ended
+  notes            String?         // Additional notes about the labour
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model WorkOrderPart {
@@ -445,4 +451,86 @@ enum PartSource {
   CUSTOMER_SUPPLIED // Customer provided the part
   WARRANTY         // Warranty replacement
   SALVAGE          // Used/salvage part
+}
+
+// QC, Attachments & Payments
+model WorkOrderQC {
+  id           String     @id @default(cuid())
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  passed       Boolean    // QC pass/fail status
+  inspector    StaffMember? @relation("QCInspections", fields: [inspectorId], references: [id])
+  inspectorId  String?
+  notes        String?    // QC notes and findings
+  qcDate       DateTime   @default(now()) // When QC was performed
+  reworkRequired Boolean  @default(false) // If rework is needed
+  reworkNotes  String?    // Notes about required rework
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model WorkOrderAttachment {
+  id           String     @id @default(cuid())
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  fileUrl      String     // URL to the stored file
+  fileName     String?    // Original filename
+  fileType     String     // MIME type (e.g., "image/jpeg", "application/pdf")
+  fileSize     Int?       // File size in bytes
+  description  String?    // Description of what the attachment shows
+  category     AttachmentCategory @default(GENERAL) // Category of attachment
+  uploadedBy   StaffMember? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
+  uploadedById String?
+  uploadedAt   DateTime   @default(now())
+}
+
+enum AttachmentCategory {
+  GENERAL       // General work order documents
+  INVOICE       // Customer invoices
+  RECEIPT       // Payment receipts
+  WARRANTY      // Warranty documents
+  INSPECTION    // Inspection reports
+  BEFORE_AFTER  // Before/after photos
+  DIAGNOSTIC    // Diagnostic reports
+  MANUAL        // Service manuals
+  OTHER         // Other documents
+}
+
+model Payment {
+  id           String     @id @default(cuid())
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrderId  String
+  method       PaymentMethod
+  amount       Decimal    @db.Decimal(10,2)
+  reference    String?    // Payment reference number
+  status       PaymentStatus @default(PENDING)
+  paidAt       DateTime   @default(now())
+  processedBy  StaffMember? @relation("ProcessedPayments", fields: [processedById], references: [id])
+  processedById String?
+  notes        String?    // Payment notes
+  refundAmount Decimal?   @db.Decimal(10,2) // For partial refunds
+  refundReason String?    // Reason for refund
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  DIGITAL_WALLET
+  INSURANCE
+  WARRANTY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIAL_REFUND
+  CANCELLED
 }
