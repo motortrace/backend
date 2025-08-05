@@ -9,13 +9,12 @@ datasource db {
 }
 
 // User Profile - extends Supabase auth.users
+// Only stores additional profile data, not identity data
 model UserProfile {
   id             String        @id @default(cuid())
-  supabaseUserId String        @unique // Links to auth.users.id
-  email          String        @unique
+  supabaseUserId String        @unique @db.Uuid // Links to auth.users.id (FK constraint added via migration)
   name           String?
   phone          String?
-  role           UserRole       @default(CUSTOMER)
   profileImage   String?
   isRegistrationComplete Boolean @default(false)
   createdAt      DateTime      @default(now())
@@ -27,27 +26,28 @@ model UserProfile {
 
 model StaffMember {
   id             String        @id @default(cuid())
-  supabaseUserId String        @unique
-  email          String        @unique
-  role           StaffRole
+  supabaseUserId String        @unique @db.Uuid // Links to auth.users.id (FK constraint added via migration)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
 }
 
+// Customer table supports both app users and walk-ins
+// For app users: userProfileId points to their UserProfile
+// For walk-ins: userProfileId is NULL
 model Customer {
-  id          String        @id @default(cuid())
-  userProfile UserProfile   @relation(fields: [userProfileId], references: [id])
-  userProfileId String      @unique
-  name        String
-  email       String?       @unique
-  phone       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  userProfile   UserProfile?  @relation(fields: [userProfileId], references: [id])
+  userProfileId String?       @unique // Nullable to support walk-ins
+  name          String        @db.VarChar(255)
+  email         String?       // Optional for walk-ins, not unique to allow duplicates
+  phone         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  vehicles    Vehicle[]
-  workOrders  WorkOrder[]
+  vehicles      Vehicle[]
+  workOrders    WorkOrder[]
 }
 
 model Vehicle {
