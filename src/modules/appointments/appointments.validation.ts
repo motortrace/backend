@@ -1,0 +1,161 @@
+import Joi from 'joi';
+import { AppointmentStatus, AppointmentPriority, DayOfWeek } from '@prisma/client';
+
+export const createAppointmentSchema = Joi.object({
+  customerId: Joi.string().required(),
+  vehicleId: Joi.string().required(),
+  requestedAt: Joi.date().required(),
+  startTime: Joi.date().optional(),
+  endTime: Joi.date().optional(),
+  notes: Joi.string().optional(),
+  priority: Joi.string().valid(...Object.values(AppointmentPriority)).optional(),
+  cannedServiceIds: Joi.array().items(Joi.string()).min(1).required(),
+  quantities: Joi.array().items(Joi.number().min(1)).optional(),
+  prices: Joi.array().items(Joi.number().min(0)).optional(),
+  serviceNotes: Joi.array().items(Joi.string()).optional(),
+});
+
+export const updateAppointmentSchema = Joi.object({
+  startTime: Joi.date().optional(),
+  endTime: Joi.date().optional(),
+  status: Joi.string().valid(...Object.values(AppointmentStatus)).optional(),
+  priority: Joi.string().valid(...Object.values(AppointmentPriority)).optional(),
+  notes: Joi.string().optional(),
+  assignedToId: Joi.string().optional(),
+});
+
+export const appointmentSlotRequestSchema = Joi.object({
+  date: Joi.date().required(),
+  serviceIds: Joi.array().items(Joi.string()).min(1).required(),
+});
+
+export const assignAppointmentSchema = Joi.object({
+  assignedToId: Joi.string().required(),
+});
+
+export const createCannedServiceSchema = Joi.object({
+  code: Joi.string().required(),
+  name: Joi.string().required(),
+  description: Joi.string().optional(),
+  duration: Joi.number().min(1).required(), // in minutes
+  price: Joi.number().min(0).required(),
+  isAvailable: Joi.boolean().default(false),
+});
+
+export const updateCannedServiceSchema = Joi.object({
+  code: Joi.string().optional(),
+  name: Joi.string().optional(),
+  description: Joi.string().optional(),
+  duration: Joi.number().min(1).optional(),
+  price: Joi.number().min(0).optional(),
+  isAvailable: Joi.boolean().optional(),
+});
+
+export const shopOperatingHoursSchema = Joi.object({
+  dayOfWeek: Joi.string().valid(...Object.values(DayOfWeek)).required(),
+  isOpen: Joi.boolean().required(),
+  openTime: Joi.string().pattern(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  closeTime: Joi.string().pattern(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+});
+
+export const shopCapacitySettingsSchema = Joi.object({
+  appointmentsPerDay: Joi.number().min(1).max(100).required(),
+  appointmentsPerTimeBlock: Joi.number().min(1).max(10).required(),
+  timeBlockIntervalMinutes: Joi.number().min(15).max(120).required(),
+  minimumNoticeHours: Joi.number().min(0).max(168).required(), // 0 to 7 days
+  futureSchedulingCutoffYears: Joi.number().min(1).max(10).required(),
+});
+
+// Validation middleware
+export const validateCreateAppointment = (req: any, res: any, next: any) => {
+  const { error } = createAppointmentSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateUpdateAppointment = (req: any, res: any, next: any) => {
+  const { error } = updateAppointmentSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateAppointmentSlotRequest = (req: any, res: any, next: any) => {
+  const slotRequest = {
+    date: new Date(req.query.date as string),
+    serviceIds: (req.query.serviceIds as string).split(','),
+  };
+  
+  const { error } = appointmentSlotRequestSchema.validate(slotRequest);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateAssignAppointment = (req: any, res: any, next: any) => {
+  const { error } = assignAppointmentSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateCreateCannedService = (req: any, res: any, next: any) => {
+  const { error } = createCannedServiceSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateUpdateCannedService = (req: any, res: any, next: any) => {
+  const { error } = updateCannedServiceSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateShopOperatingHours = (req: any, res: any, next: any) => {
+  const { error } = shopOperatingHoursSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateShopCapacitySettings = (req: any, res: any, next: any) => {
+  const { error } = shopCapacitySettingsSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+}; 

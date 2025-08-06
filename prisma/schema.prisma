@@ -128,26 +128,62 @@ model WorkOrder {
   payments        Payment[]
 }
 
-model ServiceCatalog {
+// Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
+model CannedService {
   id          String         @id @default(cuid())
   code        String         @unique
   name        String
   description String?
-  standardCost Decimal       
+  duration    Int            // Estimated labor time in minutes
+  price       Decimal        @db.Decimal(10,2)
+  isAvailable Boolean        @default(false)  // Only show these in booking UI
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   serviceItems ServiceItem[]
   partsUsed    WorkOrderPart[]
   labourItems  WorkOrderLabour[]
+  appointmentServices AppointmentCannedService[]
+}
+
+// Shop Operating Hours and Capacity Planning
+model ShopOperatingHours {
+  id          String    @id @default(cuid())
+  dayOfWeek   DayOfWeek @unique
+  isOpen      Boolean   @default(false)
+  openTime    String?   // Format: "08:00" for 8 AM
+  closeTime   String?   // Format: "17:00" for 5 PM
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ShopCapacitySettings {
+  id                          String  @id @default(cuid())
+  appointmentsPerDay          Int     @default(6)
+  appointmentsPerTimeBlock    Int     @default(2)
+  timeBlockIntervalMinutes    Int     @default(30)
+  minimumNoticeHours          Int     @default(48)
+  futureSchedulingCutoffYears Int     @default(3)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
 }
 
 model ServiceItem {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId      String
-  serviceCatalog   ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
-  serviceCatalogId String?
+  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
+  cannedServiceId  String?
   description      String
   cost             Decimal         
   createdAt        DateTime        @default(now())
@@ -217,7 +253,7 @@ enum WarrantyStatus {
   EXTENDED
 }
 
-// Appointment management
+// Appointment management - Updated for ShopMonkey-style scheduling
 model Appointment {
   id           String            @id @default(cuid())
   customer     Customer          @relation(fields: [customerId], references: [id])
@@ -228,9 +264,8 @@ model Appointment {
   startTime    DateTime?
   endTime      DateTime?
   status       AppointmentStatus @default(PENDING)
-  notes        String?
-  serviceType  String?           // e.g., "Oil Change", "Brake Inspection", "General Service"
   priority     AppointmentPriority @default(NORMAL)
+  notes        String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -240,6 +275,23 @@ model Appointment {
   createdById  String?
   assignedTo   StaffMember?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
   assignedToId String?
+  
+  // Link to CannedServices (many-to-many relationship)
+  cannedServices AppointmentCannedService[]
+}
+
+// Junction table for Appointment to CannedService relationship
+model AppointmentCannedService {
+  id             String        @id @default(cuid())
+  appointment    Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointmentId  String
+  cannedService  CannedService @relation(fields: [cannedServiceId], references: [id], onDelete: Cascade)
+  cannedServiceId String
+  quantity       Int           @default(1)
+  price          Decimal       @db.Decimal(10,2) // Price at time of booking
+  notes          String?       // Additional notes for this service
+  
+  @@unique([appointmentId, cannedServiceId])
 }
 
 enum AppointmentStatus {
@@ -409,8 +461,8 @@ model WorkOrderLabour {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId      String
-  serviceCatalog   ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
-  serviceCatalogId String?         // Optional - for catalog-based labour
+  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
+  cannedServiceId  String?         // Optional - for catalog-based labour
   description      String          // Description of the labour performed (manual or from catalog)
   hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
   rate             Decimal         @db.Decimal(10,2) // Hourly rate
@@ -430,6 +482,8 @@ model WorkOrderPart {
   workOrderId      String
   part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
   inventoryItemId  String
+  cannedService    CannedService? @relation(fields: [cannedServiceId], references: [id])
+  cannedServiceId  String?
   quantity         Int           @default(1)
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
