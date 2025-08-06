@@ -32,7 +32,6 @@ model StaffMember {
 
   workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
-  appointments   Appointment[] @relation("CreatedAppointments")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
   inspections    WorkOrderInspection[] @relation("Inspections")
   createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
@@ -275,8 +274,6 @@ model Appointment {
 
   // Relations
   workOrder    WorkOrder?
-  createdBy    StaffMember?      @relation("CreatedAppointments", fields: [createdById], references: [id])
-  createdById  String?
   assignedTo   StaffMember?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
   assignedToId String?
   
