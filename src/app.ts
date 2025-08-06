@@ -6,6 +6,7 @@ import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.
 
 import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
+import appointmentsRoutes from './modules/appointments/appointments.routes';
 
 const app = express();
 
@@ -16,8 +17,11 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/auth', authSupabaseRoutes);  // <- mount here
-app.use('/users', usersRoutes);        // <- mount protected routes
+
+// mounting section
+app.use('/auth', authSupabaseRoutes);
+app.use('/users', usersRoutes); 
+app.use('/appointments', appointmentsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

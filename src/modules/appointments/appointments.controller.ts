@@ -4,24 +4,20 @@ import {
   CreateAppointmentRequest,
   UpdateAppointmentRequest,
   AppointmentSlotRequest,
-  ShopOperatingHoursRequest,
-  ShopCapacitySettingsRequest,
-  CannedServiceRequest,
+  TimeBlockAvailabilityRequest,
+  DailyCapacityRequest,
 } from './appointments.types';
 
 export class AppointmentController {
-  private appointmentService: AppointmentService;
-
-  constructor() {
-    this.appointmentService = new AppointmentService();
-  }
+  private appointmentService = new AppointmentService();
 
   // Appointment Management
-  async createAppointment(req: Request, res: Response) {
+  async createAppointment(req: any, res: Response) {
     try {
       const appointmentData: CreateAppointmentRequest = req.body;
+
       const appointment = await this.appointmentService.createAppointment(appointmentData);
-      
+
       res.status(201).json({
         success: true,
         data: appointment,
@@ -46,13 +42,13 @@ export class AppointmentController {
       };
 
       const appointments = await this.appointmentService.getAppointments(filters);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: appointments,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -63,7 +59,7 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       const appointment = await this.appointmentService.getAppointmentById(id);
-      
+
       if (!appointment) {
         return res.status(404).json({
           success: false,
@@ -71,12 +67,12 @@ export class AppointmentController {
         });
       }
 
-      res.status(200).json({
+      res.json({
         success: true,
         data: appointment,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -87,10 +83,10 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       const updateData: UpdateAppointmentRequest = req.body;
-      
+
       const appointment = await this.appointmentService.updateAppointment(id, updateData);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: appointment,
         message: 'Appointment updated successfully',
@@ -107,13 +103,13 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       await this.appointmentService.deleteAppointment(id);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         message: 'Appointment deleted successfully',
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -129,10 +125,53 @@ export class AppointmentController {
       };
 
       const slots = await this.appointmentService.getAvailableSlots(slotRequest);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: slots,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // New: Check time block availability
+  async checkTimeBlockAvailability(req: Request, res: Response) {
+    try {
+      const timeBlockRequest: TimeBlockAvailabilityRequest = {
+        date: new Date(req.query.date as string),
+        timeBlock: req.query.timeBlock as string,
+      };
+
+      const availability = await this.appointmentService.checkTimeBlockAvailability(timeBlockRequest);
+
+      res.json({
+        success: true,
+        data: availability,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // New: Check daily capacity
+  async checkDailyCapacity(req: Request, res: Response) {
+    try {
+      const dailyCapacityRequest: DailyCapacityRequest = {
+        date: new Date(req.query.date as string),
+      };
+
+      const capacity = await this.appointmentService.checkDailyCapacity(dailyCapacityRequest);
+
+      res.json({
+        success: true,
+        data: capacity,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -146,13 +185,13 @@ export class AppointmentController {
   async getUnassignedAppointments(req: Request, res: Response) {
     try {
       const appointments = await this.appointmentService.getUnassignedAppointments();
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: appointments,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -163,10 +202,10 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       const { assignedToId } = req.body;
-      
+
       const appointment = await this.appointmentService.assignAppointment(id, assignedToId);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: appointment,
         message: 'Appointment assigned successfully',
@@ -182,12 +221,11 @@ export class AppointmentController {
   // Canned Service Management
   async createCannedService(req: Request, res: Response) {
     try {
-      const serviceData: CannedServiceRequest = req.body;
-      const service = await this.appointmentService.createCannedService(serviceData);
-      
+      const cannedService = await this.appointmentService.createCannedService(req.body);
+
       res.status(201).json({
         success: true,
-        data: service,
+        data: cannedService,
         message: 'Canned service created successfully',
       });
     } catch (error: any) {
@@ -201,13 +239,13 @@ export class AppointmentController {
   async getAvailableCannedServices(req: Request, res: Response) {
     try {
       const services = await this.appointmentService.getAvailableCannedServices();
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         data: services,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -217,13 +255,11 @@ export class AppointmentController {
   async updateCannedService(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updateData: Partial<CannedServiceRequest> = req.body;
-      
-      const service = await this.appointmentService.updateCannedService(id, updateData);
-      
-      res.status(200).json({
+      const cannedService = await this.appointmentService.updateCannedService(id, req.body);
+
+      res.json({
         success: true,
-        data: service,
+        data: cannedService,
         message: 'Canned service updated successfully',
       });
     } catch (error: any) {
@@ -238,13 +274,13 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       await this.appointmentService.deleteCannedService(id);
-      
-      res.status(200).json({
+
+      res.json({
         success: true,
         message: 'Canned service deleted successfully',
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -254,12 +290,11 @@ export class AppointmentController {
   // Shop Settings Management
   async updateOperatingHours(req: Request, res: Response) {
     try {
-      const hoursData: ShopOperatingHoursRequest = req.body;
-      const hours = await this.appointmentService.updateOperatingHours(hoursData);
-      
-      res.status(200).json({
+      const operatingHours = await this.appointmentService.updateOperatingHours(req.body);
+
+      res.json({
         success: true,
-        data: hours,
+        data: operatingHours,
         message: 'Operating hours updated successfully',
       });
     } catch (error: any) {
@@ -272,14 +307,14 @@ export class AppointmentController {
 
   async getOperatingHours(req: Request, res: Response) {
     try {
-      const hours = await this.appointmentService.getOperatingHours();
-      
-      res.status(200).json({
+      const operatingHours = await this.appointmentService.getOperatingHours();
+
+      res.json({
         success: true,
-        data: hours,
+        data: operatingHours,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });
@@ -288,12 +323,11 @@ export class AppointmentController {
 
   async updateCapacitySettings(req: Request, res: Response) {
     try {
-      const settingsData: ShopCapacitySettingsRequest = req.body;
-      const settings = await this.appointmentService.updateCapacitySettings(settingsData);
-      
-      res.status(200).json({
+      const capacitySettings = await this.appointmentService.updateCapacitySettings(req.body);
+
+      res.json({
         success: true,
-        data: settings,
+        data: capacitySettings,
         message: 'Capacity settings updated successfully',
       });
     } catch (error: any) {
@@ -306,14 +340,14 @@ export class AppointmentController {
 
   async getCapacitySettings(req: Request, res: Response) {
     try {
-      const settings = await this.appointmentService.getCapacitySettings();
-      
-      res.status(200).json({
+      const capacitySettings = await this.appointmentService.getCapacitySettings();
+
+      res.json({
         success: true,
-        data: settings,
+        data: capacitySettings,
       });
     } catch (error: any) {
-      res.status(500).json({
+      res.status(400).json({
         success: false,
         error: error.message,
       });

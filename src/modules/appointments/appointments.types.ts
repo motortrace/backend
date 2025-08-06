@@ -4,7 +4,7 @@ export interface CreateAppointmentRequest {
   customerId: string;
   vehicleId: string;
   requestedAt: Date;
-  startTime?: Date;
+  startTime: Date; // Now required for time block booking
   endTime?: Date;
   notes?: string;
   priority?: AppointmentPriority;
@@ -33,6 +33,33 @@ export interface AvailableSlot {
 export interface AppointmentSlotRequest {
   date: Date;
   serviceIds: string[];
+}
+
+// New interface for time block availability
+export interface TimeBlockAvailabilityRequest {
+  date: Date;
+  timeBlock: string; // Format: "08:00", "08:30", etc.
+}
+
+export interface TimeBlockAvailability {
+  timeBlock: string;
+  isAvailable: boolean;
+  currentBookings: number;
+  maxCapacity: number;
+  suggestedAlternatives?: string[];
+}
+
+// New interface for daily capacity check
+export interface DailyCapacityRequest {
+  date: Date;
+}
+
+export interface DailyCapacity {
+  date: Date;
+  totalBookings: number;
+  maxDailyBookings: number;
+  isAvailable: boolean;
+  timeBlocks: TimeBlockAvailability[];
 }
 
 export interface ShopOperatingHoursRequest {
@@ -94,6 +121,7 @@ export interface AppointmentWithServices {
     year?: number;
     licensePlate?: string;
   };
+
   assignedTo?: {
     id: string;
     supabaseUserId: string;

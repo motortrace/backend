@@ -118,17 +118,14 @@ export async function completeOnboarding(req: AuthenticatedRequest, res: Respons
           name,
           phone: contact,
           profileImage: profileImage || null,
-          isRegistrationComplete: true,
-          role: req.user.role?.toUpperCase() as any || 'CUSTOMER'
+          isRegistrationComplete: true
         },
         create: {
           supabaseUserId: req.user.id,
-          email: req.user.email || '',
           name,
           phone: contact,
           profileImage: profileImage || null,
-          isRegistrationComplete: true,
-          role: req.user.role?.toUpperCase() as any || 'CUSTOMER'
+          isRegistrationComplete: true
         }
       });
 

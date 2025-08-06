@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AppointmentController } from './appointments.controller';
+import { authenticateSupabaseToken, requireServiceAdvisor } from '../auth/supabase/authSupabase.middleware';
 import {
   validateCreateAppointment,
   validateUpdateAppointment,
@@ -9,24 +10,31 @@ import {
   validateUpdateCannedService,
   validateShopOperatingHours,
   validateShopCapacitySettings,
+  validateTimeBlockAvailability,
 } from './appointments.validation';
 
 const router = Router();
 const appointmentController = new AppointmentController();
 
 // Appointment Management Routes
-router.post('/appointments', validateCreateAppointment, appointmentController.createAppointment.bind(appointmentController));
-router.get('/appointments', appointmentController.getAppointments.bind(appointmentController));
-router.get('/appointments/:id', appointmentController.getAppointmentById.bind(appointmentController));
-router.put('/appointments/:id', validateUpdateAppointment, appointmentController.updateAppointment.bind(appointmentController));
-router.delete('/appointments/:id', appointmentController.deleteAppointment.bind(appointmentController));
+router.post('/', validateCreateAppointment, appointmentController.createAppointment.bind(appointmentController));
+router.get('/', appointmentController.getAppointments.bind(appointmentController));
+router.get('/:id', appointmentController.getAppointmentById.bind(appointmentController));
+router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, validateUpdateAppointment, appointmentController.updateAppointment.bind(appointmentController));
+router.delete('/:id', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.deleteAppointment.bind(appointmentController));
 
 // Available Slots Routes
-router.get('/appointments/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));
+router.get('/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));
+
+// New: Time Block Availability Routes
+router.get('/slots/timeblock', validateTimeBlockAvailability, appointmentController.checkTimeBlockAvailability.bind(appointmentController));
+
+// New: Daily Capacity Routes
+router.get('/capacity/daily', appointmentController.checkDailyCapacity.bind(appointmentController));
 
 // Unassigned Appointments Routes
-router.get('/appointments/unassigned', appointmentController.getUnassignedAppointments.bind(appointmentController));
-router.post('/appointments/:id/assign', validateAssignAppointment, appointmentController.assignAppointment.bind(appointmentController));
+router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
+router.post('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, validateAssignAppointment, appointmentController.assignAppointment.bind(appointmentController));
 
 // Canned Service Management Routes
 router.post('/canned-services', validateCreateCannedService, appointmentController.createCannedService.bind(appointmentController));

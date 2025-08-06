@@ -8,14 +8,23 @@ import {
   ShopCapacitySettingsRequest,
   CannedServiceRequest,
   AppointmentWithServices,
+  TimeBlockAvailabilityRequest,
+  TimeBlockAvailability,
+  DailyCapacityRequest,
+  DailyCapacity,
 } from './appointments.types';
 
 const prisma = new PrismaClient();
 
 export class AppointmentService {
-  // Create a new appointment
+  // Create a new appointment with ShopMonkey-style booking logic
   async createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices> {
     const { cannedServiceIds, quantities = [], prices = [], serviceNotes = [], ...appointmentData } = data;
+
+    // Convert string dates to Date objects
+    const startTime = new Date(appointmentData.startTime);
+    const endTime = appointmentData.endTime ? new Date(appointmentData.endTime) : undefined;
+    const requestedAt = new Date(appointmentData.requestedAt);
 
     // Validate that all canned services exist and are available
     const cannedServices = await prisma.cannedService.findMany({
@@ -29,10 +38,63 @@ export class AppointmentService {
       throw new Error('One or more selected services are not available');
     }
 
-    // Create appointment with services
+    // ShopMonkey Booking Logic: Check daily limit first
+    const appointmentDate = new Date(startTime);
+    appointmentDate.setHours(0, 0, 0, 0);
+    
+    const dailyBookings = await prisma.appointment.count({
+      where: {
+        startTime: {
+          gte: appointmentDate,
+          lt: new Date(appointmentDate.getTime() + 24 * 60 * 60 * 1000), // Next day
+        },
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+      },
+    });
+
+    // Get shop capacity settings
+    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+      where: { id: 'default' },
+    });
+
+    if (!capacitySettings) {
+      throw new Error('Shop capacity settings not configured');
+    }
+
+    // Check daily limit (ShopMonkey rule: max 6 appointments per day)
+    if (dailyBookings >= capacitySettings.appointmentsPerDay) {
+      throw new Error(`Daily appointment limit reached (${capacitySettings.appointmentsPerDay} appointments). Please select a different date.`);
+    }
+
+    // Check time block capacity (ShopMonkey rule: max 2 appointments per 30-min block)
+    const timeBlockStart = this.getTimeBlockStart(startTime, capacitySettings.timeBlockIntervalMinutes);
+    const timeBlockEnd = new Date(timeBlockStart.getTime() + capacitySettings.timeBlockIntervalMinutes * 60 * 1000);
+
+    const timeBlockBookings = await prisma.appointment.count({
+      where: {
+        startTime: {
+          gte: timeBlockStart,
+          lt: timeBlockEnd,
+        },
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+      },
+    });
+
+    if (timeBlockBookings >= capacitySettings.appointmentsPerTimeBlock) {
+      throw new Error(`Time block is full (${capacitySettings.appointmentsPerTimeBlock} appointments per ${capacitySettings.timeBlockIntervalMinutes}-minute block). Please select a different time.`);
+    }
+
+    // Create appointment with services (ShopMonkey: duration ignored during booking)
     const appointment = await prisma.appointment.create({
       data: {
-        ...appointmentData,
+        customerId: appointmentData.customerId,
+        vehicleId: appointmentData.vehicleId,
+        requestedAt: requestedAt,
+        startTime: startTime,
+        endTime: endTime,
+        priority: appointmentData.priority || 'NORMAL',
+        notes: appointmentData.notes,
+        status: AppointmentStatus.PENDING, // All appointments start as unassigned
         cannedServices: {
           create: cannedServiceIds.map((serviceId, index) => ({
             cannedServiceId: serviceId,
@@ -57,7 +119,7 @@ export class AppointmentService {
     return this.formatAppointmentWithServices(appointment);
   }
 
-  // Get available appointment slots for a given date and services
+  // Get available appointment slots (ShopMonkey-style: simplified time blocks)
   async getAvailableSlots(request: AppointmentSlotRequest): Promise<AvailableSlot[]> {
     const { date, serviceIds } = request;
 
@@ -80,15 +142,7 @@ export class AppointmentService {
       return []; // Shop is closed on this day
     }
 
-    // Calculate total duration needed for the services
-    const services = await prisma.cannedService.findMany({
-      where: { id: { in: serviceIds } },
-    });
-
-    const totalDurationMinutes = services.reduce((sum, service) => sum + service.duration, 0);
-    const totalDurationHours = Math.ceil(totalDurationMinutes / 60); // Round up to nearest hour
-
-    // Generate time slots
+    // ShopMonkey Logic: Generate 30-minute time blocks regardless of service duration
     const slots: AvailableSlot[] = [];
     const startTime = this.parseTimeString(operatingHours.openTime!);
     const endTime = this.parseTimeString(operatingHours.closeTime!);
@@ -99,14 +153,16 @@ export class AppointmentService {
 
     while (currentTime < endTime) {
       const slotEndTime = new Date(currentTime);
-      slotEndTime.setHours(currentTime.getHours() + totalDurationHours);
+      slotEndTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
 
       if (slotEndTime <= endTime) {
-        // Check existing appointments in this time slot
+        // Check existing appointments in this time block
         const existingAppointments = await prisma.appointment.count({
           where: {
-            startTime: { gte: currentTime },
-            endTime: { lte: slotEndTime },
+            startTime: {
+              gte: currentTime,
+              lt: slotEndTime,
+            },
             status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
           },
         });
@@ -123,11 +179,145 @@ export class AppointmentService {
         }
       }
 
-      // Move to next time slot
+      // Move to next time block
       currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
     }
 
     return slots;
+  }
+
+  // New method: Check time block availability
+  async checkTimeBlockAvailability(request: TimeBlockAvailabilityRequest): Promise<TimeBlockAvailability> {
+    const { date, timeBlock } = request;
+
+    // Get shop capacity settings
+    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+      where: { id: 'default' },
+    });
+
+    if (!capacitySettings) {
+      throw new Error('Shop capacity settings not configured');
+    }
+
+    // Parse time block and create proper date range
+    const [hours, minutes] = timeBlock.split(':').map(Number);
+    
+    // Create start of the day in local time
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    // Create time block start by adding hours and minutes
+    const timeBlockStart = new Date(dayStart.getTime() + (hours * 60 + minutes) * 60 * 1000);
+    const timeBlockEnd = new Date(timeBlockStart.getTime() + capacitySettings.timeBlockIntervalMinutes * 60 * 1000);
+
+    // Count existing bookings in this time block
+    const currentBookings = await prisma.appointment.count({
+      where: {
+        startTime: {
+          gte: timeBlockStart,
+          lt: timeBlockEnd,
+        },
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+      },
+    });
+
+    const isAvailable = currentBookings < capacitySettings.appointmentsPerTimeBlock;
+
+    // Suggest alternative time blocks if not available
+    let suggestedAlternatives: string[] = [];
+    if (!isAvailable) {
+      suggestedAlternatives = await this.getSuggestedTimeBlocks(date, timeBlock, capacitySettings);
+    }
+
+    return {
+      timeBlock,
+      isAvailable,
+      currentBookings,
+      maxCapacity: capacitySettings.appointmentsPerTimeBlock,
+      suggestedAlternatives,
+    };
+  }
+
+  // New method: Check daily capacity
+  async checkDailyCapacity(request: DailyCapacityRequest): Promise<DailyCapacity> {
+    const { date } = request;
+
+    // Get shop capacity settings
+    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+      where: { id: 'default' },
+    });
+
+    if (!capacitySettings) {
+      throw new Error('Shop capacity settings not configured');
+    }
+
+    // Count total bookings for the day
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const totalBookings = await prisma.appointment.count({
+      where: {
+        startTime: {
+          gte: dayStart,
+          lt: dayEnd,
+        },
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+      },
+    });
+
+    const isAvailable = totalBookings < capacitySettings.appointmentsPerDay;
+
+    // Get all time blocks for the day
+    const dayOfWeek = this.getDayOfWeek(date);
+    const operatingHours = await prisma.shopOperatingHours.findUnique({
+      where: { dayOfWeek },
+    });
+
+    const timeBlocks: TimeBlockAvailability[] = [];
+    
+    if (operatingHours && operatingHours.isOpen) {
+      const startTime = this.parseTimeString(operatingHours.openTime!);
+      const endTime = this.parseTimeString(operatingHours.closeTime!);
+      const intervalMinutes = capacitySettings.timeBlockIntervalMinutes;
+
+      let currentTime = new Date(date);
+      currentTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+
+      while (currentTime < endTime) {
+        const timeBlockEnd = new Date(currentTime.getTime() + intervalMinutes * 60 * 1000);
+        
+        if (timeBlockEnd <= endTime) {
+          const timeBlockBookings = await prisma.appointment.count({
+            where: {
+              startTime: {
+                gte: currentTime,
+                lt: timeBlockEnd,
+              },
+              status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+            },
+          });
+
+          timeBlocks.push({
+            timeBlock: `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`,
+            isAvailable: timeBlockBookings < capacitySettings.appointmentsPerTimeBlock,
+            currentBookings: timeBlockBookings,
+            maxCapacity: capacitySettings.appointmentsPerTimeBlock,
+          });
+        }
+
+        currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
+      }
+    }
+
+    return {
+      date,
+      totalBookings,
+      maxDailyBookings: capacitySettings.appointmentsPerDay,
+      isAvailable,
+      timeBlocks,
+    };
   }
 
   // Get all appointments with optional filters
@@ -349,6 +539,7 @@ export class AppointmentService {
         year: appointment.vehicle.year,
         licensePlate: appointment.vehicle.licensePlate,
       },
+
       assignedTo: appointment.assignedTo ? {
         id: appointment.assignedTo.id,
         supabaseUserId: appointment.assignedTo.supabaseUserId,
@@ -366,5 +557,63 @@ export class AppointmentService {
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
     return date;
+  }
+
+  // New helper method: Get time block start time
+  private getTimeBlockStart(dateTime: Date, intervalMinutes: number): Date {
+    const minutes = dateTime.getMinutes();
+    const adjustedMinutes = Math.floor(minutes / intervalMinutes) * intervalMinutes;
+    const timeBlockStart = new Date(dateTime);
+    timeBlockStart.setMinutes(adjustedMinutes, 0, 0);
+    return timeBlockStart;
+  }
+
+  // New helper method: Get suggested alternative time blocks
+  private async getSuggestedTimeBlocks(date: Date, requestedTimeBlock: string, capacitySettings: any): Promise<string[]> {
+    const dayOfWeek = this.getDayOfWeek(date);
+    const operatingHours = await prisma.shopOperatingHours.findUnique({
+      where: { dayOfWeek },
+    });
+
+    if (!operatingHours || !operatingHours.isOpen) {
+      return [];
+    }
+
+    const startTime = this.parseTimeString(operatingHours.openTime!);
+    const endTime = this.parseTimeString(operatingHours.closeTime!);
+    const intervalMinutes = capacitySettings.timeBlockIntervalMinutes;
+
+    let currentTime = new Date(date);
+    currentTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+
+    const suggestions: string[] = [];
+    const maxSuggestions = 5;
+
+    while (currentTime < endTime && suggestions.length < maxSuggestions) {
+      const timeBlockEnd = new Date(currentTime.getTime() + intervalMinutes * 60 * 1000);
+      
+      if (timeBlockEnd <= endTime) {
+        const timeBlockBookings = await prisma.appointment.count({
+          where: {
+            startTime: {
+              gte: currentTime,
+              lt: timeBlockEnd,
+            },
+            status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+          },
+        });
+
+        if (timeBlockBookings < capacitySettings.appointmentsPerTimeBlock) {
+          const timeBlockString = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`;
+          if (timeBlockString !== requestedTimeBlock) {
+            suggestions.push(timeBlockString);
+          }
+        }
+      }
+
+      currentTime.setMinutes(currentTime.getMinutes() + intervalMinutes);
+    }
+
+    return suggestions;
   }
 } 
