@@ -91,7 +91,7 @@ model WorkOrder {
   vehicleId       String
 
   appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
-  appointmentId   String?
+  appointmentId   String?        @unique
 
   serviceAdvisor  StaffMember?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
   advisorId       String?
@@ -126,6 +126,7 @@ model WorkOrder {
   qcChecks        WorkOrderQC[]
   attachments     WorkOrderAttachment[]
   payments        Payment[]
+  estimates       WorkOrderEstimate[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -197,6 +198,9 @@ model InventoryItem {
   unitPrice   Decimal       
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  
+  // Relations
+  workOrderParts WorkOrderPart[]
 }
 
 enum UserRole {
@@ -400,6 +404,7 @@ model WorkOrderEstimate {
   
   // Relations
   estimateItems WorkOrderEstimateItem[]
+  approvals     WorkOrderApproval[]
 }
 
 model WorkOrderEstimateItem {
