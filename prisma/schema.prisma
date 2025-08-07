@@ -146,6 +146,24 @@ model CannedService {
   appointmentServices AppointmentCannedService[]
 }
 
+// Individual billable labor operations that technicians perform
+// Examples: "Cooling System Pressure Test" (0.7 hrs), "Fuel Injector Test" (1.2 hrs)
+model LaborCatalog {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  name        String
+  description String?
+  estimatedHours Decimal     @db.Decimal(5,2) // Estimated hours (e.g., 0.7, 1.2, 2.5)
+  hourlyRate  Decimal        @db.Decimal(10,2) // Standard hourly rate for this operation
+  category    String?        // e.g., "Engine", "Brakes", "Electrical", "Diagnostic"
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  labourItems WorkOrderLabour[]
+}
+
 // Shop Operating Hours and Capacity Planning
 model ShopOperatingHours {
   id          String    @id @default(cuid())
@@ -465,6 +483,8 @@ model WorkOrderLabour {
   workOrderId      String
   cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
   cannedServiceId  String?         // Optional - for catalog-based labour
+  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
+  laborCatalogId   String?         // Optional - for catalog-based labour operations
   description      String          // Description of the labour performed (manual or from catalog)
   hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
   rate             Decimal         @db.Decimal(10,2) // Hourly rate

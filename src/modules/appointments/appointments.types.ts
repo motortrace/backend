@@ -4,7 +4,7 @@ export interface CreateAppointmentRequest {
   customerId: string;
   vehicleId: string;
   requestedAt: Date;
-  startTime: Date; // Now required for time block booking
+  startTime: Date; 
   endTime?: Date;
   notes?: string;
   priority?: AppointmentPriority;
@@ -35,10 +35,10 @@ export interface AppointmentSlotRequest {
   serviceIds: string[];
 }
 
-// New interface for time block availability
+
 export interface TimeBlockAvailabilityRequest {
   date: Date;
-  timeBlock: string; // Format: "08:00", "08:30", etc.
+  timeBlock: string;
 }
 
 export interface TimeBlockAvailability {
