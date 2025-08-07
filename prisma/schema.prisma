@@ -126,6 +126,7 @@ model WorkOrder {
   attachments     WorkOrderAttachment[]
   payments        Payment[]
   estimates       WorkOrderEstimate[]
+  services        WorkOrderService[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -144,6 +145,7 @@ model CannedService {
   partsUsed    WorkOrderPart[]
   labourItems  WorkOrderLabour[]
   appointmentServices AppointmentCannedService[]
+  services     WorkOrderService[]
 }
 
 // Individual billable labor operations that technicians perform
@@ -620,4 +622,26 @@ enum PaymentStatus {
   REFUNDED
   PARTIAL_REFUND
   CANCELLED
+}
+
+enum ServiceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model WorkOrderService {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  cannedService    CannedService @relation(fields: [cannedServiceId], references: [id])
+  cannedServiceId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2)
+  subtotal         Decimal       @db.Decimal(10,2)
+  status           ServiceStatus @default(PENDING)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
