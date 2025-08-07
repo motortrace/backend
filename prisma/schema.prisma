@@ -211,8 +211,19 @@ model InventoryItem {
   id          String        @id @default(cuid())
   name        String
   sku         String?       @unique
+  partNumber     String?    @unique
+  manufacturer   String?
+  category       String?    // "Engine", "Brake", "Electrical"
+  location       String?    // Shelf location
   quantity    Int           @default(0)
+  minStockLevel  Int?       @default(0)
+  maxStockLevel  Int?       @default(0)
+  reorderPoint   Int?       @default(0)
   unitPrice   Decimal       
+  supplier       String?
+  supplierPartNumber String?
+  core           Boolean    @default(false) // Core charge applicable
+  corePrice      Decimal?   @db.Decimal(10,2)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   
