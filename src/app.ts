@@ -8,6 +8,7 @@ import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import laborRoutes from './modules/labor/labor.routes';
+import inventoryRoutes from './modules/inventory/inventory.routes';
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/auth', authSupabaseRoutes);
 app.use('/users', usersRoutes); 
 app.use('/appointments', appointmentsRoutes);
 app.use('/labor', laborRoutes);
+app.use('/inventory', inventoryRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
