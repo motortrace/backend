@@ -23,7 +23,7 @@ export interface CreateInventoryItemRequest {
   sku?: string;
   partNumber?: string;
   manufacturer?: string;
-  category?: string;
+  categoryId?: string;
   location?: string;
   quantity: number;
   minStockLevel?: number;
@@ -41,7 +41,7 @@ export interface UpdateInventoryItemRequest {
   sku?: string;
   partNumber?: string;
   manufacturer?: string;
-  category?: string;
+  categoryId?: string;
   location?: string;
   quantity?: number;
   minStockLevel?: number;
@@ -91,11 +91,6 @@ export interface WorkOrderPartWithDetails extends WorkOrderPart {
     sku: string | null;
     partNumber: string | null;
   };
-  cannedService: {
-    id: string;
-    code: string;
-    name: string;
-  } | null;
   installedBy: {
     id: string;
     supabaseUserId: string;

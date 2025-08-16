@@ -9,6 +9,8 @@ import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import laborRoutes from './modules/labor/labor.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
+import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
+
 
 const app = express();
 
@@ -26,6 +28,7 @@ app.use('/users', usersRoutes);
 app.use('/appointments', appointmentsRoutes);
 app.use('/labor', laborRoutes);
 app.use('/inventory', inventoryRoutes);
+app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

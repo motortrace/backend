@@ -1,4 +1,4 @@
-import { PrismaClient, InventoryItem, WorkOrderPart, InventoryCategory } from '@prisma/client';
+import { PrismaClient, InventoryItem, WorkOrderPart } from '@prisma/client';
 import {
   CreateInventoryItemRequest,
   UpdateInventoryItemRequest,
@@ -20,7 +20,7 @@ const prisma = new PrismaClient();
 
 export class InventoryService {
   // InventoryCategory Methods
-  async createInventoryCategory(data: CreateInventoryCategoryRequest): Promise<InventoryCategory> {
+  async createInventoryCategory(data: CreateInventoryCategoryRequest) {
     return await prisma.inventoryCategory.create({
       data: {
         name: data.name,
@@ -58,7 +58,7 @@ export class InventoryService {
     });
   }
 
-  async updateInventoryCategory(id: string, data: UpdateInventoryCategoryRequest): Promise<InventoryCategory> {
+  async updateInventoryCategory(id: string, data: UpdateInventoryCategoryRequest) {
     return await prisma.inventoryCategory.update({
       where: { id },
       data: {
@@ -100,13 +100,13 @@ export class InventoryService {
   }
 
   async createInventoryItem(data: CreateInventoryItemRequest): Promise<InventoryItem> {
-    return await prisma.inventoryItem.create({
+    return await (prisma as any).inventoryItem.create({
       data: {
         name: data.name,
         sku: data.sku,
         partNumber: data.partNumber,
         manufacturer: data.manufacturer,
-        category: data.category,
+        categoryId: data.categoryId,
         location: data.location,
         quantity: data.quantity,
         minStockLevel: data.minStockLevel,
@@ -145,7 +145,7 @@ export class InventoryService {
     const where: any = {};
     
     if (filter.category) {
-      where.category = filter.category;
+      where.categoryId = filter.category;
     }
     
     if (filter.manufacturer) {
@@ -330,7 +330,7 @@ export class InventoryService {
         where: { quantity: 0 },
       }),
       prisma.inventoryItem.groupBy({
-        by: ['category'],
+        by: ['categoryId'],
         _count: {
           id: true,
         },
@@ -338,15 +338,15 @@ export class InventoryService {
           quantity: true,
         },
         where: {
-          category: { not: null },
+          categoryId: { not: null } as any,
         },
       }),
     ]);
 
     const categories = categoryStats.map((stat) => ({
-      category: stat.category!,
-      count: stat._count.id,
-      value: Number(stat._sum.quantity) || 0,
+      category: stat.categoryId!,
+      count: stat._count?.id || 0,
+      value: Number(stat._sum?.quantity) || 0,
     }));
 
     return {
@@ -529,13 +529,6 @@ export class InventoryService {
             partNumber: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         installedBy: {
           select: {
             id: true,
@@ -544,7 +537,7 @@ export class InventoryService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    });
+    }) as WorkOrderPartWithDetails[];
   }
 
   async bulkUpdateInventory(items: Array<{ id: string; quantity?: number; unitPrice?: number; location?: string; minStockLevel?: number; maxStockLevel?: number; reorderPoint?: number }>): Promise<InventoryItem[]> {
@@ -566,13 +559,12 @@ export class InventoryService {
   }
 
   async getCategories(): Promise<string[]> {
-    const categories = await prisma.inventoryItem.findMany({
-      select: { category: true },
-      where: { category: { not: null } },
-      distinct: ['category'],
+    const categories = await prisma.inventoryCategory.findMany({
+      select: { name: true },
+      orderBy: { name: 'asc' },
     });
 
-    return categories.map((c) => c.category!);
+    return categories.map((c) => c.name);
   }
 
   async getManufacturers(): Promise<string[]> {
