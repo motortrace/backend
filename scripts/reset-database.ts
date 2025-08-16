@@ -9,7 +9,6 @@ async function resetDatabase() {
     // Step 1: Drop all tables (in correct order to avoid foreign key constraints)
     console.log('📋 Dropping all tables...');
     
-    await prisma.$executeRaw`DROP TABLE IF EXISTS "ServiceItem" CASCADE`;
     await prisma.$executeRaw`DROP TABLE IF EXISTS "ServiceCatalog" CASCADE`;
     await prisma.$executeRaw`DROP TABLE IF EXISTS "WorkOrder" CASCADE`;
     await prisma.$executeRaw`DROP TABLE IF EXISTS "Vehicle" CASCADE`;

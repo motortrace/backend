@@ -117,7 +117,6 @@ model WorkOrder {
   paidAmount      Decimal?       @db.Decimal(10,2) @default(0)
 
   // Relations to be defined
-  serviceItems    ServiceItem[]
   inspections     WorkOrderInspection[]
   labourItems     WorkOrderLabour[]
   partsUsed       WorkOrderPart[]
@@ -141,11 +140,39 @@ model CannedService {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  serviceItems ServiceItem[]
-  partsUsed    WorkOrderPart[]
-  labourItems  WorkOrderLabour[]
+  // Relations to actual work orders
   appointmentServices AppointmentCannedService[]
   services     WorkOrderService[]
+  
+  // Junction table relationships
+  laborOperations CannedServiceLabor[]
+  partsCategories CannedServicePartsCategory[]
+}
+
+// Junction table for CannedService to LaborCatalog (many-to-many)
+model CannedServiceLabor {
+  id             String        @id @default(cuid())
+  cannedService  CannedService @relation(fields: [cannedServiceId], references: [id], onDelete: Cascade)
+  cannedServiceId String
+  laborCatalog   LaborCatalog  @relation(fields: [laborCatalogId], references: [id], onDelete: Cascade)
+  laborCatalogId String
+  sequence       Int           @default(1) // Order of operations
+  notes          String?       // Additional notes for this labor operation
+  
+  @@unique([cannedServiceId, laborCatalogId])
+}
+
+// Junction table for CannedService to InventoryCategory (many-to-many)
+model CannedServicePartsCategory {
+  id             String        @id @default(cuid())
+  cannedService  CannedService @relation(fields: [cannedServiceId], references: [id], onDelete: Cascade)
+  cannedServiceId String
+  category       InventoryCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId     String
+  isRequired     Boolean       @default(true) // Whether this category is required or optional
+  notes          String?       // Additional notes for this parts category
+  
+  @@unique([cannedServiceId, categoryId])
 }
 
 // Individual billable labor operations that technicians perform
@@ -164,6 +191,7 @@ model LaborCatalog {
 
   // Relations
   labourItems WorkOrderLabour[]
+  cannedServices CannedServiceLabor[] // Services that use this labor operation
 }
 
 // Shop Operating Hours and Capacity Planning
@@ -198,24 +226,12 @@ enum DayOfWeek {
   SATURDAY
 }
 
-model ServiceItem {
-  id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?
-  description      String
-  cost             Decimal         
-  createdAt        DateTime        @default(now())
-}
-
 model InventoryItem {
   id          String        @id @default(cuid())
   name        String
   sku         String?       @unique
   partNumber     String?    @unique
   manufacturer   String?
-  category       String?    // "Engine", "Brake", "Electrical"
   location       String?    // Shelf location
   quantity    Int           @default(0)
   minStockLevel  Int?       @default(0)
@@ -228,6 +244,9 @@ model InventoryItem {
   corePrice      Decimal?   @db.Decimal(10,2)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  category InventoryCategory @relation(fields: [categoryId], references: [id])
+  categoryId   String
   
   // Relations
   workOrderParts WorkOrderPart[]
@@ -494,8 +513,6 @@ model WorkOrderLabour {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId      String
-  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?         // Optional - for catalog-based labour
   laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
   laborCatalogId   String?         // Optional - for catalog-based labour operations
   description      String          // Description of the labour performed (manual or from catalog)
@@ -517,8 +534,6 @@ model WorkOrderPart {
   workOrderId      String
   part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
   inventoryItemId  String
-  cannedService    CannedService? @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?
   quantity         Int           @default(1)
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
@@ -637,6 +652,7 @@ model WorkOrderService {
   workOrderId      String
   cannedService    CannedService @relation(fields: [cannedServiceId], references: [id])
   cannedServiceId  String
+  description      String?       // Custom description (overrides canned service description if needed)
   quantity         Int           @default(1)
   unitPrice        Decimal       @db.Decimal(10,2)
   subtotal         Decimal       @db.Decimal(10,2)
@@ -644,4 +660,14 @@ model WorkOrderService {
   notes            String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+}
+
+
+model InventoryCategory {
+  id String @id @default(cuid())
+  name String @unique
+  
+  // Relations
+  inventoryItems InventoryItem[]
+  cannedServices CannedServicePartsCategory[] // Services that use parts from this category
 }

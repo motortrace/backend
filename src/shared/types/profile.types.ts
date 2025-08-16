@@ -1,7 +1,8 @@
 import { UserRole } from './auth.types';
+import { InventoryItem } from '@prisma/client';
 
-// UserProfile - stores additional profile data only
-// Identity data (email, role) is managed by Supabase Auth
+// User Profile - extends Supabase auth.users
+// Only stores additional profile data, not identity data
 export interface UserProfile {
   id: string;
   supabaseUserId: string;  // Links to auth.users.id (UUID)
@@ -72,7 +73,7 @@ export interface WorkOrder {
   vehicle?: Vehicle;
   customer?: Customer;
   technician?: StaffMember;
-  serviceItems?: ServiceItem[];
+  services?: WorkOrderService[];
 }
 
 export enum WorkOrderStatus {
@@ -82,32 +83,101 @@ export enum WorkOrderStatus {
   CANCELLED = 'CANCELLED'
 }
 
-// ServiceItem - individual service performed
-export interface ServiceItem {
+// WorkOrderService - individual service performed with better tracking
+export interface WorkOrderService {
   id: string;
   workOrderId: string;
-  serviceCatalogId?: string;
-  description: string;
-  cost: number;
-  createdAt: Date;
-  
-  // Relations
-  workOrder?: WorkOrder;
-  serviceCatalog?: ServiceCatalog;
-}
-
-// ServiceCatalog - predefined services
-export interface ServiceCatalog {
-  id: string;
-  code: string;
-  name: string;
+  cannedServiceId: string;
   description?: string;
-  standardCost: number;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  status: ServiceStatus;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
   
   // Relations
-  serviceItems?: ServiceItem[];
+  workOrder?: WorkOrder;
+  cannedService?: CannedService;
+}
+
+export enum ServiceStatus {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+
+// CannedService - predefined services (renamed from ServiceCatalog)
+export interface CannedService {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  duration: number;
+  price: number;
+  isAvailable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Relations
+  laborOperations?: CannedServiceLabor[];
+  partsCategories?: CannedServicePartsCategory[];
+  services?: WorkOrderService[];
+}
+
+// Junction table for CannedService to LaborCatalog
+export interface CannedServiceLabor {
+  id: string;
+  cannedServiceId: string;
+  laborCatalogId: string;
+  sequence: number;
+  notes?: string;
+  
+  // Relations
+  cannedService?: CannedService;
+  laborCatalog?: LaborCatalog;
+}
+
+// Junction table for CannedService to InventoryCategory
+export interface CannedServicePartsCategory {
+  id: string;
+  cannedServiceId: string;
+  categoryId: string;
+  isRequired: boolean;
+  notes?: string;
+  
+  // Relations
+  cannedService?: CannedService;
+  category?: InventoryCategory;
+}
+
+// LaborCatalog - blueprint labor operations
+export interface LaborCatalog {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  estimatedHours: number;
+  hourlyRate: number;
+  category?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Relations
+  cannedServices?: CannedService[];
+}
+
+// InventoryCategory - parts categories
+export interface InventoryCategory {
+  id: string;
+  name: string;
+  
+  // Relations
+  inventoryItems?: InventoryItem[];
+  cannedServices?: CannedService[];
 }
 
 // Create/Update DTOs
