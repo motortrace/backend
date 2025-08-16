@@ -6,11 +6,110 @@ import {
   InventoryAdjustmentRequest,
   InventoryTransferRequest,
   InventoryFilter,
+  CreateInventoryCategoryRequest,
+  UpdateInventoryCategoryRequest,
 } from './inventory.types';
 
 const inventoryService = new InventoryService();
 
 export class InventoryController {
+  // InventoryCategory Methods
+  async createInventoryCategory(req: Request, res: Response) {
+    try {
+      const data: CreateInventoryCategoryRequest = req.body;
+      const category = await inventoryService.createInventoryCategory(data);
+      
+      res.status(201).json({
+        success: true,
+        data: category,
+        message: 'Inventory category created successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getInventoryCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const category = await inventoryService.getInventoryCategory(id);
+      
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          error: 'Inventory category not found',
+        });
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: category,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getInventoryCategories(req: Request, res: Response) {
+    try {
+      const categories = await inventoryService.getInventoryCategories();
+      
+      res.status(200).json({
+        success: true,
+        data: categories,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateInventoryCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const data: UpdateInventoryCategoryRequest = req.body;
+      
+      const category = await inventoryService.updateInventoryCategory(id, data);
+      
+      res.status(200).json({
+        success: true,
+        data: category,
+        message: 'Inventory category updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteInventoryCategory(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      
+      await inventoryService.deleteInventoryCategory(id);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Inventory category deleted successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async createInventoryItem(req: Request, res: Response) {
     try {
       const data: CreateInventoryItemRequest = req.body;

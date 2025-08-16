@@ -1,5 +1,14 @@
 import Joi from 'joi';
 
+// InventoryCategory Validation Schemas
+export const createInventoryCategorySchema = Joi.object({
+  name: Joi.string().required().min(1).max(100),
+});
+
+export const updateInventoryCategorySchema = Joi.object({
+  name: Joi.string().optional().min(1).max(100),
+});
+
 export const createInventoryItemSchema = Joi.object({
   name: Joi.string().required(),
   sku: Joi.string().optional(),
@@ -142,6 +151,29 @@ export const validateInventoryFilter = (req: any, res: any, next: any) => {
 
 export const validateBulkUpdate = (req: any, res: any, next: any) => {
   const { error } = bulkUpdateSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+// InventoryCategory Validation Functions
+export const validateCreateInventoryCategory = (req: any, res: any, next: any) => {
+  const { error } = createInventoryCategorySchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateUpdateInventoryCategory = (req: any, res: any, next: any) => {
+  const { error } = updateInventoryCategorySchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,

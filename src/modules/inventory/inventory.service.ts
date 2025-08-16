@@ -1,4 +1,4 @@
-import { PrismaClient, InventoryItem, WorkOrderPart } from '@prisma/client';
+import { PrismaClient, InventoryItem, WorkOrderPart, InventoryCategory } from '@prisma/client';
 import {
   CreateInventoryItemRequest,
   UpdateInventoryItemRequest,
@@ -11,11 +11,94 @@ import {
   InventoryReport,
   StockMovement,
   ReorderSuggestion,
+  CreateInventoryCategoryRequest,
+  UpdateInventoryCategoryRequest,
+  InventoryCategoryWithItems,
 } from './inventory.types';
 
 const prisma = new PrismaClient();
 
 export class InventoryService {
+  // InventoryCategory Methods
+  async createInventoryCategory(data: CreateInventoryCategoryRequest): Promise<InventoryCategory> {
+    return await prisma.inventoryCategory.create({
+      data: {
+        name: data.name,
+      },
+    });
+  }
+
+  async getInventoryCategory(id: string): Promise<InventoryCategoryWithItems | null> {
+    return await prisma.inventoryCategory.findUnique({
+      where: { id },
+      include: {
+        inventoryItems: true,
+        _count: {
+          select: {
+            inventoryItems: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getInventoryCategories(): Promise<InventoryCategoryWithItems[]> {
+    return await prisma.inventoryCategory.findMany({
+      include: {
+        inventoryItems: true,
+        _count: {
+          select: {
+            inventoryItems: true,
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+
+  async updateInventoryCategory(id: string, data: UpdateInventoryCategoryRequest): Promise<InventoryCategory> {
+    return await prisma.inventoryCategory.update({
+      where: { id },
+      data: {
+        name: data.name,
+      },
+    });
+  }
+
+  async deleteInventoryCategory(id: string): Promise<boolean> {
+    try {
+      // Check if category has any inventory items
+      const category = await prisma.inventoryCategory.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: {
+              inventoryItems: true,
+            },
+          },
+        },
+      });
+
+      if (!category) {
+        throw new Error('Inventory category not found');
+      }
+
+      if (category._count.inventoryItems > 0) {
+        throw new Error(`Cannot delete category that has ${category._count.inventoryItems} inventory items`);
+      }
+
+      await prisma.inventoryCategory.delete({
+        where: { id },
+      });
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async createInventoryItem(data: CreateInventoryItemRequest): Promise<InventoryItem> {
     return await prisma.inventoryItem.create({
       data: {

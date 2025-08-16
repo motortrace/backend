@@ -7,16 +7,25 @@ import {
   validateInventoryTransfer,
   validateInventoryFilter,
   validateBulkUpdate,
+  validateCreateInventoryCategory,
+  validateUpdateInventoryCategory,
 } from './inventory.validation';
 
 const router = Router();
 const inventoryController = new InventoryController();
 
+// InventoryCategory CRUD operations
+router.post('/categories', validateCreateInventoryCategory, inventoryController.createInventoryCategory.bind(inventoryController));
+router.get('/categories', inventoryController.getInventoryCategories.bind(inventoryController));
+router.get('/categories/:id', inventoryController.getInventoryCategory.bind(inventoryController));
+router.put('/categories/:id', validateUpdateInventoryCategory, inventoryController.updateInventoryCategory.bind(inventoryController));
+router.delete('/categories/:id', inventoryController.deleteInventoryCategory.bind(inventoryController));
+
 // Basic CRUD operations
 router.post('/', validateCreateInventoryItem, inventoryController.createInventoryItem.bind(inventoryController));
 router.get('/', validateInventoryFilter, inventoryController.getInventoryItems.bind(inventoryController));
 router.get('/summary', inventoryController.getInventorySummary.bind(inventoryController));
-router.get('/categories', inventoryController.getCategories.bind(inventoryController));
+router.get('/item-categories', inventoryController.getCategories.bind(inventoryController));
 router.get('/manufacturers', inventoryController.getManufacturers.bind(inventoryController));
 router.get('/suppliers', inventoryController.getSuppliers.bind(inventoryController));
 router.get('/locations', inventoryController.getLocations.bind(inventoryController));

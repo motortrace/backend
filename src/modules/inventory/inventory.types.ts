@@ -1,5 +1,23 @@
 import { InventoryItem, WorkOrderPart } from '@prisma/client';
 
+// InventoryCategory Types
+export interface CreateInventoryCategoryRequest {
+  name: string;
+}
+
+export interface UpdateInventoryCategoryRequest {
+  name?: string;
+}
+
+export interface InventoryCategoryWithItems {
+  id: string;
+  name: string;
+  inventoryItems: InventoryItem[];
+  _count: {
+    inventoryItems: number;
+  };
+}
+
 export interface CreateInventoryItemRequest {
   name: string;
   sku?: string;
