@@ -116,6 +116,27 @@ model WorkOrder {
   totalAmount     Decimal?       @db.Decimal(10,2)
   paidAmount      Decimal?       @db.Decimal(10,2) @default(0)
 
+  openedAt        DateTime?
+  promisedAt      DateTime?
+  closedAt        DateTime?
+
+  workflowStep    WorkflowStep   @default(RECEIVED)
+  internalNotes   String?
+  customerNotes   String?
+
+  invoiceNumber   String?
+  finalizedAt     DateTime?
+  paymentStatus   PaymentStatus  @default(PENDING)
+
+  warrantyClaimNumber      String?
+  thirdPartyApprovalCode   String?
+
+  campaignId       String?
+  servicePackageId String?
+
+  customerSignature String?
+  customerFeedback  String?
+
   // Relations to be defined
   inspections     WorkOrderInspection[]
   labourItems     WorkOrderLabour[]
@@ -630,13 +651,22 @@ enum PaymentMethod {
   WARRANTY
 }
 
+enum WorkflowStep {
+  RECEIVED
+  INSPECTION
+  ESTIMATE
+  APPROVAL
+  REPAIR
+  QC
+  READY
+  CLOSED
+}
+
 enum PaymentStatus {
   PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-  PARTIAL_REFUND
-  CANCELLED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
 }
 
 enum ServiceStatus {
