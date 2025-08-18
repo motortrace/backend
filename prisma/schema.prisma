@@ -16,32 +16,87 @@ model UserProfile {
   name           String?
   phone          String?
   profileImage   String?
+  role           UserRole      @default(CUSTOMER)
   isRegistrationComplete Boolean @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   // Relations
   customer       Customer?
+  serviceAdvisor ServiceAdvisor?
+  technician     Technician?
+  inventoryManager InventoryManager?
+  manager        Manager?
+  admin          Admin?
 }
 
-model StaffMember {
+model ServiceAdvisor {
   id             String        @id @default(cuid())
-  supabaseUserId String        @unique @db.Uuid // Links to auth.users.id (FK constraint added via migration)
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
+  // Relations
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
-  inspections    WorkOrderInspection[] @relation("Inspections")
   createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
   approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
   approvals      WorkOrderApproval[] @relation("Approvals")
+  processedPayments Payment[] @relation("ProcessedPayments")
+}
+
+model Technician {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  specialization String?
+  certifications String[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  technicianWorkOrders WorkOrder[] @relation("TechnicianWorkOrders")
+  inspections    WorkOrderInspection[] @relation("Inspections")
   labourItems     WorkOrderLabour[] @relation("LabourWork")
   partInstallations WorkOrderPart[] @relation("PartInstallations")
   qcChecks       WorkOrderQC[] @relation("QCInspections")
+}
+
+model InventoryManager {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
   uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
-  processedPayments Payment[] @relation("ProcessedPayments")
+}
+
+model Manager {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Admin {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  permissions    String[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 // Customer table supports both app users and walk-ins
@@ -92,9 +147,9 @@ model WorkOrder {
   appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
   appointmentId   String?        @unique
 
-  serviceAdvisor  StaffMember?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
+  serviceAdvisor  ServiceAdvisor?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
   advisorId       String?
-  technician      StaffMember?   @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
+  technician      Technician?       @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
   technicianId    String?
 
   status          WorkOrderStatus
@@ -282,13 +337,7 @@ enum UserRole {
   TECHNICIAN
 }
 
-enum StaffRole {
-  ADMIN
-  MANAGER
-  SERVICE_ADVISOR
-  INVENTORY_MANAGER
-  TECHNICIAN
-}
+
 
 enum WorkOrderStatus {
   PENDING
@@ -345,7 +394,7 @@ model Appointment {
 
   // Relations
   workOrder    WorkOrder?
-  assignedTo   StaffMember?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
+  assignedTo   ServiceAdvisor?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
   assignedToId String?
   
   // Link to CannedServices (many-to-many relationship)
@@ -387,7 +436,7 @@ model WorkOrderInspection {
   id           String     @id @default(cuid())
   workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  inspector    StaffMember @relation("Inspections", fields: [inspectorId], references: [id])
+  inspector    Technician @relation("Inspections", fields: [inspectorId], references: [id])
   inspectorId  String
   date         DateTime   @default(now())
   notes        String?
@@ -462,12 +511,12 @@ model WorkOrderEstimate {
   taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
   discountAmount Decimal? @db.Decimal(10,2) // Any discounts
   notes        String?   // Additional notes about the estimate
-  createdBy    StaffMember? @relation("CreatedEstimates", fields: [createdById], references: [id])
+  createdBy    ServiceAdvisor? @relation("CreatedEstimates", fields: [createdById], references: [id])
   createdById  String?
   createdAt    DateTime  @default(now())
   approved     Boolean   @default(false)
   approvedAt   DateTime?
-  approvedBy   StaffMember? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
+  approvedBy   ServiceAdvisor? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
   approvedById String?
   
   // Relations
@@ -504,7 +553,7 @@ model WorkOrderApproval {
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
-  approvedBy   StaffMember? @relation("Approvals", fields: [approvedById], references: [id])
+  approvedBy   ServiceAdvisor? @relation("Approvals", fields: [approvedById], references: [id])
   approvedById String?
   method       ApprovalMethod?
   notes        String?      // Notes from the approval process
@@ -539,7 +588,7 @@ model WorkOrderLabour {
   description      String          // Description of the labour performed (manual or from catalog)
   hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
   rate             Decimal         @db.Decimal(10,2) // Hourly rate
-  technician       StaffMember?    @relation("LabourWork", fields: [technicianId], references: [id])
+  technician       Technician?    @relation("LabourWork", fields: [technicianId], references: [id])
   technicianId     String?
   subtotal         Decimal         @db.Decimal(10,2) // hours * rate
   startTime        DateTime?       // When the work started
@@ -564,7 +613,7 @@ model WorkOrderPart {
   warrantyInfo     String?       // Warranty information for the part
   notes            String?       // Additional notes about the part usage
   installedAt      DateTime?     // When the part was installed
-  installedBy      StaffMember?  @relation("PartInstallations", fields: [installedById], references: [id])
+  installedBy      Technician?  @relation("PartInstallations", fields: [installedById], references: [id])
   installedById    String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -584,7 +633,7 @@ model WorkOrderQC {
   workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
   workOrderId  String
   passed       Boolean    // QC pass/fail status
-  inspector    StaffMember? @relation("QCInspections", fields: [inspectorId], references: [id])
+  inspector    Technician? @relation("QCInspections", fields: [inspectorId], references: [id])
   inspectorId  String?
   notes        String?    // QC notes and findings
   qcDate       DateTime   @default(now()) // When QC was performed
@@ -604,7 +653,7 @@ model WorkOrderAttachment {
   fileSize     Int?       // File size in bytes
   description  String?    // Description of what the attachment shows
   category     AttachmentCategory @default(GENERAL) // Category of attachment
-  uploadedBy   StaffMember? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
+  uploadedBy   InventoryManager? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
   uploadedById String?
   uploadedAt   DateTime   @default(now())
 }
@@ -630,7 +679,7 @@ model Payment {
   reference    String?    // Payment reference number
   status       PaymentStatus @default(PENDING)
   paidAt       DateTime   @default(now())
-  processedBy  StaffMember? @relation("ProcessedPayments", fields: [processedById], references: [id])
+  processedBy  ServiceAdvisor? @relation("ProcessedPayments", fields: [processedById], references: [id])
   processedById String?
   notes        String?    // Payment notes
   refundAmount Decimal?   @db.Decimal(10,2) // For partial refunds
@@ -667,6 +716,11 @@ enum PaymentStatus {
   PARTIALLY_PAID
   PAID
   OVERDUE
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIAL_REFUND
+  CANCELLED
 }
 
 enum ServiceStatus {

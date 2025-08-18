@@ -1,5 +1,16 @@
 import { LaborCatalog, WorkOrderLabour } from '@prisma/client';
 
+export interface CreateLaborRequest {
+  workOrderId: string;
+  description: string;
+  hours: number;
+  rate: number;
+  technicianId?: string;
+  startTime?: Date;
+  endTime?: Date;
+  notes?: string;
+}
+
 export interface CreateLaborCatalogRequest {
   code: string;
   name: string;
@@ -57,11 +68,6 @@ export interface WorkOrderLabourWithDetails extends WorkOrderLabour {
     workOrderNumber: string;
     status: string;
   };
-  cannedService: {
-    id: string;
-    code: string;
-    name: string;
-  } | null;
   laborCatalog: {
     id: string;
     code: string;
@@ -70,7 +76,7 @@ export interface WorkOrderLabourWithDetails extends WorkOrderLabour {
   } | null;
   technician: {
     id: string;
-    supabaseUserId: string;
+    userProfileId: string;
   } | null;
 }
 

@@ -7,6 +7,7 @@ import {
   UpdateWorkOrderLabourRequest,
   LaborCatalogFilter,
   WorkOrderLabourFilter,
+  CreateLaborRequest,
 } from './labor.types';
 
 export class LaborController {
@@ -14,6 +15,26 @@ export class LaborController {
 
   constructor() {
     this.laborService = new LaborService();
+  }
+
+  // Simple Labor Creation (following appointments pattern)
+  async createLabor(req: any, res: Response) {
+    try {
+      const laborData: CreateLaborRequest = req.body;
+
+      const labor = await this.laborService.createLabor(laborData);
+
+      res.status(201).json({
+        success: true,
+        data: labor,
+        message: 'Labor created successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
   }
 
   async createLaborCatalog(req: Request, res: Response) {

@@ -7,9 +7,10 @@ import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.
 import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
+import workOrdersRoutes from './modules/work-orders';
 import laborRoutes from './modules/labor/labor.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
-import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
+// import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 
 
 const app = express();
@@ -26,9 +27,10 @@ app.use(express.json());
 app.use('/auth', authSupabaseRoutes);
 app.use('/users', usersRoutes); 
 app.use('/appointments', appointmentsRoutes);
+app.use('/work-orders', workOrdersRoutes);
 app.use('/labor', laborRoutes);
 app.use('/inventory', inventoryRoutes);
-app.use('/canned-services', cannedServicesRoutes);
+// app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

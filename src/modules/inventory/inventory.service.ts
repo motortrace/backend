@@ -531,9 +531,12 @@ export class InventoryService {
         },
         installedBy: {
           select: {
-            id: true,
-            supabaseUserId: true,
-          },
+            userProfile: {
+              select: {
+                supabaseUserId: true,
+              }
+            }
+          }
         },
       },
       orderBy: { createdAt: 'desc' },

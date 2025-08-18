@@ -96,5 +96,5 @@ export const requireRole = (allowedRoles: string[]) => {
 export const requireAdmin = requireRole(['admin']);
 export const requireManager = requireRole(['admin', 'manager']);
 export const requireServiceAdvisor = requireRole(['admin', 'manager', 'service_advisor']);
-export const requireTechnician = requireRole(['admin', 'manager', 'technician']);
+export const requireTechnician = requireRole(['admin', 'manager', 'technician', 'service_advisor']);
 export const requireInventoryManager = requireRole(['admin', 'manager', 'inventory_manager']);
