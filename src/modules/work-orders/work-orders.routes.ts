@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { WorkOrderController } from './work-orders.controller';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
+import { validateAssignTechnicianToLabor } from './work-orders.validation';
 
 const router = Router();
 const workOrderController = new WorkOrderController();
@@ -24,6 +25,7 @@ router.put('/:workOrderId/estimates/:estimateId/approve', authenticateSupabaseTo
 // Work Order Labour Routes
 router.post('/:workOrderId/labour', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderLabour.bind(workOrderController));
 router.get('/:workOrderId/labour', workOrderController.getWorkOrderLabour.bind(workOrderController));
+router.put('/labour/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateAssignTechnicianToLabor, workOrderController.assignTechnicianToLabor.bind(workOrderController));
 
 // Work Order Parts Routes
 router.post('/:workOrderId/parts', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderPart.bind(workOrderController));

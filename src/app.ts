@@ -10,6 +10,7 @@ import appointmentsRoutes from './modules/appointments/appointments.routes';
 import workOrdersRoutes from './modules/work-orders';
 import laborRoutes from './modules/labor/labor.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
+import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
 // import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 
 
@@ -30,6 +31,7 @@ app.use('/appointments', appointmentsRoutes);
 app.use('/work-orders', workOrdersRoutes);
 app.use('/labor', laborRoutes);
 app.use('/inventory', inventoryRoutes);
+app.use('/inspection-templates', inspectionTemplatesRoutes);
 // app.use('/canned-services', cannedServicesRoutes);
 
 // Health check

@@ -59,7 +59,6 @@ model Technician {
   updatedAt      DateTime      @updatedAt
 
   // Relations
-  technicianWorkOrders WorkOrder[] @relation("TechnicianWorkOrders")
   inspections    WorkOrderInspection[] @relation("Inspections")
   labourItems     WorkOrderLabour[] @relation("LabourWork")
   partInstallations WorkOrderPart[] @relation("PartInstallations")
@@ -149,8 +148,6 @@ model WorkOrder {
 
   serviceAdvisor  ServiceAdvisor?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
   advisorId       String?
-  technician      Technician?       @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
-  technicianId    String?
 
   status          WorkOrderStatus
   jobType         JobType        @default(REPAIR)
@@ -432,14 +429,53 @@ enum AppointmentPriority {
 }
 
 // Inspection & Diagnostic Reports
+// Inspection Templates - Predefined inspection categories and items
+model InspectionTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Engine (Mechanical Condition)", "Cooling System", etc.
+  description String?  // Detailed description of what this template covers
+  category    String?  // "Mechanical", "Electrical", "Safety", etc.
+  isActive    Boolean  @default(true)
+  sortOrder   Int?     // Display order in UI
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  templateItems InspectionTemplateItem[]
+  workOrderInspections WorkOrderInspection[] // Which inspections used this template
+}
+
+model InspectionTemplateItem {
+  id               String             @id @default(cuid())
+  template         InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId       String
+  name             String             // "Oil in air cleaner", "Water in oil", "Coolant level"
+  description      String?            // More detailed description of what to check
+  category         String?            // Sub-category within the template
+  sortOrder        Int?               // Order within the template
+  isRequired       Boolean            @default(true) // Must this item be checked?
+  allowsNotes      Boolean            @default(true) // Can technician add notes?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // Relations
+  checklistResults InspectionChecklistItem[] // Actual inspection results using this template item
+
+  @@unique([templateId, name]) // Prevent duplicate items within same template
+}
+
+// Updated WorkOrderInspection to link to templates
 model WorkOrderInspection {
-  id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  id           String              @id @default(cuid())
+  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  inspector    Technician @relation("Inspections", fields: [inspectorId], references: [id])
+  inspector    Technician          @relation("Inspections", fields: [inspectorId], references: [id])
   inspectorId  String
-  date         DateTime   @default(now())
-  notes        String?
+  template     InspectionTemplate? @relation(fields: [templateId], references: [id]) // NEW: Link to template used
+  templateId   String?             // NEW: Template used for this inspection
+  date         DateTime            @default(now())
+  notes        String?             // Overall inspection summary
+  isCompleted  Boolean             @default(false) // NEW: Track completion status
   
   // Relations
   checklistItems InspectionChecklistItem[]
@@ -447,15 +483,24 @@ model WorkOrderInspection {
   attachments   WorkOrderInspectionAttachment[]
 }
 
+// Updated InspectionChecklistItem to reference template items
 model InspectionChecklistItem {
-  id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
-  inspectionId String
-  category     String     // e.g., "Engine", "Brakes", "Electrical", "Safety"
-  item         String     // e.g., "Oil Level", "Brake Pads", "Battery"
-  status       ChecklistStatus
-  notes        String?    // Additional notes for the item
-  createdAt    DateTime   @default(now())
+  id                    String                  @id @default(cuid())
+  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id])
+  inspectionId          String
+  templateItem          InspectionTemplateItem? @relation(fields: [templateItemId], references: [id]) // NEW: Link to template
+  templateItemId        String?                 // NEW: Template item this result is based on
+  
+  // Keep these for backwards compatibility and custom items
+  category              String?                 // e.g., "Engine", "Brakes" (from template or manual)
+  item                  String                  // e.g., "Oil Level" (from template or manual)
+  
+  status                ChecklistStatus         // GREEN, YELLOW, RED
+  notes                 String?                 // Technician's specific notes
+  requiresFollowUp      Boolean                 @default(false) // NEW: Does this need follow-up?
+  createdAt             DateTime                @default(now())
+
+  @@unique([inspectionId, templateItemId]) // Prevent duplicate results for same template item
 }
 
 enum ChecklistStatus {

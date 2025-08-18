@@ -22,7 +22,6 @@ export interface CreateWorkOrderRequest {
   vehicleId: string;
   appointmentId?: string;
   advisorId?: string;
-  technicianId?: string;
   status?: WorkOrderStatus;
   jobType?: JobType;
   priority?: JobPriority;
@@ -54,7 +53,6 @@ export interface UpdateWorkOrderRequest {
   internalNotes?: string;
   customerNotes?: string;
   advisorId?: string;
-  technicianId?: string;
   openedAt?: Date;
   closedAt?: Date;
   workflowStep?: WorkflowStep;
@@ -75,7 +73,6 @@ export interface WorkOrderFilters {
   customerId?: string;
   vehicleId?: string;
   advisorId?: string;
-  technicianId?: string;
   startDate?: Date;
   endDate?: Date;
   workflowStep?: WorkflowStep;
@@ -149,16 +146,6 @@ export interface WorkOrderWithDetails {
     id: string;
     employeeId?: string;
     department?: string;
-    userProfile: {
-      id: string;
-      name?: string;
-      phone?: string;
-    };
-  };
-  technician?: {
-    id: string;
-    employeeId?: string;
-    specialization?: string;
     userProfile: {
       id: string;
       name?: string;

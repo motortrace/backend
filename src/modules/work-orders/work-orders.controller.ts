@@ -44,7 +44,6 @@ export class WorkOrderController {
         customerId: req.query.customerId as string,
         vehicleId: req.query.vehicleId as string,
         advisorId: req.query.advisorId as string,
-        technicianId: req.query.technicianId as string,
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
         endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
         workflowStep: req.query.workflowStep as any,
@@ -219,6 +218,34 @@ export class WorkOrderController {
       res.json({
         success: true,
         data: labourItems,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Assign technician to labor entry
+  async assignTechnicianToLabor(req: Request, res: Response) {
+    try {
+      const { laborId } = req.params;
+      const { technicianId } = req.body;
+
+      if (!technicianId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Technician ID is required',
+        });
+      }
+
+      const updatedLabor = await this.workOrderService.assignTechnicianToLabor(laborId, technicianId);
+
+      res.json({
+        success: true,
+        data: updatedLabor,
+        message: 'Technician assigned to labor entry successfully',
       });
     } catch (error: any) {
       res.status(400).json({

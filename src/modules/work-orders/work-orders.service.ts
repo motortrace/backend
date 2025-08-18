@@ -20,7 +20,6 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     vehicle: { select: { id: true; make: true; model: true; year: true; licensePlate: true; vin: true } };
     appointment: { select: { id: true; requestedAt: true; startTime: true; endTime: true } };
     serviceAdvisor: { select: { id: true; employeeId: true; department: true; userProfile: { select: { id: true; name: true; phone: true } } } };
-    technician: { select: { id: true; employeeId: true; specialization: true; userProfile: { select: { id: true; name: true; phone: true } } } };
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
     inspections: { include: { inspector: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     labourItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedHours: true; hourlyRate: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
@@ -104,16 +103,7 @@ export class WorkOrderService {
       }
     }
 
-    // Validate technician if provided
-    if (workOrderData.technicianId) {
-      const technician = await prisma.technician.findUnique({
-        where: { id: workOrderData.technicianId },
-      });
 
-      if (!technician) {
-        throw new Error('Technician not found');
-      }
-    }
 
     // Create work order with services
     const workOrder = await prisma.workOrder.create({
@@ -123,7 +113,6 @@ export class WorkOrderService {
         vehicleId: workOrderData.vehicleId,
         appointmentId: workOrderData.appointmentId,
         advisorId: workOrderData.advisorId,
-        technicianId: workOrderData.technicianId,
         status: workOrderData.status || WorkOrderStatus.PENDING,
         jobType: workOrderData.jobType || JobType.REPAIR,
         priority: workOrderData.priority || JobPriority.NORMAL,
@@ -180,20 +169,6 @@ export class WorkOrderService {
             id: true,
             employeeId: true,
             department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            specialization: true,
             userProfile: {
               select: {
                 id: true,
@@ -360,7 +335,6 @@ export class WorkOrderService {
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.vehicleId) where.vehicleId = filters.vehicleId;
     if (filters.advisorId) where.advisorId = filters.advisorId;
-    if (filters.technicianId) where.technicianId = filters.technicianId;
     if (filters.workflowStep) where.workflowStep = filters.workflowStep;
     if (filters.paymentStatus) where.paymentStatus = filters.paymentStatus;
 
@@ -404,20 +378,6 @@ export class WorkOrderService {
             id: true,
             employeeId: true,
             department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            specialization: true,
             userProfile: {
               select: {
                 id: true,
@@ -621,20 +581,6 @@ export class WorkOrderService {
             },
           },
         },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            specialization: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
         services: {
           include: {
             cannedService: {
@@ -826,20 +772,6 @@ export class WorkOrderService {
             id: true,
             employeeId: true,
             department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            specialization: true,
             userProfile: {
               select: {
                 id: true,
@@ -1205,6 +1137,60 @@ export class WorkOrderService {
     return labourItems;
   }
 
+  // Assign technician to labor entry
+  async assignTechnicianToLabor(laborId: string, technicianId: string) {
+    // Validate the labor entry exists
+    const labor = await prisma.workOrderLabour.findUnique({
+      where: { id: laborId },
+    });
+
+    if (!labor) {
+      throw new Error(`Labor entry with ID '${laborId}' not found`);
+    }
+
+    // Validate the technician exists
+    const technician = await prisma.technician.findUnique({
+      where: { id: technicianId },
+    });
+
+    if (!technician) {
+      throw new Error(`Technician with ID '${technicianId}' not found`);
+    }
+
+    // Update the labor entry with the technician
+    const updatedLabor = await prisma.workOrderLabour.update({
+      where: { id: laborId },
+      data: {
+        technicianId,
+      },
+      include: {
+        laborCatalog: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            estimatedHours: true,
+            hourlyRate: true,
+          },
+        },
+        technician: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return updatedLabor;
+  }
+
   // Create work order part
   async createWorkOrderPart(data: CreateWorkOrderPartRequest) {
     const part = await prisma.workOrderPart.create({
@@ -1278,12 +1264,29 @@ export class WorkOrderService {
 
   // Create work order service
   async createWorkOrderService(data: CreateWorkOrderServiceRequest) {
+    // Validate the canned service exists
+    const cannedService = await prisma.cannedService.findUnique({
+      where: { id: data.cannedServiceId },
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: true,
+          },
+        },
+      },
+    });
+
+    if (!cannedService) {
+      throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
+    }
+
+    // Create the work order service
     const service = await prisma.workOrderService.create({
       data: {
         ...data,
         quantity: data.quantity || 1,
-        unitPrice: data.unitPrice || 0,
-        subtotal: (data.quantity || 1) * (data.unitPrice || 0),
+        unitPrice: data.unitPrice || Number(cannedService.price),
+        subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
       },
       include: {
         cannedService: {
@@ -1299,7 +1302,60 @@ export class WorkOrderService {
       },
     });
 
-    return service;
+    // Automatically create labor entries for this canned service
+    if (cannedService.laborOperations.length > 0) {
+      const laborEntries = await Promise.all(
+        cannedService.laborOperations.map(async (laborOp) => {
+          return await prisma.workOrderLabour.create({
+            data: {
+              workOrderId: data.workOrderId,
+              laborCatalogId: laborOp.laborCatalogId,
+              description: laborOp.laborCatalog.name,
+              hours: Number(laborOp.laborCatalog.estimatedHours),
+              rate: Number(laborOp.laborCatalog.hourlyRate),
+              subtotal: Number(laborOp.laborCatalog.estimatedHours) * Number(laborOp.laborCatalog.hourlyRate),
+              notes: laborOp.notes || `Auto-generated from canned service: ${cannedService.name}`,
+            },
+            include: {
+              laborCatalog: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  estimatedHours: true,
+                  hourlyRate: true,
+                },
+              },
+              technician: {
+                select: {
+                  id: true,
+                  employeeId: true,
+                  userProfile: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+        })
+      );
+
+      // Return both the service and the created labor entries
+      return {
+        service,
+        laborEntries,
+        message: `Created service and ${laborEntries.length} labor entries automatically`,
+      };
+    }
+
+    return {
+      service,
+      laborEntries: [],
+      message: 'Created service (no labor entries found for this canned service)',
+    };
   }
 
   // Get work order services
@@ -1568,7 +1624,6 @@ export class WorkOrderService {
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.vehicleId) where.vehicleId = filters.vehicleId;
     if (filters.advisorId) where.advisorId = filters.advisorId;
-    if (filters.technicianId) where.technicianId = filters.technicianId;
     if (filters.workflowStep) where.workflowStep = filters.workflowStep;
     if (filters.paymentStatus) where.paymentStatus = filters.paymentStatus;
 
@@ -1600,18 +1655,6 @@ export class WorkOrderService {
           },
         },
         serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        technician: {
           select: {
             id: true,
             employeeId: true,
