@@ -19,6 +19,7 @@ router.put('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, work
 
 // Work Order Estimates Routes
 router.post('/:workOrderId/estimates', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrderEstimate.bind(workOrderController));
+router.post('/:workOrderId/generate-estimate', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.generateEstimateFromLaborAndParts.bind(workOrderController));
 router.get('/:workOrderId/estimates', workOrderController.getWorkOrderEstimates.bind(workOrderController));
 router.put('/:workOrderId/estimates/:estimateId/approve', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.approveWorkOrderEstimate.bind(workOrderController));
 

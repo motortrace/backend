@@ -210,6 +210,55 @@ Creates a new estimate for a work order.
 - `discountAmount`: Discount amount
 - `notes`: Additional notes
 
+#### Generate Estimate from Labor and Parts
+```
+POST /api/work-orders/:workOrderId/generate-estimate
+```
+Automatically generates an estimate from existing labor and parts entries, and updates work order status to APPROVAL.
+
+**Features:**
+- Calculates totals from all recorded labor, parts, and services
+- Creates estimate items for each labor and part entry
+- Automatically approves the estimate
+- Updates work order status from ESTIMATE to APPROVAL
+- Updates work order totals (subtotalLabour, subtotalParts, totalAmount, taxAmount)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "estimate": {
+      "id": "est_123",
+      "version": 1,
+      "totalAmount": 1500.00,
+      "labourAmount": 800.00,
+      "partsAmount": 500.00,
+      "taxAmount": 150.00,
+      "approved": true,
+      "estimateItems": [...]
+    },
+    "workOrderUpdate": {
+      "status": "IN_PROGRESS",
+      "workflowStep": "APPROVAL",
+      "estimatedTotal": 1500.00,
+      "subtotalLabour": 800.00,
+      "subtotalParts": 500.00,
+      "totalAmount": 1500.00,
+      "taxAmount": 150.00
+    }
+  },
+  "message": "Estimate generated successfully and work order status updated to APPROVAL"
+}
+```
+
+**Example Usage:**
+```bash
+curl -X POST http://localhost:3000/api/work-orders/wo-123/generate-estimate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 #### Get Work Order Estimates
 ```
 GET /api/work-orders/:workOrderId/estimates
@@ -387,160 +436,4 @@ Creates a QC record for a work order.
 **Optional Fields:**
 - `inspectorId`: Inspector ID
 - `notes`: QC notes
-- `reworkRequired`: Whether rework is required
-- `reworkNotes`: Rework notes
-
-#### Get Work Order QC
-```
-GET /api/work-orders/:workOrderId/qc
-```
-Retrieves all QC records for a work order.
-
-### Statistics
-
-#### Get Work Order Statistics
-```
-GET /api/work-orders/statistics/overview
-```
-Retrieves work order statistics and metrics.
-
-**Query Parameters:**
-- `startDate`: Start date for statistics
-- `endDate`: End date for statistics
-
-### Search
-
-#### Search Work Orders
-```
-POST /api/work-orders/search
-```
-Searches work orders by various criteria.
-
-**Required Fields:**
-- `query`: Search query
-
-**Optional Fields:**
-- `filters`: Additional filters
-
-## Authentication and Authorization
-
-The work orders module uses role-based access control:
-
-- **Service Advisors**: Can create, update, and manage work orders, estimates, and payments
-- **Technicians**: Can record labour, parts, inspections, and QC
-- **Managers**: Can delete work orders and access statistics
-- **Inventory Managers**: Can upload attachments
-
-## Data Models
-
-The module uses the following Prisma models:
-
-- `WorkOrder`: Main work order entity
-- `WorkOrderEstimate`: Estimates with line items
-- `WorkOrderLabour`: Labour entries
-- `WorkOrderPart`: Parts used
-- `WorkOrderService`: Services performed
-- `Payment`: Payment records
-- `WorkOrderAttachment`: File attachments
-- `WorkOrderInspection`: Inspection records
-- `WorkOrderQC`: Quality control records
-
-## Error Handling
-
-The module provides comprehensive error handling:
-
-- Input validation using Joi schemas
-- Database constraint validation
-- Business rule validation
-- Proper HTTP status codes
-- Detailed error messages
-
-## Integration
-
-The work orders module integrates with:
-
-- **Appointments Module**: Links work orders to appointments
-- **Users Module**: Uses role-based authentication
-- **Inventory Module**: References inventory items
-- **Canned Services**: Links to predefined services
-
-## Usage Examples
-
-### Creating a Work Order
-
-```typescript
-const workOrderData = {
-  customerId: "customer-123",
-  vehicleId: "vehicle-456",
-  complaint: "Engine making strange noise",
-  jobType: "REPAIR",
-  priority: "HIGH",
-  source: "WALK_IN",
-  cannedServiceIds: ["service-1", "service-2"],
-  quantities: [1, 1],
-  prices: [150.00, 75.00],
-  serviceNotes: ["Diagnostic required", "Check engine light on"]
-};
-
-const response = await fetch('/api/work-orders', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(workOrderData)
-});
-```
-
-### Adding Labour
-
-```typescript
-const labourData = {
-  description: "Engine diagnostic",
-  hours: 2.5,
-  rate: 85.00,
-  technicianId: "tech-789",
-  notes: "Found faulty sensor"
-};
-
-const response = await fetch('/api/work-orders/work-order-123/labour', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(labourData)
-});
-```
-
-### Recording a Payment
-
-```typescript
-const paymentData = {
-  method: "CREDIT_CARD",
-  amount: 500.00,
-  reference: "TXN-123456",
-  notes: "Payment received"
-};
-
-const response = await fetch('/api/work-orders/work-order-123/payments', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify(paymentData)
-});
-```
-
-## Future Enhancements
-
-Potential future enhancements include:
-
-- Real-time notifications for work order updates
-- Integration with external parts suppliers
-- Advanced reporting and analytics
-- Mobile app support
-- Integration with accounting systems
-- Automated workflow triggers
-- Customer portal integration
+- `

@@ -1855,6 +1855,174 @@ export class WorkOrderService {
     return qc;
   }
 
+  // Generate estimate from existing labor and parts
+  async generateEstimateFromLaborAndParts(workOrderId: string, createdById: string) {
+    // Get the work order with all labor and parts
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        labourItems: {
+          include: {
+            laborCatalog: true,
+            technician: {
+              include: {
+                userProfile: true
+              }
+            }
+          }
+        },
+        partsUsed: {
+          include: {
+            part: true,
+            installedBy: {
+              include: {
+                userProfile: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!workOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Calculate totals (only labor and parts, no services)
+    const labourTotal = workOrder.labourItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const partsTotal = workOrder.partsUsed.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    
+    const subtotal = labourTotal + partsTotal;
+    const taxAmount = subtotal * 0.1; // 10% tax - you can make this configurable
+    const totalAmount = subtotal + taxAmount;
+
+    // Create estimate items from labor
+    const estimateItems: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+      itemType: EstimateItemType;
+      notes?: string | null;
+    }> = [];
+
+    // Add labor items
+    workOrder.labourItems.forEach(labor => {
+      estimateItems.push({
+        description: labor.description,
+        quantity: Number(labor.hours),
+        unitPrice: Number(labor.rate),
+        totalPrice: Number(labor.subtotal),
+        itemType: 'LABOUR' as EstimateItemType,
+        notes: labor.notes ? labor.notes : `Performed by ${labor.technician?.userProfile?.name || 'Technician'}`
+      });
+    });
+
+    // Add parts items
+    workOrder.partsUsed.forEach(part => {
+      estimateItems.push({
+        description: part.part.name,
+        quantity: part.quantity,
+        unitPrice: Number(part.unitPrice),
+        totalPrice: Number(part.subtotal),
+        itemType: 'PART' as EstimateItemType,
+        notes: part.notes || `Installed by ${part.installedBy?.userProfile?.name || 'Technician'}`
+      });
+    });
+
+
+
+    // Create the estimate
+    const estimate = await prisma.workOrderEstimate.create({
+      data: {
+        workOrderId,
+        version: 1,
+        description: `Estimate generated from labor and parts for ${workOrder.workOrderNumber}`,
+        totalAmount,
+        labourAmount: labourTotal,
+        partsAmount: partsTotal,
+        taxAmount,
+        discountAmount: 0,
+        notes: 'Estimate automatically generated from recorded labor and parts',
+        createdById,
+        approved: true, // Auto-approve since it's based on actual work
+        approvedAt: new Date(),
+        approvedById: createdById,
+        estimateItems: {
+          create: estimateItems
+        }
+      },
+      include: {
+        estimateItems: true,
+        createdBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Update work order status to APPROVAL and update totals
+    await prisma.workOrder.update({
+      where: { id: workOrderId },
+      data: {
+        status: 'IN_PROGRESS' as WorkOrderStatus,
+        workflowStep: 'APPROVAL' as WorkflowStep,
+        estimatedTotal: totalAmount,
+        subtotalLabour: labourTotal,
+        subtotalParts: partsTotal,
+        totalAmount: totalAmount,
+        taxAmount: taxAmount,
+        estimateApproved: true
+      }
+    });
+
+    return {
+      estimate,
+      workOrderUpdate: {
+        status: 'IN_PROGRESS',
+        workflowStep: 'APPROVAL',
+        estimatedTotal: totalAmount,
+        subtotalLabour: labourTotal,
+        subtotalParts: partsTotal,
+        totalAmount: totalAmount,
+        taxAmount: taxAmount
+      }
+    };
+  }
+
+  // Helper method to find ServiceAdvisor by Supabase user ID
+  async findServiceAdvisorBySupabaseUserId(supabaseUserId: string) {
+    const serviceAdvisor = await prisma.serviceAdvisor.findFirst({
+      where: {
+        userProfile: {
+          supabaseUserId: supabaseUserId
+        }
+      }
+    });
+
+    return serviceAdvisor;
+  }
+
   // Helper method to update work order payment status
   private async updateWorkOrderPaymentStatus(workOrderId: string) {
     const workOrder = await prisma.workOrder.findUnique({
