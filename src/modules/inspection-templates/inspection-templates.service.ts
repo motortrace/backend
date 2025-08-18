@@ -738,4 +738,208 @@ export class InspectionTemplatesService {
   async getWorkOrderInspectionsByInspector(inspectorId: string): Promise<WorkOrderInspectionsResponse> {
     return this.getWorkOrderInspections({ inspectorId });
   }
+
+  // Work Order Inspection Status Methods
+  async getWorkOrderInspectionStatus(workOrderId: string): Promise<{
+    success: boolean;
+    data?: {
+      totalInspections: number;
+      completedInspections: number;
+      pendingInspections: number;
+      allCompleted: boolean;
+      inspections: Array<{
+        id: string;
+        templateName: string;
+        inspectorName: string;
+        isCompleted: boolean;
+        completedAt?: Date;
+                 checklistItems: Array<{
+           id: string;
+           item: string;
+           status: ChecklistStatus;
+           requiresFollowUp: boolean;
+           notes?: string;
+         }>;
+      }>;
+    };
+    error?: string;
+  }> {
+    try {
+      // Get all inspections for the work order
+      const inspections = await prisma.workOrderInspection.findMany({
+        where: { workOrderId },
+        include: {
+          template: true,
+          inspector: {
+            include: {
+              userProfile: true
+            }
+          },
+          checklistItems: {
+            orderBy: { createdAt: 'asc' }
+          }
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      if (inspections.length === 0) {
+        return {
+          success: true,
+          data: {
+            totalInspections: 0,
+            completedInspections: 0,
+            pendingInspections: 0,
+            allCompleted: false,
+            inspections: []
+          }
+        };
+      }
+
+      const totalInspections = inspections.length;
+      const completedInspections = inspections.filter(inspection => inspection.isCompleted).length;
+      const pendingInspections = totalInspections - completedInspections;
+      const allCompleted = completedInspections === totalInspections;
+
+              const inspectionDetails = inspections.map(inspection => ({
+          id: inspection.id,
+          templateName: inspection.template?.name || 'Custom Inspection',
+          inspectorName: inspection.inspector.userProfile?.name || 'Unknown Inspector',
+          isCompleted: inspection.isCompleted,
+          completedAt: inspection.isCompleted ? inspection.date : undefined,
+          checklistItems: inspection.checklistItems.map(item => ({
+            id: item.id,
+            item: item.item,
+            status: item.status,
+            requiresFollowUp: item.requiresFollowUp,
+            notes: item.notes || undefined
+          }))
+        }));
+
+      return {
+        success: true,
+        data: {
+          totalInspections,
+          completedInspections,
+          pendingInspections,
+          allCompleted,
+          inspections: inspectionDetails
+        }
+      };
+    } catch (error) {
+      console.error('Error getting work order inspection status:', error);
+      return {
+        success: false,
+        error: 'Failed to get work order inspection status'
+      };
+    }
+  }
+
+  async canProceedToEstimate(workOrderId: string): Promise<{
+    success: boolean;
+    data?: {
+      canProceed: boolean;
+      reason?: string;
+      inspectionStatus: {
+        totalInspections: number;
+        completedInspections: number;
+        pendingInspections: number;
+        allCompleted: boolean;
+      };
+      followUpItems: Array<{
+        inspectionId: string;
+        templateName: string;
+        itemName: string;
+        status: ChecklistStatus;
+        notes?: string;
+      }>;
+    };
+    error?: string;
+  }> {
+    try {
+      const statusResult = await this.getWorkOrderInspectionStatus(workOrderId);
+      
+      if (!statusResult.success) {
+        return {
+          success: false,
+          error: statusResult.error || 'Failed to get inspection status'
+        };
+      }
+
+      const { data: status } = statusResult;
+      
+      if (!status) {
+        return {
+          success: false,
+          error: 'Failed to get inspection status'
+        };
+      }
+
+      // Check if all inspections are completed
+      if (!status.allCompleted) {
+        return {
+          success: true,
+          data: {
+            canProceed: false,
+            reason: `${status.pendingInspections} inspection(s) still pending`,
+            inspectionStatus: {
+              totalInspections: status.totalInspections,
+              completedInspections: status.completedInspections,
+              pendingInspections: status.pendingInspections,
+              allCompleted: status.allCompleted
+            },
+            followUpItems: []
+          }
+        };
+      }
+
+      // Check for items requiring follow-up
+      const followUpItems: Array<{
+        inspectionId: string;
+        templateName: string;
+        itemName: string;
+        status: ChecklistStatus;
+        notes?: string;
+      }> = [];
+
+      status.inspections.forEach((inspection: any) => {
+        inspection.checklistItems.forEach((item: any) => {
+          if (item.requiresFollowUp) {
+            followUpItems.push({
+              inspectionId: inspection.id,
+              templateName: inspection.templateName,
+              itemName: item.item,
+              status: item.status,
+              notes: item.notes
+            });
+          }
+        });
+      });
+
+      const canProceed = followUpItems.length === 0;
+      const reason = canProceed 
+        ? 'All inspections completed successfully'
+        : `${followUpItems.length} item(s) require follow-up before proceeding`;
+
+      return {
+        success: true,
+        data: {
+          canProceed,
+          reason,
+          inspectionStatus: {
+            totalInspections: status.totalInspections,
+            completedInspections: status.completedInspections,
+            pendingInspections: status.pendingInspections,
+            allCompleted: status.allCompleted
+          },
+          followUpItems
+        }
+      };
+    } catch (error) {
+      console.error('Error checking if can proceed to estimate:', error);
+      return {
+        success: false,
+        error: 'Failed to check estimate readiness'
+      };
+    }
+  }
 }

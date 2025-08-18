@@ -520,4 +520,49 @@ export class InspectionTemplatesController {
       });
     }
   }
+
+  // Work Order Inspection Status Methods
+  async getWorkOrderInspectionStatus(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      if (!workOrderId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Work order ID parameter is required'
+        });
+      }
+
+      const result = await this.service.getWorkOrderInspectionStatus(workOrderId);
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Controller error - getWorkOrderInspectionStatus:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async canProceedToEstimate(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      if (!workOrderId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Work order ID parameter is required'
+        });
+      }
+
+      const result = await this.service.canProceedToEstimate(workOrderId);
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Controller error - canProceedToEstimate:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+
 }

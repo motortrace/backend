@@ -27,4 +27,8 @@ router.post('/inspections/:inspectionId/checklist-items', controller.addChecklis
 router.put('/checklist-items/:id', controller.updateChecklistItem.bind(controller));
 router.delete('/checklist-items/:id', controller.deleteChecklistItem.bind(controller));
 
+// Work Order Inspection Status Routes
+router.get('/work-orders/:workOrderId/inspection-status', controller.getWorkOrderInspectionStatus.bind(controller));
+router.get('/work-orders/:workOrderId/can-proceed-to-estimate', controller.canProceedToEstimate.bind(controller));
+
 export default router;

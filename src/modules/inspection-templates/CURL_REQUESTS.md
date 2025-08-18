@@ -364,6 +364,18 @@ curl -X PUT http://localhost:3000/inspection-templates/inspections/INSPECTION_ID
   }'
 ```
 
+## 13. Check Work Order Inspection Status
+
+```bash
+curl -X GET "http://localhost:3000/inspection-templates/work-orders/WORK_ORDER_ID/inspection-status"
+```
+
+## 14. Check if Can Proceed to Estimate
+
+```bash
+curl -X GET "http://localhost:3000/inspection-templates/work-orders/WORK_ORDER_ID/can-proceed-to-estimate"
+```
+
 ## Notes
 
 - Replace `WORK_ORDER_ID`, `TEMPLATE_ID`, `TECHNICIAN_ID`, `CHECKLIST_ITEM_ID`, and `INSPECTION_ID` with actual IDs from your database
