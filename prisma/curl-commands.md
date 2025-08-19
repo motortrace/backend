@@ -88,3 +88,7 @@ curl -X POST http://localhost:3000/estimates/estimate_id_from_step_2/approve \
   -d '{
     "approvedById": "service_advisor_id"
   }'
+
+9. Verify Work Order Labor Items Were Created
+
+curl -X GET http://localhost:3000/work-orders/work_order_id_from_step_1
