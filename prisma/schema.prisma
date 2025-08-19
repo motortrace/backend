@@ -60,9 +60,9 @@ model Technician {
 
   // Relations
   inspections    WorkOrderInspection[] @relation("Inspections")
+  qcChecks       WorkOrderQC[] @relation("QCInspections")
   laborItems     WorkOrderLabor[] @relation("LaborWork")
   partInstallations WorkOrderPart[] @relation("PartInstallations")
-  qcChecks       WorkOrderQC[] @relation("QCInspections")
 }
 
 model InventoryManager {
@@ -191,14 +191,14 @@ model WorkOrder {
 
   // Relations to be defined
   inspections     WorkOrderInspection[]
-  laborItems     WorkOrderLabor[]
-  partsUsed       WorkOrderPart[]
   approvals       WorkOrderApproval[]
   qcChecks        WorkOrderQC[]
   attachments     WorkOrderAttachment[]
   payments        Payment[]
   estimates       WorkOrderEstimate[]
   services        WorkOrderService[]
+  laborItems     WorkOrderLabor[]
+  partsUsed       WorkOrderPart[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -263,8 +263,9 @@ model LaborCatalog {
   updatedAt   DateTime       @updatedAt
 
   // Relations
-  laborItems WorkOrderLabor[]
   cannedServices CannedServiceLabor[] // Services that use this labor operation
+  estimateLaborItems EstimateLabor[]
+  laborItems WorkOrderLabor[]
 }
 
 // Shop Operating Hours and Capacity Planning
@@ -322,6 +323,7 @@ model InventoryItem {
   categoryId   String
   
   // Relations
+  estimatePartItems EstimatePart[]
   workOrderParts WorkOrderPart[]
 }
 
@@ -565,29 +567,100 @@ model WorkOrderEstimate {
   approvedById String?
   
   // Relations
-  estimateItems WorkOrderEstimateItem[]
+  estimateLaborItems EstimateLabor[]
+  estimatePartItems EstimatePart[]
   approvals     WorkOrderApproval[]
 }
 
-model WorkOrderEstimateItem {
-  id           String    @id @default(cuid())
-  estimate     WorkOrderEstimate @relation(fields: [estimateId], references: [id])
-  estimateId   String
-  description  String    // Item description
-  quantity     Int       @default(1)
-  unitPrice    Decimal   @db.Decimal(10,2)
-  totalPrice   Decimal   @db.Decimal(10,2)
-  itemType     EstimateItemType @default(LABOUR)
-  notes        String?   // Additional notes for this item
-  createdAt    DateTime  @default(now())
+model EstimateLabor {
+  id               String          @id @default(cuid())
+  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
+  estimateId       String
+  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
+  laborCatalogId   String?         // Optional - for catalog-based labor operations
+  description      String          // Description of the labor to be performed
+  hours            Decimal         @db.Decimal(5,2) // Estimated hours (e.g., 2.5 hours)
+  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  notes            String?         // Additional notes about the labor
+  customerApproved Boolean         @default(false) // Customer approval status
+  customerNotes    String?         // Customer's notes or comments
+  cannedServiceId  String?         // Reference to canned service if this labor came from one
+  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
-enum EstimateItemType {
-  LABOUR
-  PART
-  SERVICE
-  OTHER
+model EstimatePart {
+  id               String        @id @default(cuid())
+  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
+  estimateId       String
+  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2) // Estimated price
+  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  source           PartSource    @default(INVENTORY)
+  supplierName     String?       // Supplier name if not from inventory
+  warrantyInfo     String?       // Warranty information for the part
+  notes            String?       // Additional notes about the part
+  customerApproved Boolean       @default(false) // Customer approval status
+  customerNotes    String?       // Customer's notes or comments
+  cannedServiceId  String?       // Reference to canned service if this part came from one
+  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
+
+// Labor & Parts Usage - Populated from estimates when approved
+model WorkOrderLabor {
+  id               String          @id @default(cuid())
+  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
+  laborCatalogId   String?         // Optional - for catalog-based labor operations
+  description      String          // Description of the labor performed (manual or from catalog)
+  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
+  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  technician       Technician?    @relation("LaborWork", fields: [technicianId], references: [id])
+  technicianId     String?
+  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  startTime        DateTime?       // When the work started
+  endTime          DateTime?       // When the work ended
+  notes            String?         // Additional notes about the labor
+  cannedServiceId  String?         // Reference to canned service if this labor came from one
+  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model WorkOrderPart {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
+  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  source           PartSource    @default(INVENTORY)
+  supplierName     String?       // Supplier name if not from inventory
+  supplierInvoice  String?       // Supplier invoice number
+  warrantyInfo     String?       // Warranty information for the part
+  notes            String?       // Additional notes about the part usage
+  installedAt      DateTime?     // When the part was installed
+  installedBy      Technician?  @relation("PartInstallations", fields: [installedById], references: [id])
+  installedById    String?
+  cannedServiceId  String?       // Reference to canned service if this part came from one
+  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
 
 model WorkOrderApproval {
   id           String       @id @default(cuid())
@@ -623,53 +696,17 @@ enum ApprovalMethod {
   DIGITAL_SIGNATURE
 }
 
-// Labor & Parts Usage
-model WorkOrderLabor {
-  id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
-  laborCatalogId   String?         // Optional - for catalog-based labor operations
-  description      String          // Description of the labor performed (manual or from catalog)
-  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
-  rate             Decimal         @db.Decimal(10,2) // Hourly rate
-  technician       Technician?    @relation("LaborWork", fields: [technicianId], references: [id])
-  technicianId     String?
-  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
-  startTime        DateTime?       // When the work started
-  endTime          DateTime?       // When the work ended
-  notes            String?         // Additional notes about the labor
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-}
-
-model WorkOrderPart {
-  id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  inventoryItemId  String
-  quantity         Int           @default(1)
-  unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
-  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
-  source           PartSource    @default(INVENTORY)
-  supplierName     String?       // Supplier name if not from inventory
-  supplierInvoice  String?       // Supplier invoice number
-  warrantyInfo     String?       // Warranty information for the part
-  notes            String?       // Additional notes about the part usage
-  installedAt      DateTime?     // When the part was installed
-  installedBy      Technician?  @relation("PartInstallations", fields: [installedById], references: [id])
-  installedById    String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-}
-
 enum PartSource {
   INVENTORY        // From shop inventory
   SUPPLIER         // Ordered from supplier
   CUSTOMER_SUPPLIED // Customer provided the part
   WARRANTY         // Warranty replacement
   SALVAGE          // Used/salvage part
+}
+
+enum ServiceDiscountType {
+  FIXED           // Fixed dollar amount discount
+  PERCENTAGE      // Percentage-based discount
 }
 
 // QC, Attachments & Payments

@@ -12,7 +12,6 @@ import {
   PaymentMethod,
   ApprovalStatus,
   ApprovalMethod,
-  EstimateItemType,
   ChecklistStatus,
   TirePosition,
   AttachmentCategory
@@ -82,60 +81,7 @@ export const assignWorkOrderSchema = Joi.object({
   technicianId: Joi.string().optional(),
 });
 
-// Work Order Estimate Creation Schema
-export const createWorkOrderEstimateSchema = Joi.object({
-  description: Joi.string().optional(),
-  totalAmount: Joi.number().min(0).required(),
-  laborAmount: Joi.number().min(0).optional(),
-  partsAmount: Joi.number().min(0).optional(),
-  taxAmount: Joi.number().min(0).optional(),
-  discountAmount: Joi.number().min(0).optional(),
-  notes: Joi.string().optional(),
-  items: Joi.array().items(Joi.object({
-    description: Joi.string().required(),
-    quantity: Joi.number().min(1).required(),
-    unitPrice: Joi.number().min(0).required(),
-    totalPrice: Joi.number().min(0).required(),
-    itemType: Joi.string().valid(...Object.values(EstimateItemType)).required(),
-    notes: Joi.string().optional(),
-  })).required(),
-});
 
-// Work Order Estimate Approval Schema
-export const approveWorkOrderEstimateSchema = Joi.object({
-  approvedById: Joi.string().required(),
-});
-
-// Work Order Labor Creation Schema
-export const createWorkOrderLaborSchema = Joi.object({
-  laborCatalogId: Joi.string().optional(),
-  description: Joi.string().required(),
-  hours: Joi.number().min(0).required(),
-  rate: Joi.number().min(0).required(),
-  technicianId: Joi.string().optional(),
-  startTime: Joi.date().optional(),
-  endTime: Joi.date().optional(),
-  notes: Joi.string().optional(),
-});
-
-// Assign Technician to Labor Schema
-export const assignTechnicianToLaborSchema = Joi.object({
-  technicianId: Joi.string().required(),
-});
-
-// Work Order Part Creation Schema
-export const createWorkOrderPartSchema = Joi.object({
-  inventoryItemId: Joi.string().required(),
-  quantity: Joi.number().min(1).required(),
-  unitPrice: Joi.number().min(0).required(),
-  source: Joi.string().valid(...Object.values(PartSource)).optional(),
-  supplierName: Joi.string().optional(),
-  supplierInvoice: Joi.string().optional(),
-  warrantyInfo: Joi.string().optional(),
-  notes: Joi.string().optional(),
-  installedAt: Joi.date().optional(),
-  installedById: Joi.string().optional(),
-});
 
 // Work Order Service Creation Schema
 export const createWorkOrderServiceSchema = Joi.object({

@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
 export class AppointmentService {
   // Create a new appointment with ShopMonkey-style booking logic
   async createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices> {
-    const { cannedServiceIds, quantities = [], prices = [], serviceNotes = [], ...appointmentData } = data;
+    const { cannedServiceIds, serviceNotes = [], ...appointmentData } = data;
 
     // Convert string dates to Date objects
     const startTime = new Date(appointmentData.startTime);
@@ -92,14 +92,14 @@ export class AppointmentService {
         requestedAt: requestedAt,
         startTime: startTime,
         endTime: endTime,
-        priority: appointmentData.priority || 'NORMAL',
+        priority: null,
         notes: appointmentData.notes,
         status: AppointmentStatus.PENDING, // All appointments start as unassigned
         cannedServices: {
           create: cannedServiceIds.map((serviceId, index) => ({
             cannedServiceId: serviceId,
-            quantity: quantities[index] || 1,
-            price: prices[index] || cannedServices.find(s => s.id === serviceId)?.price || 0,
+            quantity: 1,
+            price: cannedServices.find(s => s.id === serviceId)?.price || 0,
             notes: serviceNotes[index],
           })),
         },

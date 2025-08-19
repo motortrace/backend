@@ -11,7 +11,6 @@ import {
   PaymentMethod,
   ApprovalStatus,
   ApprovalMethod,
-  EstimateItemType,
   ChecklistStatus,
   TirePosition,
   AttachmentCategory
@@ -312,50 +311,7 @@ export interface WorkOrderWithDetails {
   }[];
 }
 
-export interface CreateWorkOrderEstimateRequest {
-  workOrderId: string;
-  description?: string;
-  totalAmount: number;
-  laborAmount?: number;
-  partsAmount?: number;
-  taxAmount?: number;
-  discountAmount?: number;
-  notes?: string;
-  items: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-    itemType: EstimateItemType;
-    notes?: string;
-  }[];
-}
 
-export interface CreateWorkOrderLaborRequest {
-  workOrderId: string;
-  laborCatalogId?: string;
-  description: string;
-  hours: number;
-  rate: number;
-  technicianId?: string;
-  startTime?: Date;
-  endTime?: Date;
-  notes?: string;
-}
-
-export interface CreateWorkOrderPartRequest {
-  workOrderId: string;
-  inventoryItemId: string;
-  quantity: number;
-  unitPrice: number;
-  source?: PartSource;
-  supplierName?: string;
-  supplierInvoice?: string;
-  warrantyInfo?: string;
-  notes?: string;
-  installedAt?: Date;
-  installedById?: string;
-}
 
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;

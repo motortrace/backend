@@ -106,10 +106,7 @@ Content-Type: application/json
   "startTime": "2024-01-15T10:00:00Z",
   "endTime": "2024-01-15T12:00:00Z",
   "notes": "Customer prefers morning appointment",
-  "priority": "NORMAL",
   "cannedServiceIds": ["service1", "service2"],
-  "quantities": [1, 1],
-  "prices": [150.00, 75.00],
   "serviceNotes": ["Front brake pads", "Oil change with synthetic"]
 }
 ```
