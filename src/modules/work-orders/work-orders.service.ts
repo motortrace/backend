@@ -4,7 +4,7 @@ import {
   UpdateWorkOrderRequest,
   WorkOrderFilters,
   CreateWorkOrderEstimateRequest,
-  CreateWorkOrderLabourRequest,
+  CreateWorkOrderLaborRequest,
   CreateWorkOrderPartRequest,
   CreateWorkOrderServiceRequest,
   CreatePaymentRequest,
@@ -22,7 +22,7 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     serviceAdvisor: { select: { id: true; employeeId: true; department: true; userProfile: { select: { id: true; name: true; phone: true } } } };
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
     inspections: { include: { inspector: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    labourItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedHours: true; hourlyRate: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
+    laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedHours: true; hourlyRate: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     estimates: { include: { createdBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } }; approvedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
@@ -208,7 +208,7 @@ export class WorkOrderService {
             },
           },
         },
-        labourItems: {
+        laborItems: {
           include: {
             laborCatalog: {
               select: {
@@ -417,7 +417,7 @@ export class WorkOrderService {
             },
           },
         },
-        labourItems: {
+        laborItems: {
           include: {
             laborCatalog: {
               select: {
@@ -611,7 +611,7 @@ export class WorkOrderService {
             },
           },
         },
-        labourItems: {
+        laborItems: {
           include: {
             laborCatalog: {
               select: {
@@ -811,7 +811,7 @@ export class WorkOrderService {
             },
           },
         },
-        labourItems: {
+        laborItems: {
           include: {
             laborCatalog: {
               select: {
@@ -1065,9 +1065,9 @@ export class WorkOrderService {
     return estimate;
   }
 
-  // Create work order labour
-  async createWorkOrderLabour(data: CreateWorkOrderLabourRequest) {
-    const labour = await prisma.workOrderLabour.create({
+  // Create work order labor
+  async createWorkOrderLabor(data: CreateWorkOrderLaborRequest) {
+    const labor = await prisma.workOrderLabor.create({
       data: {
         ...data,
         subtotal: data.hours * data.rate,
@@ -1099,12 +1099,12 @@ export class WorkOrderService {
       },
     });
 
-    return labour;
+    return labor;
   }
 
-  // Get work order labour
-  async getWorkOrderLabour(workOrderId: string) {
-    const labourItems = await prisma.workOrderLabour.findMany({
+  // Get work order labor
+  async getWorkOrderLabor(workOrderId: string) {
+    const laborItems = await prisma.workOrderLabor.findMany({
       where: { workOrderId },
       include: {
         laborCatalog: {
@@ -1134,13 +1134,13 @@ export class WorkOrderService {
       },
     });
 
-    return labourItems;
+    return laborItems;
   }
 
   // Assign technician to labor entry
   async assignTechnicianToLabor(laborId: string, technicianId: string) {
     // Validate the labor entry exists
-    const labor = await prisma.workOrderLabour.findUnique({
+    const labor = await prisma.workOrderLabor.findUnique({
       where: { id: laborId },
     });
 
@@ -1158,7 +1158,7 @@ export class WorkOrderService {
     }
 
     // Update the labor entry with the technician
-    const updatedLabor = await prisma.workOrderLabour.update({
+    const updatedLabor = await prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         technicianId,
@@ -1306,7 +1306,7 @@ export class WorkOrderService {
     if (cannedService.laborOperations.length > 0) {
       const laborEntries = await Promise.all(
         cannedService.laborOperations.map(async (laborOp) => {
-          return await prisma.workOrderLabour.create({
+          return await prisma.workOrderLabor.create({
             data: {
               workOrderId: data.workOrderId,
               laborCatalogId: laborOp.laborCatalogId,
@@ -1512,7 +1512,7 @@ export class WorkOrderService {
         where: { ...where, status: WorkOrderStatus.COMPLETED },
         _sum: { totalAmount: true },
       }),
-      prisma.workOrderLabour.groupBy({
+      prisma.workOrderLabor.groupBy({
         by: ['technicianId'],
         where: { workOrder: where },
         _sum: { hours: true },
@@ -1861,7 +1861,7 @@ export class WorkOrderService {
     const workOrder = await prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
-        labourItems: {
+        laborItems: {
           include: {
             laborCatalog: true,
             technician: {
@@ -1889,10 +1889,10 @@ export class WorkOrderService {
     }
 
     // Calculate totals (only labor and parts, no services)
-    const labourTotal = workOrder.labourItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const laborTotal = workOrder.laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const partsTotal = workOrder.partsUsed.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    const subtotal = labourTotal + partsTotal;
+    const subtotal = laborTotal + partsTotal;
     const taxAmount = subtotal * 0.1; // 10% tax - you can make this configurable
     const totalAmount = subtotal + taxAmount;
 
@@ -1907,7 +1907,7 @@ export class WorkOrderService {
     }> = [];
 
     // Add labor items
-    workOrder.labourItems.forEach(labor => {
+    workOrder.laborItems.forEach(labor => {
       estimateItems.push({
         description: labor.description,
         quantity: Number(labor.hours),
@@ -1939,7 +1939,7 @@ export class WorkOrderService {
         version: 1,
         description: `Estimate generated from labor and parts for ${workOrder.workOrderNumber}`,
         totalAmount,
-        labourAmount: labourTotal,
+        laborAmount: laborTotal,
         partsAmount: partsTotal,
         taxAmount,
         discountAmount: 0,
@@ -1988,7 +1988,7 @@ export class WorkOrderService {
         status: 'IN_PROGRESS' as WorkOrderStatus,
         workflowStep: 'APPROVAL' as WorkflowStep,
         estimatedTotal: totalAmount,
-        subtotalLabour: labourTotal,
+        subtotalLabor: laborTotal,
         subtotalParts: partsTotal,
         totalAmount: totalAmount,
         taxAmount: taxAmount,
@@ -2002,7 +2002,7 @@ export class WorkOrderService {
         status: 'IN_PROGRESS',
         workflowStep: 'APPROVAL',
         estimatedTotal: totalAmount,
-        subtotalLabour: labourTotal,
+        subtotalLabor: laborTotal,
         subtotalParts: partsTotal,
         totalAmount: totalAmount,
         taxAmount: taxAmount

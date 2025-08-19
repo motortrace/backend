@@ -86,7 +86,7 @@ export const assignWorkOrderSchema = Joi.object({
 export const createWorkOrderEstimateSchema = Joi.object({
   description: Joi.string().optional(),
   totalAmount: Joi.number().min(0).required(),
-  labourAmount: Joi.number().min(0).optional(),
+  laborAmount: Joi.number().min(0).optional(),
   partsAmount: Joi.number().min(0).optional(),
   taxAmount: Joi.number().min(0).optional(),
   discountAmount: Joi.number().min(0).optional(),
@@ -106,8 +106,8 @@ export const approveWorkOrderEstimateSchema = Joi.object({
   approvedById: Joi.string().required(),
 });
 
-// Work Order Labour Creation Schema
-export const createWorkOrderLabourSchema = Joi.object({
+// Work Order Labor Creation Schema
+export const createWorkOrderLaborSchema = Joi.object({
   laborCatalogId: Joi.string().optional(),
   description: Joi.string().required(),
   hours: Joi.number().min(0).required(),
@@ -254,8 +254,8 @@ export const validateApproveWorkOrderEstimate = (req: any, res: any, next: any) 
   next();
 };
 
-export const validateCreateWorkOrderLabour = (req: any, res: any, next: any) => {
-  const { error } = createWorkOrderLabourSchema.validate(req.body);
+export const validateCreateWorkOrderLabor = (req: any, res: any, next: any) => {
+  const { error } = createWorkOrderLaborSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,

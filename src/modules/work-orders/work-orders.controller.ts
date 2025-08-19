@@ -5,7 +5,7 @@ import {
   UpdateWorkOrderRequest,
   WorkOrderFilters,
   CreateWorkOrderEstimateRequest,
-  CreateWorkOrderLabourRequest,
+  CreateWorkOrderLaborRequest,
   CreateWorkOrderPartRequest,
   CreateWorkOrderServiceRequest,
   CreatePaymentRequest,
@@ -188,19 +188,19 @@ export class WorkOrderController {
     }
   }
 
-  // Work Order Labour
-  async createWorkOrderLabour(req: Request, res: Response) {
+  // Work Order Labor
+  async createWorkOrderLabor(req: Request, res: Response) {
     try {
       const { workOrderId } = req.params;
-      const labourData: CreateWorkOrderLabourRequest = req.body;
-      labourData.workOrderId = workOrderId;
+      const laborData: CreateWorkOrderLaborRequest = req.body;
+      laborData.workOrderId = workOrderId;
 
-      const labour = await this.workOrderService.createWorkOrderLabour(labourData);
+      const labor = await this.workOrderService.createWorkOrderLabor(laborData);
 
       res.status(201).json({
         success: true,
-        data: labour,
-        message: 'Work order labour created successfully',
+        data: labor,
+        message: 'Work order labor created successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -210,14 +210,14 @@ export class WorkOrderController {
     }
   }
 
-  async getWorkOrderLabour(req: Request, res: Response) {
+  async getWorkOrderLabor(req: Request, res: Response) {
     try {
       const { workOrderId } = req.params;
-      const labourItems = await this.workOrderService.getWorkOrderLabour(workOrderId);
+      const laborItems = await this.workOrderService.getWorkOrderLabor(workOrderId);
 
       res.json({
         success: true,
-        data: labourItems,
+        data: laborItems,
       });
     } catch (error: any) {
       res.status(400).json({

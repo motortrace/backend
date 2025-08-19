@@ -73,7 +73,7 @@ When a technician adds this service to a work order:
 }
 ```
 
-#### Step 2: Copy Labor Operations to WorkOrderLabour
+#### Step 2: Copy Labor Operations to WorkOrderLabor
 ```typescript
 // For each labor operation in the canned service
 {

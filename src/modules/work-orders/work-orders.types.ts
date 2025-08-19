@@ -99,7 +99,7 @@ export interface WorkOrderWithDetails {
   estimatedTotal?: number;
   estimateNotes?: string;
   estimateApproved: boolean;
-  subtotalLabour?: number;
+  subtotalLabor?: number;
   subtotalParts?: number;
   discountAmount?: number;
   taxAmount?: number;
@@ -184,7 +184,7 @@ export interface WorkOrderWithDetails {
       };
     };
   }[];
-  labourItems: {
+  laborItems: {
     id: string;
     laborCatalogId?: string;
     description: string;
@@ -265,7 +265,7 @@ export interface WorkOrderWithDetails {
     version: number;
     description?: string;
     totalAmount: number;
-    labourAmount?: number;
+    laborAmount?: number;
     partsAmount?: number;
     taxAmount?: number;
     discountAmount?: number;
@@ -316,7 +316,7 @@ export interface CreateWorkOrderEstimateRequest {
   workOrderId: string;
   description?: string;
   totalAmount: number;
-  labourAmount?: number;
+  laborAmount?: number;
   partsAmount?: number;
   taxAmount?: number;
   discountAmount?: number;
@@ -331,7 +331,7 @@ export interface CreateWorkOrderEstimateRequest {
   }[];
 }
 
-export interface CreateWorkOrderLabourRequest {
+export interface CreateWorkOrderLaborRequest {
   workOrderId: string;
   laborCatalogId?: string;
   description: string;

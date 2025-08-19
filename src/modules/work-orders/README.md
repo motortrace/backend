@@ -8,7 +8,7 @@ The work orders module provides comprehensive functionality for managing automot
 
 - Work order creation and management
 - Estimates and approvals
-- Labour tracking
+- Labor tracking
 - Parts management
 - Service tracking
 - Payment processing
@@ -46,11 +46,11 @@ work-orders/
 - Approve estimates with digital signatures
 - Link estimates to work orders
 
-### 3. Labour Tracking
-- Record labour hours and rates
-- Link labour to technicians
+### 3. Labor Tracking
+- Record labor hours and rates
+- Link labor to technicians
 - Track start and end times
-- Support both catalog and manual labour entries
+- Support both catalog and manual labor entries
 
 ### 4. Parts Management
 - Track parts used in work orders
@@ -204,7 +204,7 @@ Creates a new estimate for a work order.
 
 **Optional Fields:**
 - `description`: Estimate description
-- `labourAmount`: Labour portion
+- `laborAmount`: Labor portion
 - `partsAmount`: Parts portion
 - `taxAmount`: Tax amount
 - `discountAmount`: Discount amount
@@ -221,7 +221,7 @@ Automatically generates an estimate from existing labor and parts entries, and u
 - Creates estimate items for each labor and part entry
 - Automatically approves the estimate
 - Updates work order status from ESTIMATE to APPROVAL
-- Updates work order totals (subtotalLabour, subtotalParts, totalAmount, taxAmount)
+- Updates work order totals (subtotalLabor, subtotalParts, totalAmount, taxAmount)
 
 **Response:**
 ```json
@@ -232,7 +232,7 @@ Automatically generates an estimate from existing labor and parts entries, and u
       "id": "est_123",
       "version": 1,
       "totalAmount": 1500.00,
-      "labourAmount": 800.00,
+      "laborAmount": 800.00,
       "partsAmount": 500.00,
       "taxAmount": 150.00,
       "approved": true,
@@ -242,7 +242,7 @@ Automatically generates an estimate from existing labor and parts entries, and u
       "status": "IN_PROGRESS",
       "workflowStep": "APPROVAL",
       "estimatedTotal": 1500.00,
-      "subtotalLabour": 800.00,
+      "subtotalLabor": 800.00,
       "subtotalParts": 500.00,
       "totalAmount": 1500.00,
       "taxAmount": 150.00
@@ -274,31 +274,31 @@ Approves an estimate.
 **Required Fields:**
 - `approvedById`: ID of the person approving
 
-### Labour
+### Labor
 
-#### Create Work Order Labour
+#### Create Work Order Labor
 ```
-POST /api/work-orders/:workOrderId/labour
+POST /api/work-orders/:workOrderId/labor
 ```
-Records labour performed on a work order.
+Records labor performed on a work order.
 
 **Required Fields:**
-- `description`: Labour description
+- `description`: Labor description
 - `hours`: Hours worked
 - `rate`: Hourly rate
 
 **Optional Fields:**
-- `laborCatalogId`: Labour catalog entry ID
+- `laborCatalogId`: Labor catalog entry ID
 - `technicianId`: Technician ID
 - `startTime`: Start time
 - `endTime`: End time
 - `notes`: Additional notes
 
-#### Get Work Order Labour
+#### Get Work Order Labor
 ```
-GET /api/work-orders/:workOrderId/labour
+GET /api/work-orders/:workOrderId/labor
 ```
-Retrieves all labour entries for a work order.
+Retrieves all labor entries for a work order.
 
 ### Parts
 

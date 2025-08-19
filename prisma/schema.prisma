@@ -60,7 +60,7 @@ model Technician {
 
   // Relations
   inspections    WorkOrderInspection[] @relation("Inspections")
-  labourItems     WorkOrderLabour[] @relation("LabourWork")
+  laborItems     WorkOrderLabor[] @relation("LaborWork")
   partInstallations WorkOrderPart[] @relation("PartInstallations")
   qcChecks       WorkOrderQC[] @relation("QCInspections")
 }
@@ -161,7 +161,7 @@ model WorkOrder {
   estimateNotes   String?
   estimateApproved Boolean       @default(false)
 
-  subtotalLabour  Decimal?       @db.Decimal(10,2)
+  subtotalLabor  Decimal?       @db.Decimal(10,2)
   subtotalParts   Decimal?       @db.Decimal(10,2)
   discountAmount  Decimal?       @db.Decimal(10,2)
   taxAmount       Decimal?       @db.Decimal(10,2)
@@ -191,7 +191,7 @@ model WorkOrder {
 
   // Relations to be defined
   inspections     WorkOrderInspection[]
-  labourItems     WorkOrderLabour[]
+  laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
   approvals       WorkOrderApproval[]
   qcChecks        WorkOrderQC[]
@@ -263,7 +263,7 @@ model LaborCatalog {
   updatedAt   DateTime       @updatedAt
 
   // Relations
-  labourItems WorkOrderLabour[]
+  laborItems WorkOrderLabor[]
   cannedServices CannedServiceLabor[] // Services that use this labor operation
 }
 
@@ -551,7 +551,7 @@ model WorkOrderEstimate {
   version      Int       @default(1) // Track estimate versions
   description  String?   // Brief description of what this estimate covers
   totalAmount  Decimal   @db.Decimal(10,2)
-  labourAmount Decimal?  @db.Decimal(10,2) // Labour portion
+  laborAmount Decimal?  @db.Decimal(10,2) // Labor portion
   partsAmount  Decimal?  @db.Decimal(10,2) // Parts portion
   taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
   discountAmount Decimal? @db.Decimal(10,2) // Any discounts
@@ -623,22 +623,22 @@ enum ApprovalMethod {
   DIGITAL_SIGNATURE
 }
 
-// Labour & Parts Usage
-model WorkOrderLabour {
+// Labor & Parts Usage
+model WorkOrderLabor {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId      String
   laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
-  laborCatalogId   String?         // Optional - for catalog-based labour operations
-  description      String          // Description of the labour performed (manual or from catalog)
+  laborCatalogId   String?         // Optional - for catalog-based labor operations
+  description      String          // Description of the labor performed (manual or from catalog)
   hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
   rate             Decimal         @db.Decimal(10,2) // Hourly rate
-  technician       Technician?    @relation("LabourWork", fields: [technicianId], references: [id])
+  technician       Technician?    @relation("LaborWork", fields: [technicianId], references: [id])
   technicianId     String?
   subtotal         Decimal         @db.Decimal(10,2) // hours * rate
   startTime        DateTime?       // When the work started
   endTime          DateTime?       // When the work ended
-  notes            String?         // Additional notes about the labour
+  notes            String?         // Additional notes about the labor
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 }

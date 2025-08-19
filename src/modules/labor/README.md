@@ -85,22 +85,22 @@ POST /api/labor/work-order
 }
 ```
 
-#### Get Work Order Labours
+#### Get Work Order Labors
 ```
 GET /api/labor/work-order?workOrderId=wo_123&technicianId=tech_789
 ```
 
-#### Get Work Order Labour by ID
+#### Get Work Order Labor by ID
 ```
 GET /api/labor/work-order/:id
 ```
 
-#### Update Work Order Labour
+#### Update Work Order Labor
 ```
 PUT /api/labor/work-order/:id
 ```
 
-#### Delete Work Order Labour
+#### Delete Work Order Labor
 ```
 DELETE /api/labor/work-order/:id
 ```
@@ -151,7 +151,7 @@ GET /api/labor/technician/:technicianId/summary?startDate=2024-01-01&endDate=202
 }
 ```
 
-### WorkOrderLabour
+### WorkOrderLabor
 ```typescript
 {
   id: string;
@@ -181,7 +181,7 @@ GET /api/labor/technician/:technicianId/summary?startDate=2024-01-01&endDate=202
 - `category`: Optional
 - `isActive`: Optional, defaults to true
 
-### Work Order Labour
+### Work Order Labor
 - `workOrderId`: Required
 - `description`: Required
 - `hours`: Required, 0.1-100 hours
@@ -205,7 +205,7 @@ GET /api/labor/technician/:technicianId/summary?startDate=2024-01-01&endDate=202
 
 ### Filtering and Search
 - Labor catalogs can be filtered by category, active status, and search terms
-- Work order labours can be filtered by work order, technician, date range, and category
+- Work order labors can be filtered by work order, technician, date range, and category
 
 ## Integration Points
 

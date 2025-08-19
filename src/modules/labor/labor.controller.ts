@@ -3,10 +3,10 @@ import { LaborService } from './labor.service';
 import {
   CreateLaborCatalogRequest,
   UpdateLaborCatalogRequest,
-  CreateWorkOrderLabourRequest,
-  UpdateWorkOrderLabourRequest,
+  CreateWorkOrderLaborRequest,
+  UpdateWorkOrderLaborRequest,
   LaborCatalogFilter,
-  WorkOrderLabourFilter,
+  WorkOrderLaborFilter,
   CreateLaborRequest,
 } from './labor.types';
 
@@ -132,15 +132,15 @@ export class LaborController {
     }
   }
 
-  async createWorkOrderLabour(req: Request, res: Response) {
+  async createWorkOrderLabor(req: Request, res: Response) {
     try {
-      const data: CreateWorkOrderLabourRequest = req.body;
-      const workOrderLabour = await this.laborService.createWorkOrderLabour(data);
+      const data: CreateWorkOrderLaborRequest = req.body;
+      const workOrderLabor = await this.laborService.createWorkOrderLabor(data);
 
       res.status(201).json({
         success: true,
-        data: workOrderLabour,
-        message: 'Work order labour created successfully',
+        data: workOrderLabor,
+        message: 'Work order labor created successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -150,9 +150,9 @@ export class LaborController {
     }
   }
 
-  async getWorkOrderLabours(req: Request, res: Response) {
+  async getWorkOrderLabors(req: Request, res: Response) {
     try {
-      const filter: WorkOrderLabourFilter = {
+      const filter: WorkOrderLaborFilter = {
         workOrderId: req.query.workOrderId as string,
         technicianId: req.query.technicianId as string,
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
@@ -160,12 +160,12 @@ export class LaborController {
         category: req.query.category as string,
       };
 
-      const workOrderLabours = await this.laborService.getWorkOrderLabours(filter);
+      const workOrderLabors = await this.laborService.getWorkOrderLabors(filter);
 
       res.status(200).json({
         success: true,
-        data: workOrderLabours,
-        message: 'Work order labours retrieved successfully',
+        data: workOrderLabors,
+        message: 'Work order labors retrieved successfully',
       });
     } catch (error: any) {
       res.status(500).json({
@@ -175,15 +175,15 @@ export class LaborController {
     }
   }
 
-  async getWorkOrderLabourById(req: Request, res: Response) {
+  async getWorkOrderLaborById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const workOrderLabour = await this.laborService.getWorkOrderLabourById(id);
+      const workOrderLabor = await this.laborService.getWorkOrderLaborById(id);
 
       res.status(200).json({
         success: true,
-        data: workOrderLabour,
-        message: 'Work order labour retrieved successfully',
+        data: workOrderLabor,
+        message: 'Work order labor retrieved successfully',
       });
     } catch (error: any) {
       res.status(404).json({
@@ -193,16 +193,16 @@ export class LaborController {
     }
   }
 
-  async updateWorkOrderLabour(req: Request, res: Response) {
+  async updateWorkOrderLabor(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data: UpdateWorkOrderLabourRequest = req.body;
-      const workOrderLabour = await this.laborService.updateWorkOrderLabour(id, data);
+      const data: UpdateWorkOrderLaborRequest = req.body;
+      const workOrderLabor = await this.laborService.updateWorkOrderLabor(id, data);
 
       res.status(200).json({
         success: true,
-        data: workOrderLabour,
-        message: 'Work order labour updated successfully',
+        data: workOrderLabor,
+        message: 'Work order labor updated successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -212,14 +212,14 @@ export class LaborController {
     }
   }
 
-  async deleteWorkOrderLabour(req: Request, res: Response) {
+  async deleteWorkOrderLabor(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await this.laborService.deleteWorkOrderLabour(id);
+      await this.laborService.deleteWorkOrderLabor(id);
 
       res.status(200).json({
         success: true,
-        message: 'Work order labour deleted successfully',
+        message: 'Work order labor deleted successfully',
       });
     } catch (error: any) {
       res.status(400).json({

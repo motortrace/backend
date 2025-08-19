@@ -23,10 +23,10 @@ router.post('/:workOrderId/generate-estimate', authenticateSupabaseToken, requir
 router.get('/:workOrderId/estimates', workOrderController.getWorkOrderEstimates.bind(workOrderController));
 router.put('/:workOrderId/estimates/:estimateId/approve', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.approveWorkOrderEstimate.bind(workOrderController));
 
-// Work Order Labour Routes
-router.post('/:workOrderId/labour', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderLabour.bind(workOrderController));
-router.get('/:workOrderId/labour', workOrderController.getWorkOrderLabour.bind(workOrderController));
-router.put('/labour/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateAssignTechnicianToLabor, workOrderController.assignTechnicianToLabor.bind(workOrderController));
+// Work Order Labor Routes
+router.post('/:workOrderId/labor', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderLabor.bind(workOrderController));
+router.get('/:workOrderId/labor', workOrderController.getWorkOrderLabor.bind(workOrderController));
+router.put('/labor/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateAssignTechnicianToLabor, workOrderController.assignTechnicianToLabor.bind(workOrderController));
 
 // Work Order Parts Routes
 router.post('/:workOrderId/parts', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderPart.bind(workOrderController));

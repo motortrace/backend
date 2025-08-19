@@ -10,10 +10,10 @@ import {
 import {
   validateCreateLaborCatalog,
   validateUpdateLaborCatalog,
-  validateCreateWorkOrderLabour,
-  validateUpdateWorkOrderLabour,
+  validateCreateWorkOrderLabor,
+  validateUpdateWorkOrderLabor,
   validateLaborCatalogFilter,
-  validateWorkOrderLabourFilter,
+  validateWorkOrderLaborFilter,
 } from './labor.validation';
 
 const router = Router();
@@ -29,12 +29,12 @@ router.get('/catalog/:id', authenticateSupabaseToken, laborController.getLaborCa
 router.put('/catalog/:id', authenticateSupabaseToken, requireManager, validateUpdateLaborCatalog, laborController.updateLaborCatalog.bind(laborController));
 router.delete('/catalog/:id', authenticateSupabaseToken, requireManager, laborController.deleteLaborCatalog.bind(laborController));
 
-// Work Order Labour Management Routes
-router.post('/work-order', authenticateSupabaseToken, requireTechnician, validateCreateWorkOrderLabour, laborController.createWorkOrderLabour.bind(laborController));
-router.get('/work-order', authenticateSupabaseToken, requireServiceAdvisor, validateWorkOrderLabourFilter, laborController.getWorkOrderLabours.bind(laborController));
-router.get('/work-order/:id', authenticateSupabaseToken, requireServiceAdvisor, laborController.getWorkOrderLabourById.bind(laborController));
-router.put('/work-order/:id', authenticateSupabaseToken, requireTechnician, validateUpdateWorkOrderLabour, laborController.updateWorkOrderLabour.bind(laborController));
-router.delete('/work-order/:id', authenticateSupabaseToken, requireManager, laborController.deleteWorkOrderLabour.bind(laborController));
+// Work Order Labor Management Routes
+router.post('/work-order', authenticateSupabaseToken, requireTechnician, validateCreateWorkOrderLabor, laborController.createWorkOrderLabor.bind(laborController));
+router.get('/work-order', authenticateSupabaseToken, requireServiceAdvisor, validateWorkOrderLaborFilter, laborController.getWorkOrderLabors.bind(laborController));
+router.get('/work-order/:id', authenticateSupabaseToken, requireServiceAdvisor, laborController.getWorkOrderLaborById.bind(laborController));
+router.put('/work-order/:id', authenticateSupabaseToken, requireTechnician, validateUpdateWorkOrderLabor, laborController.updateWorkOrderLabor.bind(laborController));
+router.delete('/work-order/:id', authenticateSupabaseToken, requireManager, laborController.deleteWorkOrderLabor.bind(laborController));
 
 // Summary and Analytics Routes
 router.get('/work-order/:workOrderId/summary', authenticateSupabaseToken, requireServiceAdvisor, laborController.getWorkOrderLaborSummary.bind(laborController));
