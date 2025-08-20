@@ -1,5 +1,6 @@
 // src/app.ts
 import express from 'express';
+
 import cors from 'cors';
 import prisma from './infrastructure/database/prisma';
 import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.middleware';
@@ -8,6 +9,8 @@ import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import laborRoutes from './modules/labor/labor.routes';
+import { productRoutes } from "./modules/product";
+
 
 const app = express();
 
@@ -24,6 +27,7 @@ app.use('/auth', authSupabaseRoutes);
 app.use('/users', usersRoutes); 
 app.use('/appointments', appointmentsRoutes);
 app.use('/labor', laborRoutes);
+app.use("/products", productRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
