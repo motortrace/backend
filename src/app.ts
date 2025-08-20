@@ -10,6 +10,9 @@ import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import laborRoutes from './modules/labor/labor.routes';
 import { productRoutes } from "./modules/product";
+import vehiclesRoutes from './modules/vehicles/vehicles.routes';
+
+
 
 
 const app = express();
@@ -28,6 +31,7 @@ app.use('/users', usersRoutes);
 app.use('/appointments', appointmentsRoutes);
 app.use('/labor', laborRoutes);
 app.use("/products", productRoutes);
+app.use('/vehicles', vehiclesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
