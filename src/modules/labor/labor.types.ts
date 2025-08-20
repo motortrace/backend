@@ -1,4 +1,15 @@
-import { LaborCatalog, WorkOrderLabour } from '@prisma/client';
+import { LaborCatalog, WorkOrderLabor } from '@prisma/client';
+
+export interface CreateLaborRequest {
+  workOrderId: string;
+  description: string;
+  hours: number;
+  rate: number;
+  technicianId?: string;
+  startTime?: Date;
+  endTime?: Date;
+  notes?: string;
+}
 
 export interface CreateLaborCatalogRequest {
   code: string;
@@ -20,7 +31,7 @@ export interface UpdateLaborCatalogRequest {
   isActive?: boolean;
 }
 
-export interface CreateWorkOrderLabourRequest {
+export interface CreateWorkOrderLaborRequest {
   workOrderId: string;
   cannedServiceId?: string;
   laborCatalogId?: string;
@@ -33,7 +44,7 @@ export interface CreateWorkOrderLabourRequest {
   notes?: string;
 }
 
-export interface UpdateWorkOrderLabourRequest {
+export interface UpdateWorkOrderLaborRequest {
   cannedServiceId?: string;
   laborCatalogId?: string;
   description?: string;
@@ -47,21 +58,16 @@ export interface UpdateWorkOrderLabourRequest {
 
 export interface LaborCatalogWithUsage extends LaborCatalog {
   _count: {
-    labourItems: number;
+    laborItems: number;
   };
 }
 
-export interface WorkOrderLabourWithDetails extends WorkOrderLabour {
+export interface WorkOrderLaborWithDetails extends WorkOrderLabor {
   workOrder: {
     id: string;
     workOrderNumber: string;
     status: string;
   };
-  cannedService: {
-    id: string;
-    code: string;
-    name: string;
-  } | null;
   laborCatalog: {
     id: string;
     code: string;
@@ -70,14 +76,14 @@ export interface WorkOrderLabourWithDetails extends WorkOrderLabour {
   } | null;
   technician: {
     id: string;
-    supabaseUserId: string;
+    userProfileId: string;
   } | null;
 }
 
 export interface LaborSummary {
   totalHours: number;
   totalCost: number;
-  laborItems: WorkOrderLabourWithDetails[];
+  laborItems: WorkOrderLaborWithDetails[];
 }
 
 export interface LaborCatalogFilter {
@@ -86,7 +92,7 @@ export interface LaborCatalogFilter {
   search?: string;
 }
 
-export interface WorkOrderLabourFilter {
+export interface WorkOrderLaborFilter {
   workOrderId?: string;
   technicianId?: string;
   startDate?: Date;

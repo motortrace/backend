@@ -7,10 +7,7 @@ export interface CreateAppointmentRequest {
   startTime: Date; 
   endTime?: Date;
   notes?: string;
-  priority?: AppointmentPriority;
   cannedServiceIds: string[];
-  quantities?: number[];
-  prices?: number[];
   serviceNotes?: string[];
 }
 

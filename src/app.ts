@@ -1,6 +1,5 @@
 // src/app.ts
 import express from 'express';
-
 import cors from 'cors';
 import prisma from './infrastructure/database/prisma';
 import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.middleware';
@@ -8,11 +7,13 @@ import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.
 import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
+import workOrdersRoutes from './modules/work-orders';
+import estimatesRoutes from './modules/estimates/estimates.routes';
 import laborRoutes from './modules/labor/labor.routes';
-import { productRoutes } from "./modules/product";
-import vehiclesRoutes from './modules/vehicles/vehicles.routes';
-
-
+import inventoryRoutes from './modules/inventory/inventory.routes';
+import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
+// import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 
 
 const app = express();
@@ -29,9 +30,13 @@ app.use(express.json());
 app.use('/auth', authSupabaseRoutes);
 app.use('/users', usersRoutes); 
 app.use('/appointments', appointmentsRoutes);
+app.use('/work-orders', workOrdersRoutes);
+app.use('/estimates', estimatesRoutes);
 app.use('/labor', laborRoutes);
-app.use("/products", productRoutes);
-app.use('/vehicles', vehiclesRoutes);
+app.use('/inventory', inventoryRoutes);
+app.use('/inspection-templates', inspectionTemplatesRoutes);
+app.use('/payments', paymentsRoutes);
+// app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

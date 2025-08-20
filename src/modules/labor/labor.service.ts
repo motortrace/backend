@@ -2,18 +2,85 @@ import { PrismaClient } from '@prisma/client';
 import {
   CreateLaborCatalogRequest,
   UpdateLaborCatalogRequest,
-  CreateWorkOrderLabourRequest,
-  UpdateWorkOrderLabourRequest,
+  CreateWorkOrderLaborRequest,
+  UpdateWorkOrderLaborRequest,
   LaborCatalogWithUsage,
-  WorkOrderLabourWithDetails,
+  WorkOrderLaborWithDetails,
   LaborSummary,
   LaborCatalogFilter,
-  WorkOrderLabourFilter,
+  WorkOrderLaborFilter,
+  CreateLaborRequest,
 } from './labor.types';
 
 const prisma = new PrismaClient();
 
 export class LaborService {
+
+  // Simple Labor Creation (following appointments pattern)
+  async createLabor(data: CreateLaborRequest): Promise<WorkOrderLaborWithDetails> {
+    // Validate work order exists
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: data.workOrderId },
+    });
+
+    if (!workOrder) {
+      throw new Error(`Work order with ID '${data.workOrderId}' not found`);
+    }
+
+    // Validate technician exists if provided
+    if (data.technicianId) {
+      const technician = await prisma.technician.findUnique({
+        where: { id: data.technicianId },
+      });
+
+      if (!technician) {
+        throw new Error(`Technician with ID '${data.technicianId}' not found`);
+      }
+    }
+
+    // Calculate subtotal
+    const subtotal = data.hours * data.rate;
+
+    // Create labor record
+    const labor = await prisma.workOrderLabor.create({
+      data: {
+        workOrderId: data.workOrderId,
+        description: data.description,
+        hours: data.hours,
+        rate: data.rate,
+        subtotal,
+        technicianId: data.technicianId,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        notes: data.notes,
+      },
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+            status: true,
+          },
+        },
+        laborCatalog: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            category: true,
+          },
+        },
+        technician: {
+          select: {
+            id: true,
+            userProfileId: true,
+          },
+        },
+      },
+    });
+
+    return labor as WorkOrderLaborWithDetails;
+  }
 
   async createLaborCatalog(data: CreateLaborCatalogRequest) {
     const existingCatalog = await prisma.laborCatalog.findUnique({
@@ -60,7 +127,7 @@ export class LaborService {
       where,
       include: {
         _count: {
-          select: { labourItems: true },
+          select: { laborItems: true },
         },
       },
       orderBy: { name: 'asc' },
@@ -72,7 +139,7 @@ export class LaborService {
       where: { id },
       include: {
         _count: {
-          select: { labourItems: true },
+          select: { laborItems: true },
         },
       },
     });
@@ -114,7 +181,7 @@ export class LaborService {
       where: { id },
       include: {
         _count: {
-          select: { labourItems: true },
+          select: { laborItems: true },
         },
       },
     });
@@ -123,8 +190,8 @@ export class LaborService {
       throw new Error(`Labor catalog with ID '${id}' not found`);
     }
 
-    if (catalog._count.labourItems > 0) {
-      throw new Error(`Cannot delete labor catalog that is being used in ${catalog._count.labourItems} work orders`);
+    if (catalog._count.laborItems > 0) {
+      throw new Error(`Cannot delete labor catalog that is being used in ${catalog._count.laborItems} work orders`);
     }
 
     return await prisma.laborCatalog.delete({
@@ -132,7 +199,7 @@ export class LaborService {
     });
   }
 
-  async createWorkOrderLabour(data: CreateWorkOrderLabourRequest) {
+  async createWorkOrderLabor(data: CreateWorkOrderLaborRequest) {
     const workOrder = await prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
     });
@@ -162,7 +229,7 @@ export class LaborService {
     }
 
     if (data.technicianId) {
-      const technician = await prisma.staffMember.findUnique({
+      const technician = await prisma.technician.findUnique({
         where: { id: data.technicianId },
       });
 
@@ -173,10 +240,9 @@ export class LaborService {
 
     const subtotal = data.hours * data.rate;
 
-    return await prisma.workOrderLabour.create({
+    return await prisma.workOrderLabor.create({
       data: {
         workOrderId: data.workOrderId,
-        cannedServiceId: data.cannedServiceId,
         laborCatalogId: data.laborCatalogId,
         description: data.description,
         hours: data.hours,
@@ -195,13 +261,6 @@ export class LaborService {
             status: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         laborCatalog: {
           select: {
             id: true,
@@ -213,14 +272,14 @@ export class LaborService {
         technician: {
           select: {
             id: true,
-            supabaseUserId: true,
+            userProfileId: true,
           },
         },
       },
     });
   }
 
-  async getWorkOrderLabours(filter?: WorkOrderLabourFilter) {
+  async getWorkOrderLabors(filter?: WorkOrderLaborFilter) {
     const where: any = {};
 
     if (filter?.workOrderId) {
@@ -247,7 +306,7 @@ export class LaborService {
       };
     }
 
-    return await prisma.workOrderLabour.findMany({
+    return await prisma.workOrderLabor.findMany({
       where,
       include: {
         workOrder: {
@@ -257,13 +316,6 @@ export class LaborService {
             status: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         laborCatalog: {
           select: {
             id: true,
@@ -275,7 +327,7 @@ export class LaborService {
         technician: {
           select: {
             id: true,
-            supabaseUserId: true,
+            userProfileId: true,
           },
         },
       },
@@ -283,8 +335,8 @@ export class LaborService {
     });
   }
 
-  async getWorkOrderLabourById(id: string) {
-    const labour = await prisma.workOrderLabour.findUnique({
+  async getWorkOrderLaborById(id: string) {
+    const labor = await prisma.workOrderLabor.findUnique({
       where: { id },
       include: {
         workOrder: {
@@ -294,13 +346,6 @@ export class LaborService {
             status: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         laborCatalog: {
           select: {
             id: true,
@@ -312,26 +357,26 @@ export class LaborService {
         technician: {
           select: {
             id: true,
-            supabaseUserId: true,
+            userProfileId: true,
           },
         },
       },
     });
 
-    if (!labour) {
-      throw new Error(`Work order labour with ID '${id}' not found`);
+    if (!labor) {
+      throw new Error(`Work order labor with ID '${id}' not found`);
     }
 
-    return labour;
+    return labor;
   }
 
-  async updateWorkOrderLabour(id: string, data: UpdateWorkOrderLabourRequest) {
-    const existingLabour = await prisma.workOrderLabour.findUnique({
+  async updateWorkOrderLabor(id: string, data: UpdateWorkOrderLaborRequest) {
+    const existingLabor = await prisma.workOrderLabor.findUnique({
       where: { id },
     });
 
-    if (!existingLabour) {
-      throw new Error(`Work order labour with ID '${id}' not found`);
+    if (!existingLabor) {
+      throw new Error(`Work order labor with ID '${id}' not found`);
     }
 
     if (data.laborCatalogId) {
@@ -355,7 +400,7 @@ export class LaborService {
     }
 
     if (data.technicianId) {
-      const technician = await prisma.staffMember.findUnique({
+      const technician = await prisma.technician.findUnique({
         where: { id: data.technicianId },
       });
 
@@ -367,12 +412,12 @@ export class LaborService {
     const updateData: any = { ...data };
 
     if (data.hours !== undefined || data.rate !== undefined) {
-      const hours = data.hours ?? Number(existingLabour.hours);
-      const rate = data.rate ?? Number(existingLabour.rate);
+      const hours = data.hours ?? Number(existingLabor.hours);
+      const rate = data.rate ?? Number(existingLabor.rate);
       updateData.subtotal = hours * rate;
     }
 
-    return await prisma.workOrderLabour.update({
+    return await prisma.workOrderLabor.update({
       where: { id },
       data: updateData,
       include: {
@@ -383,13 +428,6 @@ export class LaborService {
             status: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         laborCatalog: {
           select: {
             id: true,
@@ -401,29 +439,29 @@ export class LaborService {
         technician: {
           select: {
             id: true,
-            supabaseUserId: true,
+            userProfileId: true,
           },
         },
       },
     });
   }
 
-  async deleteWorkOrderLabour(id: string) {
-    const labour = await prisma.workOrderLabour.findUnique({
+  async deleteWorkOrderLabor(id: string) {
+    const labor = await prisma.workOrderLabor.findUnique({
       where: { id },
     });
 
-    if (!labour) {
-      throw new Error(`Work order labour with ID '${id}' not found`);
+    if (!labor) {
+      throw new Error(`Work order labor with ID '${id}' not found`);
     }
 
-    return await prisma.workOrderLabour.delete({
+    return await prisma.workOrderLabor.delete({
       where: { id },
     });
   }
 
   async getWorkOrderLaborSummary(workOrderId: string): Promise<LaborSummary> {
-    const laborItems = await prisma.workOrderLabour.findMany({
+    const laborItems = await prisma.workOrderLabor.findMany({
       where: { workOrderId },
       include: {
         workOrder: {
@@ -433,13 +471,6 @@ export class LaborService {
             status: true,
           },
         },
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
         laborCatalog: {
           select: {
             id: true,
@@ -451,7 +482,7 @@ export class LaborService {
         technician: {
           select: {
             id: true,
-            supabaseUserId: true,
+            userProfileId: true,
           },
         },
       },
@@ -492,7 +523,7 @@ export class LaborService {
       }
     }
 
-    const laborItems = await prisma.workOrderLabour.findMany({
+    const laborItems = await prisma.workOrderLabor.findMany({
       where,
       include: {
         workOrder: {

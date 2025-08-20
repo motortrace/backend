@@ -20,7 +20,7 @@ export const updateLaborCatalogSchema = Joi.object({
   isActive: Joi.boolean().optional(),
 });
 
-export const createWorkOrderLabourSchema = Joi.object({
+export const createWorkOrderLaborSchema = Joi.object({
   workOrderId: Joi.string().required(),
   cannedServiceId: Joi.string().optional(),
   laborCatalogId: Joi.string().optional(),
@@ -33,7 +33,7 @@ export const createWorkOrderLabourSchema = Joi.object({
   notes: Joi.string().optional(),
 });
 
-export const updateWorkOrderLabourSchema = Joi.object({
+export const updateWorkOrderLaborSchema = Joi.object({
   cannedServiceId: Joi.string().optional(),
   laborCatalogId: Joi.string().optional(),
   description: Joi.string().optional(),
@@ -51,7 +51,7 @@ export const laborCatalogFilterSchema = Joi.object({
   search: Joi.string().optional(),
 });
 
-export const workOrderLabourFilterSchema = Joi.object({
+export const workOrderLaborFilterSchema = Joi.object({
   workOrderId: Joi.string().optional(),
   technicianId: Joi.string().optional(),
   startDate: Joi.date().optional(),
@@ -81,8 +81,8 @@ export const validateUpdateLaborCatalog = (req: any, res: any, next: any) => {
   next();
 };
 
-export const validateCreateWorkOrderLabour = (req: any, res: any, next: any) => {
-  const { error } = createWorkOrderLabourSchema.validate(req.body);
+export const validateCreateWorkOrderLabor = (req: any, res: any, next: any) => {
+  const { error } = createWorkOrderLaborSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,
@@ -92,8 +92,8 @@ export const validateCreateWorkOrderLabour = (req: any, res: any, next: any) => 
   next();
 };
 
-export const validateUpdateWorkOrderLabour = (req: any, res: any, next: any) => {
-  const { error } = updateWorkOrderLabourSchema.validate(req.body);
+export const validateUpdateWorkOrderLabor = (req: any, res: any, next: any) => {
+  const { error } = updateWorkOrderLaborSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,
@@ -114,8 +114,8 @@ export const validateLaborCatalogFilter = (req: any, res: any, next: any) => {
   next();
 };
 
-export const validateWorkOrderLabourFilter = (req: any, res: any, next: any) => {
-  const { error } = workOrderLabourFilterSchema.validate(req.query);
+export const validateWorkOrderLaborFilter = (req: any, res: any, next: any) => {
+  const { error } = workOrderLaborFilterSchema.validate(req.query);
   if (error) {
     return res.status(400).json({
       success: false,

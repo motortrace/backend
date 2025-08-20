@@ -16,32 +16,86 @@ model UserProfile {
   name           String?
   phone          String?
   profileImage   String?
+  role           UserRole      @default(CUSTOMER)
   isRegistrationComplete Boolean @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   // Relations
   customer       Customer?
+  serviceAdvisor ServiceAdvisor?
+  technician     Technician?
+  inventoryManager InventoryManager?
+  manager        Manager?
+  admin          Admin?
 }
 
-model StaffMember {
+model ServiceAdvisor {
   id             String        @id @default(cuid())
-  supabaseUserId String        @unique @db.Uuid // Links to auth.users.id (FK constraint added via migration)
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  workOrders     WorkOrder[]   @relation("TechnicianWorkOrders")
+  // Relations
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
-  inspections    WorkOrderInspection[] @relation("Inspections")
   createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
   approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
   approvals      WorkOrderApproval[] @relation("Approvals")
-  labourItems     WorkOrderLabour[] @relation("LabourWork")
-  partInstallations WorkOrderPart[] @relation("PartInstallations")
-  qcChecks       WorkOrderQC[] @relation("QCInspections")
-  uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
   processedPayments Payment[] @relation("ProcessedPayments")
+}
+
+model Technician {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  specialization String?
+  certifications String[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  inspections    WorkOrderInspection[] @relation("Inspections")
+  qcChecks       WorkOrderQC[] @relation("QCInspections")
+  laborItems     WorkOrderLabor[] @relation("LaborWork")
+  partInstallations WorkOrderPart[] @relation("PartInstallations")
+}
+
+model InventoryManager {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
+}
+
+model Manager {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  department     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Admin {
+  id             String        @id @default(cuid())
+  userProfile    UserProfile   @relation(fields: [userProfileId], references: [id])
+  userProfileId  String        @unique
+  employeeId     String?       @unique
+  permissions    String[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 // Customer table supports both app users and walk-ins
@@ -92,10 +146,8 @@ model WorkOrder {
   appointment     Appointment?   @relation(fields: [appointmentId], references: [id])
   appointmentId   String?        @unique
 
-  serviceAdvisor  StaffMember?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
+  serviceAdvisor  ServiceAdvisor?   @relation("AdvisorWorkOrders", fields: [advisorId], references: [id])
   advisorId       String?
-  technician      StaffMember?   @relation("TechnicianWorkOrders", fields: [technicianId], references: [id])
-  technicianId    String?
 
   status          WorkOrderStatus
   jobType         JobType        @default(REPAIR)
@@ -109,24 +161,44 @@ model WorkOrder {
   estimateNotes   String?
   estimateApproved Boolean       @default(false)
 
-  subtotalLabour  Decimal?       @db.Decimal(10,2)
+  subtotalLabor  Decimal?       @db.Decimal(10,2)
   subtotalParts   Decimal?       @db.Decimal(10,2)
   discountAmount  Decimal?       @db.Decimal(10,2)
   taxAmount       Decimal?       @db.Decimal(10,2)
   totalAmount     Decimal?       @db.Decimal(10,2)
   paidAmount      Decimal?       @db.Decimal(10,2) @default(0)
 
+  openedAt        DateTime?
+  promisedAt      DateTime?
+  closedAt        DateTime?
+
+  workflowStep    WorkflowStep   @default(RECEIVED)
+  internalNotes   String?
+  customerNotes   String?
+
+  invoiceNumber   String?
+  finalizedAt     DateTime?
+  paymentStatus   PaymentStatus  @default(PENDING)
+
+  warrantyClaimNumber      String?
+  thirdPartyApprovalCode   String?
+
+  campaignId       String?
+  servicePackageId String?
+
+  customerSignature String?
+  customerFeedback  String?
+
   // Relations to be defined
-  serviceItems    ServiceItem[]
   inspections     WorkOrderInspection[]
-  labourItems     WorkOrderLabour[]
-  partsUsed       WorkOrderPart[]
   approvals       WorkOrderApproval[]
   qcChecks        WorkOrderQC[]
   attachments     WorkOrderAttachment[]
   payments        Payment[]
   estimates       WorkOrderEstimate[]
   services        WorkOrderService[]
+  laborItems     WorkOrderLabor[]
+  partsUsed       WorkOrderPart[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -141,11 +213,39 @@ model CannedService {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  serviceItems ServiceItem[]
-  partsUsed    WorkOrderPart[]
-  labourItems  WorkOrderLabour[]
+  // Relations to actual work orders
   appointmentServices AppointmentCannedService[]
   services     WorkOrderService[]
+  
+  // Junction table relationships
+  laborOperations CannedServiceLabor[]
+  partsCategories CannedServicePartsCategory[]
+}
+
+// Junction table for CannedService to LaborCatalog (many-to-many)
+model CannedServiceLabor {
+  id             String        @id @default(cuid())
+  cannedService  CannedService @relation(fields: [cannedServiceId], references: [id], onDelete: Cascade)
+  cannedServiceId String
+  laborCatalog   LaborCatalog  @relation(fields: [laborCatalogId], references: [id], onDelete: Cascade)
+  laborCatalogId String
+  sequence       Int           @default(1) // Order of operations
+  notes          String?       // Additional notes for this labor operation
+  
+  @@unique([cannedServiceId, laborCatalogId])
+}
+
+// Junction table for CannedService to InventoryCategory (many-to-many)
+model CannedServicePartsCategory {
+  id             String        @id @default(cuid())
+  cannedService  CannedService @relation(fields: [cannedServiceId], references: [id], onDelete: Cascade)
+  cannedServiceId String
+  category       InventoryCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId     String
+  isRequired     Boolean       @default(true) // Whether this category is required or optional
+  notes          String?       // Additional notes for this parts category
+  
+  @@unique([cannedServiceId, categoryId])
 }
 
 // Individual billable labor operations that technicians perform
@@ -163,7 +263,9 @@ model LaborCatalog {
   updatedAt   DateTime       @updatedAt
 
   // Relations
-  labourItems WorkOrderLabour[]
+  cannedServices CannedServiceLabor[] // Services that use this labor operation
+  estimateLaborItems EstimateLabor[]
+  laborItems WorkOrderLabor[]
 }
 
 // Shop Operating Hours and Capacity Planning
@@ -198,24 +300,12 @@ enum DayOfWeek {
   SATURDAY
 }
 
-model ServiceItem {
-  id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?
-  description      String
-  cost             Decimal         
-  createdAt        DateTime        @default(now())
-}
-
 model InventoryItem {
   id          String        @id @default(cuid())
   name        String
   sku         String?       @unique
   partNumber     String?    @unique
   manufacturer   String?
-  category       String?    // "Engine", "Brake", "Electrical"
   location       String?    // Shelf location
   quantity    Int           @default(0)
   minStockLevel  Int?       @default(0)
@@ -228,8 +318,12 @@ model InventoryItem {
   corePrice      Decimal?   @db.Decimal(10,2)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  category InventoryCategory @relation(fields: [categoryId], references: [id])
+  categoryId   String
   
   // Relations
+  estimatePartItems EstimatePart[]
   workOrderParts WorkOrderPart[]
 }
 
@@ -242,13 +336,7 @@ enum UserRole {
   TECHNICIAN
 }
 
-enum StaffRole {
-  ADMIN
-  MANAGER
-  SERVICE_ADVISOR
-  INVENTORY_MANAGER
-  TECHNICIAN
-}
+
 
 enum WorkOrderStatus {
   PENDING
@@ -305,7 +393,7 @@ model Appointment {
 
   // Relations
   workOrder    WorkOrder?
-  assignedTo   StaffMember?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
+  assignedTo   ServiceAdvisor?      @relation("AssignedAppointments", fields: [assignedToId], references: [id])
   assignedToId String?
   
   // Link to CannedServices (many-to-many relationship)
@@ -343,14 +431,53 @@ enum AppointmentPriority {
 }
 
 // Inspection & Diagnostic Reports
+// Inspection Templates - Predefined inspection categories and items
+model InspectionTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Engine (Mechanical Condition)", "Cooling System", etc.
+  description String?  // Detailed description of what this template covers
+  category    String?  // "Mechanical", "Electrical", "Safety", etc.
+  isActive    Boolean  @default(true)
+  sortOrder   Int?     // Display order in UI
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  templateItems InspectionTemplateItem[]
+  workOrderInspections WorkOrderInspection[] // Which inspections used this template
+}
+
+model InspectionTemplateItem {
+  id               String             @id @default(cuid())
+  template         InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId       String
+  name             String             // "Oil in air cleaner", "Water in oil", "Coolant level"
+  description      String?            // More detailed description of what to check
+  category         String?            // Sub-category within the template
+  sortOrder        Int?               // Order within the template
+  isRequired       Boolean            @default(true) // Must this item be checked?
+  allowsNotes      Boolean            @default(true) // Can technician add notes?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // Relations
+  checklistResults InspectionChecklistItem[] // Actual inspection results using this template item
+
+  @@unique([templateId, name]) // Prevent duplicate items within same template
+}
+
+// Updated WorkOrderInspection to link to templates
 model WorkOrderInspection {
-  id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  id           String              @id @default(cuid())
+  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  inspector    StaffMember @relation("Inspections", fields: [inspectorId], references: [id])
+  inspector    Technician          @relation("Inspections", fields: [inspectorId], references: [id])
   inspectorId  String
-  date         DateTime   @default(now())
-  notes        String?
+  template     InspectionTemplate? @relation(fields: [templateId], references: [id]) // NEW: Link to template used
+  templateId   String?             // NEW: Template used for this inspection
+  date         DateTime            @default(now())
+  notes        String?             // Overall inspection summary
+  isCompleted  Boolean             @default(false) // NEW: Track completion status
   
   // Relations
   checklistItems InspectionChecklistItem[]
@@ -358,15 +485,24 @@ model WorkOrderInspection {
   attachments   WorkOrderInspectionAttachment[]
 }
 
+// Updated InspectionChecklistItem to reference template items
 model InspectionChecklistItem {
-  id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
-  inspectionId String
-  category     String     // e.g., "Engine", "Brakes", "Electrical", "Safety"
-  item         String     // e.g., "Oil Level", "Brake Pads", "Battery"
-  status       ChecklistStatus
-  notes        String?    // Additional notes for the item
-  createdAt    DateTime   @default(now())
+  id                    String                  @id @default(cuid())
+  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id])
+  inspectionId          String
+  templateItem          InspectionTemplateItem? @relation(fields: [templateItemId], references: [id]) // NEW: Link to template
+  templateItemId        String?                 // NEW: Template item this result is based on
+  
+  // Keep these for backwards compatibility and custom items
+  category              String?                 // e.g., "Engine", "Brakes" (from template or manual)
+  item                  String                  // e.g., "Oil Level" (from template or manual)
+  
+  status                ChecklistStatus         // GREEN, YELLOW, RED
+  notes                 String?                 // Technician's specific notes
+  requiresFollowUp      Boolean                 @default(false) // NEW: Does this need follow-up?
+  createdAt             DateTime                @default(now())
+
+  @@unique([inspectionId, templateItemId]) // Prevent duplicate results for same template item
 }
 
 enum ChecklistStatus {
@@ -417,43 +553,114 @@ model WorkOrderEstimate {
   version      Int       @default(1) // Track estimate versions
   description  String?   // Brief description of what this estimate covers
   totalAmount  Decimal   @db.Decimal(10,2)
-  labourAmount Decimal?  @db.Decimal(10,2) // Labour portion
+  laborAmount Decimal?  @db.Decimal(10,2) // Labor portion
   partsAmount  Decimal?  @db.Decimal(10,2) // Parts portion
   taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
   discountAmount Decimal? @db.Decimal(10,2) // Any discounts
   notes        String?   // Additional notes about the estimate
-  createdBy    StaffMember? @relation("CreatedEstimates", fields: [createdById], references: [id])
+  createdBy    ServiceAdvisor? @relation("CreatedEstimates", fields: [createdById], references: [id])
   createdById  String?
   createdAt    DateTime  @default(now())
   approved     Boolean   @default(false)
   approvedAt   DateTime?
-  approvedBy   StaffMember? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
+  approvedBy   ServiceAdvisor? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
   approvedById String?
   
   // Relations
-  estimateItems WorkOrderEstimateItem[]
+  estimateLaborItems EstimateLabor[]
+  estimatePartItems EstimatePart[]
   approvals     WorkOrderApproval[]
 }
 
-model WorkOrderEstimateItem {
-  id           String    @id @default(cuid())
-  estimate     WorkOrderEstimate @relation(fields: [estimateId], references: [id])
-  estimateId   String
-  description  String    // Item description
-  quantity     Int       @default(1)
-  unitPrice    Decimal   @db.Decimal(10,2)
-  totalPrice   Decimal   @db.Decimal(10,2)
-  itemType     EstimateItemType @default(LABOUR)
-  notes        String?   // Additional notes for this item
-  createdAt    DateTime  @default(now())
+model EstimateLabor {
+  id               String          @id @default(cuid())
+  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
+  estimateId       String
+  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
+  laborCatalogId   String?         // Optional - for catalog-based labor operations
+  description      String          // Description of the labor to be performed
+  hours            Decimal         @db.Decimal(5,2) // Estimated hours (e.g., 2.5 hours)
+  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  notes            String?         // Additional notes about the labor
+  customerApproved Boolean         @default(false) // Customer approval status
+  customerNotes    String?         // Customer's notes or comments
+  cannedServiceId  String?         // Reference to canned service if this labor came from one
+  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
-enum EstimateItemType {
-  LABOUR
-  PART
-  SERVICE
-  OTHER
+model EstimatePart {
+  id               String        @id @default(cuid())
+  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
+  estimateId       String
+  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2) // Estimated price
+  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  source           PartSource    @default(INVENTORY)
+  supplierName     String?       // Supplier name if not from inventory
+  warrantyInfo     String?       // Warranty information for the part
+  notes            String?       // Additional notes about the part
+  customerApproved Boolean       @default(false) // Customer approval status
+  customerNotes    String?       // Customer's notes or comments
+  cannedServiceId  String?       // Reference to canned service if this part came from one
+  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
+
+// Labor & Parts Usage - Populated from estimates when approved
+model WorkOrderLabor {
+  id               String          @id @default(cuid())
+  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
+  laborCatalogId   String?         // Optional - for catalog-based labor operations
+  description      String          // Description of the labor performed (manual or from catalog)
+  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
+  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  technician       Technician?    @relation("LaborWork", fields: [technicianId], references: [id])
+  technicianId     String?
+  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  startTime        DateTime?       // When the work started
+  endTime          DateTime?       // When the work ended
+  notes            String?         // Additional notes about the labor
+  cannedServiceId  String?         // Reference to canned service if this labor came from one
+  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model WorkOrderPart {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId  String
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
+  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  source           PartSource    @default(INVENTORY)
+  supplierName     String?       // Supplier name if not from inventory
+  supplierInvoice  String?       // Supplier invoice number
+  warrantyInfo     String?       // Warranty information for the part
+  notes            String?       // Additional notes about the part usage
+  installedAt      DateTime?     // When the part was installed
+  installedBy      Technician?  @relation("PartInstallations", fields: [installedById], references: [id])
+  installedById    String?
+  cannedServiceId  String?       // Reference to canned service if this part came from one
+  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
+  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
 
 model WorkOrderApproval {
   id           String       @id @default(cuid())
@@ -464,7 +671,7 @@ model WorkOrderApproval {
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
-  approvedBy   StaffMember? @relation("Approvals", fields: [approvedById], references: [id])
+  approvedBy   ServiceAdvisor? @relation("Approvals", fields: [approvedById], references: [id])
   approvedById String?
   method       ApprovalMethod?
   notes        String?      // Notes from the approval process
@@ -489,51 +696,6 @@ enum ApprovalMethod {
   DIGITAL_SIGNATURE
 }
 
-// Labour & Parts Usage
-model WorkOrderLabour {
-  id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  cannedService    CannedService?  @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?         // Optional - for catalog-based labour
-  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
-  laborCatalogId   String?         // Optional - for catalog-based labour operations
-  description      String          // Description of the labour performed (manual or from catalog)
-  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
-  rate             Decimal         @db.Decimal(10,2) // Hourly rate
-  technician       StaffMember?    @relation("LabourWork", fields: [technicianId], references: [id])
-  technicianId     String?
-  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
-  startTime        DateTime?       // When the work started
-  endTime          DateTime?       // When the work ended
-  notes            String?         // Additional notes about the labour
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-}
-
-model WorkOrderPart {
-  id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
-  workOrderId      String
-  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  inventoryItemId  String
-  cannedService    CannedService? @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String?
-  quantity         Int           @default(1)
-  unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
-  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
-  source           PartSource    @default(INVENTORY)
-  supplierName     String?       // Supplier name if not from inventory
-  supplierInvoice  String?       // Supplier invoice number
-  warrantyInfo     String?       // Warranty information for the part
-  notes            String?       // Additional notes about the part usage
-  installedAt      DateTime?     // When the part was installed
-  installedBy      StaffMember?  @relation("PartInstallations", fields: [installedById], references: [id])
-  installedById    String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-}
-
 enum PartSource {
   INVENTORY        // From shop inventory
   SUPPLIER         // Ordered from supplier
@@ -542,13 +704,18 @@ enum PartSource {
   SALVAGE          // Used/salvage part
 }
 
+enum ServiceDiscountType {
+  FIXED           // Fixed dollar amount discount
+  PERCENTAGE      // Percentage-based discount
+}
+
 // QC, Attachments & Payments
 model WorkOrderQC {
   id           String     @id @default(cuid())
   workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
   workOrderId  String
   passed       Boolean    // QC pass/fail status
-  inspector    StaffMember? @relation("QCInspections", fields: [inspectorId], references: [id])
+  inspector    Technician? @relation("QCInspections", fields: [inspectorId], references: [id])
   inspectorId  String?
   notes        String?    // QC notes and findings
   qcDate       DateTime   @default(now()) // When QC was performed
@@ -568,7 +735,7 @@ model WorkOrderAttachment {
   fileSize     Int?       // File size in bytes
   description  String?    // Description of what the attachment shows
   category     AttachmentCategory @default(GENERAL) // Category of attachment
-  uploadedBy   StaffMember? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
+  uploadedBy   InventoryManager? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
   uploadedById String?
   uploadedAt   DateTime   @default(now())
 }
@@ -594,7 +761,7 @@ model Payment {
   reference    String?    // Payment reference number
   status       PaymentStatus @default(PENDING)
   paidAt       DateTime   @default(now())
-  processedBy  StaffMember? @relation("ProcessedPayments", fields: [processedById], references: [id])
+  processedBy  ServiceAdvisor? @relation("ProcessedPayments", fields: [processedById], references: [id])
   processedById String?
   notes        String?    // Payment notes
   refundAmount Decimal?   @db.Decimal(10,2) // For partial refunds
@@ -615,8 +782,22 @@ enum PaymentMethod {
   WARRANTY
 }
 
+enum WorkflowStep {
+  RECEIVED
+  INSPECTION
+  ESTIMATE
+  APPROVAL
+  REPAIR
+  QC
+  READY
+  CLOSED
+}
+
 enum PaymentStatus {
   PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
   COMPLETED
   FAILED
   REFUNDED
@@ -637,6 +818,7 @@ model WorkOrderService {
   workOrderId      String
   cannedService    CannedService @relation(fields: [cannedServiceId], references: [id])
   cannedServiceId  String
+  description      String?       // Custom description (overrides canned service description if needed)
   quantity         Int           @default(1)
   unitPrice        Decimal       @db.Decimal(10,2)
   subtotal         Decimal       @db.Decimal(10,2)
@@ -646,8 +828,12 @@ model WorkOrderService {
   updatedAt        DateTime      @updatedAt
 }
 
-model Product {
-  id              String         @id @default(uuid())
-  name            String
-  price           Float
+
+model InventoryCategory {
+  id String @id @default(cuid())
+  name String @unique
+  
+  // Relations
+  inventoryItems InventoryItem[]
+  cannedServices CannedServicePartsCategory[] // Services that use parts from this category
 }

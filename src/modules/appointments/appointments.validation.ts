@@ -8,10 +8,7 @@ export const createAppointmentSchema = Joi.object({
   startTime: Joi.date().required(), // Now required for time block booking
   endTime: Joi.date().optional(),
   notes: Joi.string().optional(),
-  priority: Joi.string().valid(...Object.values(AppointmentPriority)).optional(),
   cannedServiceIds: Joi.array().items(Joi.string()).min(1).required(),
-  quantities: Joi.array().items(Joi.number().min(1)).optional(),
-  prices: Joi.array().items(Joi.number().min(0)).optional(),
   serviceNotes: Joi.array().items(Joi.string()).optional(),
 });
 
