@@ -92,7 +92,6 @@ export class AppointmentService {
         requestedAt: requestedAt,
         startTime: startTime,
         endTime: endTime,
-        priority: null,
         notes: appointmentData.notes,
         status: AppointmentStatus.PENDING, // All appointments start as unassigned
         cannedServices: {
