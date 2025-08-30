@@ -119,6 +119,35 @@ export class CannedServiceController {
     }
   }
 
+  // Get canned service with detailed information including labor and parts
+  async getCannedServiceDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const cannedService = await this.cannedServiceService.getCannedServiceDetails(id);
+
+      if (!cannedService) {
+        res.status(404).json({
+          success: false,
+          error: 'Canned service not found',
+          message: 'The requested canned service does not exist',
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: cannedService,
+        message: 'Canned service details retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve canned service details',
+      });
+    }
+  }
+
   // Update canned service
   async updateCannedService(req: Request, res: Response): Promise<void> {
     try {

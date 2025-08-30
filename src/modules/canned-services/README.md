@@ -1,154 +1,256 @@
 # Canned Services Module
 
-A dedicated module for managing predefined automotive services that can be used across the system.
-
-## Overview
-
-The Canned Services module provides a centralized way to manage standard automotive services like oil changes, brake inspections, tire rotations, etc. These services can be referenced by:
-
-- Work Orders
-- Appointments
-- Estimates
-- Service Catalogs
-- Customer Service Menus
+A comprehensive module for managing predefined service packages in the automotive service system. This module handles both basic service information and detailed breakdowns of labor operations and parts categories.
 
 ## Features
 
-- **CRUD Operations**: Create, read, update, and delete canned services
-- **Availability Management**: Enable/disable services without deleting them
-- **Search & Filtering**: Find services by name, description, code, or price range
-- **Bulk Operations**: Update prices across multiple services
-- **Validation**: Comprehensive input validation and error handling
-- **Audit Trail**: Track creation and modification timestamps
+### Basic Service Management
+- Create, read, update, and delete canned services
+- Search and filter services by availability, price, and keywords
+- Toggle service availability for booking UI
+- Bulk price updates for annual adjustments
+
+### Detailed Service Information
+- **NEW**: Get complete service breakdown including labor operations and parts categories
+- View labor operations with sequence, estimated hours, and hourly rates
+- View required and optional parts categories
+- Support for service notes and additional metadata
 
 ## API Endpoints
 
-### Base Path: `/canned-services`
+### Basic Service Management
 
-#### GET `/canned-services`
-Get all canned services with optional filters
-- **Query Parameters:**
-  - `isAvailable` (boolean): Filter by availability
-  - `minPrice` (number): Minimum price filter
-  - `maxPrice` (number): Maximum price filter
-  - `search` (string): Search in name, description, or code
-
-#### GET `/canned-services/available`
-Get only available (enabled) canned services
-
-#### GET `/canned-services/search`
-Search canned services with filters
-- **Query Parameters:** Same as above, plus `query` (required)
-
-#### GET `/canned-services/:id`
-Get a specific canned service by ID
-
-#### GET `/canned-services/code/:code`
-Get a specific canned service by code
-
-#### POST `/canned-services`
-Create a new canned service
-- **Body:**
-  ```json
-  {
-    "code": "OIL_CHANGE",
-    "name": "Oil Change Service",
-    "description": "Standard oil change with filter replacement",
-    "duration": 30,
-    "price": 49.99,
-    "isAvailable": true
-  }
-  ```
-
-#### PUT `/canned-services/:id`
-Update an existing canned service
-- **Body:** Same as POST, but all fields are optional
-
-#### PATCH `/canned-services/:id/toggle-availability`
-Toggle the availability of a canned service
-
-#### PATCH `/canned-services/bulk-update-prices`
-Bulk update prices across all services
-- **Body:**
-  ```json
-  {
-    "percentageIncrease": 5.5
-  }
-  ```
-
-#### DELETE `/canned-services/:id`
-Delete a canned service (only if not used in work orders or appointments)
-
-## Data Model
-
-```typescript
-interface CannedService {
-  id: string;
-  code: string;           // Unique service code (e.g., "OIL_CHANGE")
-  name: string;           // Service name
-  description?: string;   // Service description
-  duration: number;       // Duration in minutes
-  price: number;          // Service price
-  isAvailable: boolean;   // Whether service is currently available
-  createdAt: Date;        // Creation timestamp
-  updatedAt: Date;        // Last update timestamp
+#### Create Canned Service
+```
+POST /api/canned-services
+```
+**Body:**
+```json
+{
+  "code": "OIL_CHANGE",
+  "name": "Oil Change Service",
+  "description": "Complete oil change with filter replacement",
+  "duration": 30,
+  "price": 89.99,
+  "isAvailable": true
 }
 ```
 
+#### Get All Canned Services
+```
+GET /api/canned-services?isAvailable=true&minPrice=50&maxPrice=200&search=oil
+```
+
+#### Get Canned Service by ID
+```
+GET /api/canned-services/:id
+```
+
+#### Get Canned Service by Code
+```
+GET /api/canned-services/code/:code
+```
+
+#### Update Canned Service
+```
+PUT /api/canned-services/:id
+```
+
+#### Delete Canned Service
+```
+DELETE /api/canned-services/:id
+```
+
+### **NEW: Detailed Service Information**
+
+#### Get Canned Service with Labor and Parts Details
+```
+GET /api/canned-services/:id/details
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cs_001",
+    "code": "OIL_CHANGE",
+    "name": "Oil Change Service",
+    "description": "Complete oil change with filter replacement",
+    "duration": 30,
+    "price": 89.99,
+    "isAvailable": true,
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z",
+    "laborOperations": [
+      {
+        "id": "csl_001",
+        "sequence": 1,
+        "notes": "Drain oil and replace filter",
+        "labor": {
+          "id": "labor_001",
+          "code": "OIL_CHANGE_LABOR",
+          "name": "Oil Change Labor",
+          "description": "Standard oil change labor operation",
+          "estimatedHours": 0.5,
+          "hourlyRate": 75.00,
+          "category": "Engine",
+          "isActive": true
+        }
+      }
+    ],
+    "partsCategories": [
+      {
+        "id": "cspc_001",
+        "isRequired": true,
+        "notes": "Engine oil",
+        "category": {
+          "id": "cat_001",
+          "name": "Engine Oil"
+        }
+      },
+      {
+        "id": "cspc_002",
+        "isRequired": true,
+        "notes": "Oil filter",
+        "category": {
+          "id": "cat_002",
+          "name": "Oil Filters"
+        }
+      }
+    ]
+  },
+  "message": "Canned service details retrieved successfully"
+}
+```
+
+### Additional Operations
+
+#### Toggle Service Availability
+```
+PATCH /api/canned-services/:id/toggle-availability
+```
+
+#### Get Available Services Only
+```
+GET /api/canned-services/available
+```
+
+#### Search Services
+```
+GET /api/canned-services/search?query=oil&isAvailable=true
+```
+
+#### Bulk Update Prices
+```
+PATCH /api/canned-services/bulk-update-prices
+```
+**Body:**
+```json
+{
+  "percentageIncrease": 5.5
+}
+```
+
+## Data Models
+
+### CannedService
+```typescript
+{
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  duration: number; // in minutes
+  price: number;
+  isAvailable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### CannedServiceLaborDetail
+```typescript
+{
+  id: string;
+  sequence: number;
+  notes?: string;
+  labor: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    estimatedHours: number;
+    hourlyRate: number;
+    category?: string;
+    isActive: boolean;
+  };
+}
+```
+
+### CannedServicePartsCategoryDetail
+```typescript
+{
+  id: string;
+  isRequired: boolean;
+  notes?: string;
+  category: {
+    id: string;
+    name: string;
+  };
+}
+```
+
+## Database Relationships
+
+The `CannedService` model uses junction tables to maintain many-to-many relationships:
+
+- **CannedServiceLabor**: Links services to labor operations with sequence and notes
+- **CannedServicePartsCategory**: Links services to parts categories with required/optional flags
+
 ## Usage Examples
 
-### Creating a New Service
-```bash
-curl -X POST "http://localhost:3000/canned-services" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "BRAKE_INSPECTION",
-    "name": "Brake System Inspection",
-    "description": "Complete brake system inspection and safety check",
-    "duration": 45,
-    "price": 89.99
-  }'
+### Getting Service Details for Work Order Creation
+```typescript
+// Get complete service breakdown
+const serviceDetails = await cannedServiceService.getCannedServiceDetails(serviceId);
+
+// Access labor operations
+const laborOperations = serviceDetails.laborOperations;
+const totalLaborHours = laborOperations.reduce((sum, op) => sum + op.labor.estimatedHours, 0);
+
+// Access parts categories
+const requiredParts = serviceDetails.partsCategories.filter(pc => pc.isRequired);
+const optionalParts = serviceDetails.partsCategories.filter(pc => !pc.isRequired);
 ```
 
-### Getting Available Services
-```bash
-curl -X GET "http://localhost:3000/canned-services/available"
+### Creating Work Order from Canned Service
+```typescript
+// When creating a work order, you can now see exactly what labor and parts are needed
+const serviceDetails = await cannedServiceService.getCannedServiceDetails(cannedServiceId);
+
+// Copy labor operations to work order
+for (const laborOp of serviceDetails.laborOperations) {
+  await workOrderService.addLabor({
+    workOrderId,
+    laborCatalogId: laborOp.labor.id,
+    description: laborOp.labor.name,
+    hours: laborOp.labor.estimatedHours,
+    rate: laborOp.labor.hourlyRate,
+    notes: laborOp.notes
+  });
+}
+
+// Show technician what parts categories they need to select from
+const partsCategories = serviceDetails.partsCategories;
 ```
 
-### Searching Services
+## Testing
+
+Use the provided test script to verify the endpoint works:
+
 ```bash
-curl -X GET "http://localhost:3000/canned-services/search?query=oil&maxPrice=100"
+node scripts/test-canned-service-details.js
 ```
 
-### Updating a Service
-```bash
-curl -X PUT "http://localhost:3000/canned-services/{id}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "price": 54.99
-  }'
-```
-
-## Business Rules
-
-1. **Unique Codes**: Service codes must be unique across the system
-2. **Deletion Protection**: Services cannot be deleted if they're used in work orders or appointments
-3. **Price Validation**: Prices must be non-negative numbers
-4. **Duration Limits**: Duration must be between 1 minute and 8 hours (480 minutes)
-5. **Availability Toggle**: Services can be disabled without deletion for seasonal or temporary unavailability
-
-## Integration Points
-
-- **Work Orders**: Services are referenced when creating work order line items
-- **Appointments**: Services can be selected when booking appointments
-- **Estimates**: Services contribute to estimate calculations
-- **Inventory**: Services can be linked to required parts
-- **Labor**: Services can have associated labor operations
-
-## Future Enhancements
-
-- **Categories**: Group services by type (maintenance, repair, inspection)
-- **Seasonal Pricing**: Different prices for different times of year
-- **Service Packages**: Combine multiple services into packages
-- **Customer Pricing**: Different prices for different customer types
-- **Service Templates**: Predefined service workflows and checklists
+This will test the new details endpoint and show you the complete breakdown of a canned service including its labor operations and parts categories.

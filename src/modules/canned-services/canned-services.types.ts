@@ -20,10 +20,50 @@ export interface UpdateCannedServiceRequest {
 
 export interface CannedServiceFilters {
   isAvailable?: boolean;
-  category?: string;
   minPrice?: number;
   maxPrice?: number;
   search?: string;
+}
+
+// Detailed response interfaces for canned service with labor and parts
+export interface CannedServiceLaborDetail {
+  id: string;
+  sequence: number;
+  notes?: string;
+  labor: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    estimatedHours: number | any; // Allow Prisma Decimal type
+    hourlyRate: number | any; // Allow Prisma Decimal type
+    category?: string;
+    isActive: boolean;
+  };
+}
+
+export interface CannedServicePartsCategoryDetail {
+  id: string;
+  isRequired: boolean;
+  notes?: string;
+  category: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface CannedServiceDetails {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  duration: number;
+  price: number | any; // Allow Prisma Decimal type
+  isAvailable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  laborOperations: CannedServiceLaborDetail[];
+  partsCategories: CannedServicePartsCategoryDetail[];
 }
 
 // Validation schemas

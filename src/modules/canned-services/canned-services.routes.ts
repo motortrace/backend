@@ -49,6 +49,12 @@ router.get(
   cannedServiceController.getCannedServiceByCode.bind(cannedServiceController)
 );
 
+// Get canned service with detailed information including labor and parts
+router.get(
+  '/:id/details',
+  cannedServiceController.getCannedServiceDetails.bind(cannedServiceController)
+);
+
 // Update canned service
 router.put(
   '/:id',

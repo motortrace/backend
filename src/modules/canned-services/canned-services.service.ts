@@ -3,6 +3,7 @@ import {
   CreateCannedServiceRequest,
   UpdateCannedServiceRequest,
   CannedServiceFilters,
+  CannedServiceDetails,
 } from './canned-services.types';
 
 const prisma = new PrismaClient();
@@ -82,6 +83,66 @@ export class CannedServiceService {
     });
 
     return cannedService;
+  }
+
+  // Get canned service with detailed information including labor and parts
+  async getCannedServiceDetails(id: string): Promise<CannedServiceDetails | null> {
+    const cannedService = await prisma.cannedService.findUnique({
+      where: { id },
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                estimatedHours: true,
+                hourlyRate: true,
+                category: true,
+                isActive: true
+              }
+            }
+          },
+          orderBy: {
+            sequence: 'asc'
+          }
+        },
+        partsCategories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!cannedService) {
+      return null;
+    }
+
+    // Transform the data to be more user-friendly
+    return {
+      ...cannedService,
+      description: cannedService.description || undefined, // Convert null to undefined
+      laborOperations: cannedService.laborOperations.map((op: any) => ({
+        id: op.id,
+        sequence: op.sequence,
+        notes: op.notes || undefined, // Convert null to undefined
+        labor: op.laborCatalog
+      })),
+      partsCategories: cannedService.partsCategories.map((pc: any) => ({
+        id: pc.id,
+        isRequired: pc.isRequired,
+        notes: pc.notes || undefined, // Convert null to undefined
+        category: pc.category
+      }))
+    };
   }
 
   // Update canned service
