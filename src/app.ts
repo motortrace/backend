@@ -13,6 +13,7 @@ import laborRoutes from './modules/labor/labor.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
+import customerRoutes from './modules/customers/customers.routes';
 // import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 
 
@@ -36,6 +37,7 @@ app.use('/labor', laborRoutes);
 app.use('/inventory', inventoryRoutes);
 app.use('/inspection-templates', inspectionTemplatesRoutes);
 app.use('/payments', paymentsRoutes);
+app.use('/customers', customerRoutes);
 // app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
