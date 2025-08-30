@@ -74,14 +74,7 @@ export interface ShopCapacitySettingsRequest {
   futureSchedulingCutoffYears: number;
 }
 
-export interface CannedServiceRequest {
-  code: string;
-  name: string;
-  description?: string;
-  duration: number; // in minutes
-  price: number;
-  isAvailable: boolean;
-}
+
 
 export interface AppointmentWithServices {
   id: string;

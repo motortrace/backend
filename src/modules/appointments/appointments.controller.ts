@@ -218,74 +218,7 @@ export class AppointmentController {
     }
   }
 
-  // Canned Service Management
-  async createCannedService(req: Request, res: Response) {
-    try {
-      const cannedService = await this.appointmentService.createCannedService(req.body);
 
-      res.status(201).json({
-        success: true,
-        data: cannedService,
-        message: 'Canned service created successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async getAvailableCannedServices(req: Request, res: Response) {
-    try {
-      const services = await this.appointmentService.getAvailableCannedServices();
-
-      res.json({
-        success: true,
-        data: services,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async updateCannedService(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const cannedService = await this.appointmentService.updateCannedService(id, req.body);
-
-      res.json({
-        success: true,
-        data: cannedService,
-        message: 'Canned service updated successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async deleteCannedService(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      await this.appointmentService.deleteCannedService(id);
-
-      res.json({
-        success: true,
-        message: 'Canned service deleted successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
 
   // Shop Settings Management
   async updateOperatingHours(req: Request, res: Response) {

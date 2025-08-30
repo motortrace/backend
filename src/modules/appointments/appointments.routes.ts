@@ -6,8 +6,6 @@ import {
   validateUpdateAppointment,
   validateAppointmentSlotRequest,
   validateAssignAppointment,
-  validateCreateCannedService,
-  validateUpdateCannedService,
   validateShopOperatingHours,
   validateShopCapacitySettings,
   validateTimeBlockAvailability,
@@ -36,11 +34,7 @@ router.get('/capacity/daily', appointmentController.checkDailyCapacity.bind(appo
 router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
 router.post('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, validateAssignAppointment, appointmentController.assignAppointment.bind(appointmentController));
 
-// Canned Service Management Routes
-router.post('/canned-services', validateCreateCannedService, appointmentController.createCannedService.bind(appointmentController));
-router.get('/canned-services/available', appointmentController.getAvailableCannedServices.bind(appointmentController));
-router.put('/canned-services/:id', validateUpdateCannedService, appointmentController.updateCannedService.bind(appointmentController));
-router.delete('/canned-services/:id', appointmentController.deleteCannedService.bind(appointmentController));
+
 
 // Shop Settings Management Routes
 router.put('/shop/operating-hours', validateShopOperatingHours, appointmentController.updateOperatingHours.bind(appointmentController));

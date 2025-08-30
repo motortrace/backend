@@ -6,7 +6,6 @@ import {
   AppointmentSlotRequest,
   ShopOperatingHoursRequest,
   ShopCapacitySettingsRequest,
-  CannedServiceRequest,
   AppointmentWithServices,
   TimeBlockAvailabilityRequest,
   TimeBlockAvailability,
@@ -445,32 +444,7 @@ export class AppointmentService {
     return this.formatAppointmentWithServices(appointment);
   }
 
-  // Canned Service Management
-  async createCannedService(data: CannedServiceRequest) {
-    return await prisma.cannedService.create({
-      data,
-    });
-  }
 
-  async getAvailableCannedServices() {
-    return await prisma.cannedService.findMany({
-      where: { isAvailable: true },
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  async updateCannedService(id: string, data: Partial<CannedServiceRequest>) {
-    return await prisma.cannedService.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async deleteCannedService(id: string) {
-    await prisma.cannedService.delete({
-      where: { id },
-    });
-  }
 
   // Shop Settings Management
   async updateOperatingHours(data: ShopOperatingHoursRequest) {

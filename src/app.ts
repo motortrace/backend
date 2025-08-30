@@ -14,7 +14,7 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import customerRoutes from './modules/customers/customers.routes';
-// import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
+import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 
 
 const app = express();
@@ -38,7 +38,7 @@ app.use('/inventory', inventoryRoutes);
 app.use('/inspection-templates', inspectionTemplatesRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/customers', customerRoutes);
-// app.use('/canned-services', cannedServicesRoutes);
+app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

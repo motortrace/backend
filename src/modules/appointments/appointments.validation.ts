@@ -36,23 +36,7 @@ export const assignAppointmentSchema = Joi.object({
   assignedToId: Joi.string().required(),
 });
 
-export const createCannedServiceSchema = Joi.object({
-  code: Joi.string().required(),
-  name: Joi.string().required(),
-  description: Joi.string().optional(),
-  duration: Joi.number().min(1).required(), // in minutes
-  price: Joi.number().min(0).required(),
-  isAvailable: Joi.boolean().default(false),
-});
 
-export const updateCannedServiceSchema = Joi.object({
-  code: Joi.string().optional(),
-  name: Joi.string().optional(),
-  description: Joi.string().optional(),
-  duration: Joi.number().min(1).optional(),
-  price: Joi.number().min(0).optional(),
-  isAvailable: Joi.boolean().optional(),
-});
 
 export const shopOperatingHoursSchema = Joi.object({
   dayOfWeek: Joi.string().valid(...Object.values(DayOfWeek)).required(),
@@ -136,27 +120,7 @@ export const validateAssignAppointment = (req: any, res: any, next: any) => {
   next();
 };
 
-export const validateCreateCannedService = (req: any, res: any, next: any) => {
-  const { error } = createCannedServiceSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
 
-export const validateUpdateCannedService = (req: any, res: any, next: any) => {
-  const { error } = updateCannedServiceSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
 
 export const validateShopOperatingHours = (req: any, res: any, next: any) => {
   const { error } = shopOperatingHoursSchema.validate(req.body);
