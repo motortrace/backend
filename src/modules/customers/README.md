@@ -396,6 +396,27 @@ curl -X GET "http://localhost:3000/customers?search=john&limit=5&offset=10" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
+#### Test 9: Empty String Handling
+```bash
+# Test: Empty search parameter (should be ignored)
+curl -X GET "http://localhost:3000/customers?search=&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Test 10: Whitespace-Only String Handling
+```bash
+# Test: Whitespace-only search parameter (should be ignored)
+curl -X GET "http://localhost:3000/customers?search=%20%20&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Test 11: Mixed Empty and Valid Filters
+```bash
+# Test: Empty email + valid search (only search should be applied)
+curl -X GET "http://localhost:3000/customers?search=john&email=&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
 ### Filter Logic Verification
 
 The fixed implementation ensures:
@@ -404,6 +425,7 @@ The fixed implementation ensures:
 2. **AND Logic for Individual Filters**: When individual filters (email, phone, hasVehicles, hasWorkOrders) are provided, they create AND conditions
 3. **Proper Combination**: When both search and individual filters are used, the query structure becomes: `(OR conditions) AND (individual filter conditions)`
 4. **No Conflicts**: Individual filters no longer overwrite the search OR clause
+5. **Empty String Handling**: Empty strings and whitespace-only strings are properly ignored and don't create invalid filters
 
 ### Expected Response Format
 
@@ -431,4 +453,16 @@ All filter tests should return responses in this format:
   }
 }
 ```
+
+### Troubleshooting Filter Issues
+
+If filters are not working as expected:
+
+1. **Check JWT Token**: Ensure your authorization token is valid
+2. **Verify Query Parameters**: Check that parameter names match exactly (case-sensitive)
+3. **Test Individual Filters**: Try each filter separately before combining
+4. **Check Response**: Look for validation errors in the response
+5. **Database Content**: Ensure test data exists that matches your filter criteria
+6. **Email Filter**: The email filter accepts partial matches (e.g., "gmail" for "john@gmail.com"), not complete email addresses
+7. **Empty Strings**: Empty strings and whitespace-only strings are automatically ignored and won't create filters
 

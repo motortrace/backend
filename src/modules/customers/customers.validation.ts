@@ -14,9 +14,9 @@ export const updateCustomerSchema = Joi.object({
 });
 
 export const customerFiltersSchema = Joi.object({
-  search: Joi.string().optional(),
-  email: Joi.string().optional(), // Allow partial email searches
-  phone: Joi.string().optional(),
+  search: Joi.string().trim().empty('').optional(),
+  email: Joi.string().trim().empty('').optional(), // Allow partial email searches, but not empty strings
+  phone: Joi.string().trim().empty('').optional(),
   hasVehicles: Joi.boolean().optional(),
   hasWorkOrders: Joi.boolean().optional(),
   limit: Joi.number().integer().min(1).max(100).default(20),

@@ -151,21 +151,21 @@ export class CustomerService {
       const andConditions: any[] = [];
 
       // Handle search filter (creates OR clause)
-      if (filters.search) {
+      if (filters.search && filters.search.trim().length > 0) {
         where.OR = [
-          { name: { contains: filters.search, mode: 'insensitive' } },
-          { email: { contains: filters.search, mode: 'insensitive' } },
-          { phone: { contains: filters.search, mode: 'insensitive' } },
+          { name: { contains: filters.search.trim(), mode: 'insensitive' } },
+          { email: { contains: filters.search.trim(), mode: 'insensitive' } },
+          { phone: { contains: filters.search.trim(), mode: 'insensitive' } },
         ];
       }
 
       // Handle individual filters (creates AND conditions)
-      if (filters.email) {
-        andConditions.push({ email: { contains: filters.email, mode: 'insensitive' } });
+      if (filters.email && filters.email.trim().length > 0) {
+        andConditions.push({ email: { contains: filters.email.trim(), mode: 'insensitive' } });
       }
 
-      if (filters.phone) {
-        andConditions.push({ phone: { contains: filters.phone, mode: 'insensitive' } });
+      if (filters.phone && filters.phone.trim().length > 0) {
+        andConditions.push({ phone: { contains: filters.phone.trim(), mode: 'insensitive' } });
       }
 
       if (filters.hasVehicles !== undefined) {
