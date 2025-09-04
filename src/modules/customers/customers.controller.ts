@@ -9,11 +9,11 @@ export class CustomerController {
   async getCustomers(req: Request, res: Response) {
     try {
       const filters: CustomerFilters = {
-        search: req.query.search as string,
-        email: req.query.email as string,
-        phone: req.query.phone as string,
-        hasVehicles: req.query.hasVehicles === 'true',
-        hasWorkOrders: req.query.hasWorkOrders === 'true',
+        search: req.query.search as string ?? undefined,
+        email: req.query.email as string ?? undefined,
+        phone: req.query.phone as string ?? undefined,
+        hasVehicles: req.query.hasVehicles !== undefined ? req.query.hasVehicles === 'true' : undefined,
+        hasWorkOrders: req.query.hasWorkOrders !== undefined ? req.query.hasWorkOrders === 'true' : undefined,
         limit: parseInt(req.query.limit as string) || 20,
         offset: parseInt(req.query.offset as string) || 0,
       };

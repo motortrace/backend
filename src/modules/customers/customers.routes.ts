@@ -14,7 +14,8 @@ const customerController = new CustomerController();
 router.use(authenticateSupabaseToken);
 
 // Customer Management Routes
-router.post('/', validateCreateCustomer, customerController.createCustomer.bind(customerController));
+// better if we avoid creating customers directly, because the current method is to first create a profiile and then do the onboarding, if the admin goes to create it by himself, then that will cause a huge issue
+// router.post('/', validateCreateCustomer, customerController.createCustomer.bind(customerController));
 router.get('/', validateCustomerFilters, customerController.getCustomers.bind(customerController));
 router.get('/:id', customerController.getCustomerById.bind(customerController));
 router.put('/:id', validateUpdateCustomer, customerController.updateCustomer.bind(customerController));

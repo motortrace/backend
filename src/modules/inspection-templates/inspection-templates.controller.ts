@@ -79,7 +79,7 @@ export class InspectionTemplatesController {
     try {
       const { page = 1, limit = 10, category, isActive, search } = req.query;
       
-      const filters = { category, isActive: isActive === 'true', search };
+      const filters = { category, isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined, search };
       const validation = validateInspectionTemplateFilters({ ...filters, page, limit });
       
       if (validation.error) {
@@ -271,7 +271,7 @@ export class InspectionTemplatesController {
         workOrderId, 
         inspectorId, 
         templateId, 
-        isCompleted: isCompleted === 'true',
+        isCompleted: isCompleted === 'true' ? true : isCompleted === 'false' ? false : undefined,
         dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
         dateTo: dateTo ? new Date(dateTo as string) : undefined
       };
