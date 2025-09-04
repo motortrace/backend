@@ -326,3 +326,109 @@ The module includes comprehensive testing:
 - Integration tests for API endpoints
 - Validation tests
 - Error handling tests
+
+### Filter Combination Testing
+
+The following CURL commands test the **filter combination logic** that was recently fixed to handle OR and AND clauses properly:
+
+#### Test 1: Search + Email Filter Combination
+```bash
+# Test: Search for "john" AND filter by email containing "gmail"
+curl -X GET "http://localhost:3000/customers?search=john&email=gmail&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%john%' OR email LIKE '%john%' OR phone LIKE '%john%') AND (email LIKE '%gmail%')`
+
+**Note:** The email filter accepts partial matches (e.g., "gmail" will match "john@gmail.com")
+
+#### Test 2: Search + Phone Filter Combination
+```bash
+# Test: Search for "smith" AND filter by phone containing "555"
+curl -X GET "http://localhost:3000/customers?search=smith&phone=555&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%smith%' OR email LIKE '%smith%' OR phone LIKE '%smith%') AND (phone LIKE '%555%')`
+
+#### Test 3: Search + HasVehicles Filter Combination
+```bash
+# Test: Search for "doe" AND filter customers who have vehicles
+curl -X GET "http://localhost:3000/customers?search=doe&hasVehicles=true&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%doe%' OR email LIKE '%doe%' OR phone LIKE '%doe%') AND (vehicles.some())`
+
+#### Test 4: Search + HasWorkOrders Filter Combination
+```bash
+# Test: Search for "jane" AND filter customers who have work orders
+curl -X GET "http://localhost:3000/customers?search=jane&hasWorkOrders=true&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%jane%' OR email LIKE '%jane%' OR phone LIKE '%jane%') AND (workOrders.some())`
+
+#### Test 5: Complex Multi-Filter Combination
+```bash
+# Test: Search + Email + Phone + HasVehicles + HasWorkOrders
+curl -X GET "http://localhost:3000/customers?search=john&email=gmail&phone=555&hasVehicles=true&hasWorkOrders=false&limit=5" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%john%' OR email LIKE '%john%' OR phone LIKE '%john%') AND (email LIKE '%gmail%') AND (phone LIKE '%555%') AND (vehicles.some()) AND (workOrders.none())`
+
+#### Test 6: Individual Filters Only (No Search)
+```bash
+# Test: Email + Phone + HasVehicles (no search filter)
+curl -X GET "http://localhost:3000/customers?email=yahoo&phone=123&hasVehicles=false&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(email LIKE '%yahoo%') AND (phone LIKE '%123%') AND (vehicles.none())`
+
+#### Test 7: Search Only (No Additional Filters)
+```bash
+# Test: Search only across all fields
+curl -X GET "http://localhost:3000/customers?search=test&limit=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+**Expected Query Logic:** `(name LIKE '%test%' OR email LIKE '%test%' OR phone LIKE '%test%')`
+
+#### Test 8: Pagination with Filters
+```bash
+# Test: Search with pagination
+curl -X GET "http://localhost:3000/customers?search=john&limit=5&offset=10" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Filter Logic Verification
+
+The fixed implementation ensures:
+
+1. **OR Logic for Search**: When `search` parameter is provided, it creates an OR clause across name, email, and phone fields
+2. **AND Logic for Individual Filters**: When individual filters (email, phone, hasVehicles, hasWorkOrders) are provided, they create AND conditions
+3. **Proper Combination**: When both search and individual filters are used, the query structure becomes: `(OR conditions) AND (individual filter conditions)`
+4. **No Conflicts**: Individual filters no longer overwrite the search OR clause
+
+### Expected Response Format
+
+All filter tests should return responses in this format:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "customer_id",
+      "name": "John Doe",
+      "email": "john@gmail.com",
+      "phone": "+1555123456",
+      "userProfile": {...},
+      "vehicles": [...],
+      "workOrders": [...],
+      "appointments": [...]
+    }
+  ],
+  "message": "Customers retrieved successfully",
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "count": 1
+  }
+}
+```
+

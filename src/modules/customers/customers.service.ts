@@ -148,7 +148,9 @@ export class CustomerService {
   async getCustomers(filters: CustomerFilters): Promise<Customer[]> {
     try {
       const where: any = {};
+      const andConditions: any[] = [];
 
+      // Handle search filter (creates OR clause)
       if (filters.search) {
         where.OR = [
           { name: { contains: filters.search, mode: 'insensitive' } },
@@ -157,27 +159,43 @@ export class CustomerService {
         ];
       }
 
+      // Handle individual filters (creates AND conditions)
       if (filters.email) {
-        where.email = { contains: filters.email, mode: 'insensitive' };
+        andConditions.push({ email: { contains: filters.email, mode: 'insensitive' } });
       }
 
       if (filters.phone) {
-        where.phone = { contains: filters.phone, mode: 'insensitive' };
+        andConditions.push({ phone: { contains: filters.phone, mode: 'insensitive' } });
       }
 
       if (filters.hasVehicles !== undefined) {
         if (filters.hasVehicles) {
-          where.vehicles = { some: {} };
+          andConditions.push({ vehicles: { some: {} } });
         } else {
-          where.vehicles = { none: {} };
+          andConditions.push({ vehicles: { none: {} } });
         }
       }
 
       if (filters.hasWorkOrders !== undefined) {
         if (filters.hasWorkOrders) {
-          where.workOrders = { some: {} };
+          andConditions.push({ workOrders: { some: {} } });
         } else {
-          where.workOrders = { none: {} };
+          andConditions.push({ workOrders: { none: {} } });
+        }
+      }
+
+      // Combine OR clause with AND conditions
+      if (andConditions.length > 0) {
+        if (where.OR) {
+          // If we have both OR and AND conditions, wrap them properly
+          where.AND = [
+            { OR: where.OR },
+            ...andConditions
+          ];
+          delete where.OR; // Remove the top-level OR since it's now nested
+        } else {
+          // If we only have AND conditions, use them directly
+          where.AND = andConditions;
         }
       }
 
