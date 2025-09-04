@@ -6,6 +6,16 @@ import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.
 
 import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
+import appointmentsRoutes from './modules/appointments/appointments.routes';
+import workOrdersRoutes from './modules/work-orders';
+import estimatesRoutes from './modules/estimates/estimates.routes';
+import laborRoutes from './modules/labor/labor.routes';
+import inventoryRoutes from './modules/inventory/inventory.routes';
+import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
+import customerRoutes from './modules/customers/customers.routes';
+import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
+
 
 const app = express();
 
@@ -16,8 +26,19 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/auth', authSupabaseRoutes);  // <- mount here
-app.use('/users', usersRoutes);        // <- mount protected routes
+
+// mounting section
+app.use('/auth', authSupabaseRoutes);
+app.use('/users', usersRoutes); 
+app.use('/appointments', appointmentsRoutes);
+app.use('/work-orders', workOrdersRoutes);
+app.use('/estimates', estimatesRoutes);
+app.use('/labor', laborRoutes);
+app.use('/inventory', inventoryRoutes);
+app.use('/inspection-templates', inspectionTemplatesRoutes);
+app.use('/payments', paymentsRoutes);
+app.use('/customers', customerRoutes);
+app.use('/canned-services', cannedServicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
