@@ -17,9 +17,9 @@ const appointmentController = new AppointmentController();
 // Appointment Management Routes
 router.post('/', validateCreateAppointment, appointmentController.createAppointment.bind(appointmentController));
 router.get('/', appointmentController.getAppointments.bind(appointmentController));
-router.get('/:id', appointmentController.getAppointmentById.bind(appointmentController));
-router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, validateUpdateAppointment, appointmentController.updateAppointment.bind(appointmentController));
-router.delete('/:id', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.deleteAppointment.bind(appointmentController));
+
+// Unassigned Appointments Routes (must come before /:id)
+router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
 
 // Available Slots Routes
 router.get('/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));
@@ -30,8 +30,10 @@ router.get('/slots/timeblock', validateTimeBlockAvailability, appointmentControl
 // New: Daily Capacity Routes
 router.get('/capacity/daily', appointmentController.checkDailyCapacity.bind(appointmentController));
 
-// Unassigned Appointments Routes
-router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
+// Individual appointment routes (must come after specific routes)
+router.get('/:id', appointmentController.getAppointmentById.bind(appointmentController));
+router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, validateUpdateAppointment, appointmentController.updateAppointment.bind(appointmentController));
+router.delete('/:id', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.deleteAppointment.bind(appointmentController));
 router.post('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, validateAssignAppointment, appointmentController.assignAppointment.bind(appointmentController));
 
 

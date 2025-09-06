@@ -23,7 +23,7 @@ export const updateAppointmentSchema = Joi.object({
 
 export const appointmentSlotRequestSchema = Joi.object({
   date: Joi.date().required(),
-  serviceIds: Joi.array().items(Joi.string()).min(1).required(),
+  serviceIds: Joi.array().items(Joi.string()).optional(), // Make serviceIds optional
 });
 
 // New schema for time block availability check
@@ -79,7 +79,7 @@ export const validateUpdateAppointment = (req: any, res: any, next: any) => {
 export const validateAppointmentSlotRequest = (req: any, res: any, next: any) => {
   const slotRequest = {
     date: new Date(req.query.date as string),
-    serviceIds: (req.query.serviceIds as string).split(','),
+    serviceIds: req.query.serviceIds ? (req.query.serviceIds as string).split(',') : [], // Handle optional serviceIds
   };
   
   const { error } = appointmentSlotRequestSchema.validate(slotRequest);
