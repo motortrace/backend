@@ -108,11 +108,47 @@ export class WorkOrderController {
   async deleteWorkOrder(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await this.workOrderService.deleteWorkOrder(id);
+      const cancelledWorkOrder = await this.workOrderService.deleteWorkOrder(id);
 
       res.json({
         success: true,
-        message: 'Work order deleted successfully',
+        data: cancelledWorkOrder,
+        message: 'Work order cancelled successfully (soft delete - data preserved)',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async restoreWorkOrder(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
+
+      res.json({
+        success: true,
+        data: restoredWorkOrder,
+        message: 'Work order restored successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getCancelledWorkOrders(req: Request, res: Response) {
+    try {
+      const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
+
+      res.json({
+        success: true,
+        data: cancelledWorkOrders,
+        message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
       });
     } catch (error: any) {
       res.status(400).json({

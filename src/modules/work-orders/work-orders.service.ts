@@ -924,11 +924,628 @@ export class WorkOrderService {
     return workOrder;
   }
 
-  // Delete work order
-  async deleteWorkOrder(id: string): Promise<void> {
-    await prisma.workOrder.delete({
+  // Soft delete work order (change status to CANCELLED instead of deleting)
+  async deleteWorkOrder(id: string): Promise<WorkOrderWithDetails> {
+    // First check if work order exists
+    const existingWorkOrder = await prisma.workOrder.findUnique({
       where: { id },
     });
+
+    if (!existingWorkOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Check if work order is already cancelled
+    if (existingWorkOrder.status === WorkOrderStatus.CANCELLED) {
+      throw new Error('Work order is already cancelled');
+    }
+
+    // Soft delete by changing status to CANCELLED and updating workflow step
+    const cancelledWorkOrder = await prisma.workOrder.update({
+      where: { id },
+      data: {
+        status: WorkOrderStatus.CANCELLED,
+        workflowStep: WorkflowStep.CLOSED,
+        closedAt: new Date(),
+        internalNotes: existingWorkOrder.internalNotes 
+          ? `${existingWorkOrder.internalNotes}\n\n[CANCELLED] Work order cancelled on ${new Date().toISOString()}`
+          : `[CANCELLED] Work order cancelled on ${new Date().toISOString()}`,
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            make: true,
+            model: true,
+            year: true,
+            licensePlate: true,
+            vin: true,
+          },
+        },
+        appointment: {
+          select: {
+            id: true,
+            requestedAt: true,
+            startTime: true,
+            endTime: true,
+          },
+        },
+        serviceAdvisor: {
+          select: {
+            id: true,
+            employeeId: true,
+            department: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        services: {
+          include: {
+            cannedService: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                duration: true,
+                price: true,
+              },
+            },
+          },
+        },
+        inspections: {
+          include: {
+            inspector: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        laborItems: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+              },
+            },
+            technician: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        partsUsed: {
+          include: {
+            part: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                partNumber: true,
+                manufacturer: true,
+              },
+            },
+            installedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          include: {
+            processedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        estimates: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            approvedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return cancelledWorkOrder;
+  }
+
+  // Restore cancelled work order (change status back from CANCELLED)
+  async restoreWorkOrder(id: string): Promise<WorkOrderWithDetails> {
+    // First check if work order exists
+    const existingWorkOrder = await prisma.workOrder.findUnique({
+      where: { id },
+    });
+
+    if (!existingWorkOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Check if work order is actually cancelled
+    if (existingWorkOrder.status !== WorkOrderStatus.CANCELLED) {
+      throw new Error('Work order is not cancelled and cannot be restored');
+    }
+
+    // Restore by changing status back to PENDING and updating workflow step
+    const restoredWorkOrder = await prisma.workOrder.update({
+      where: { id },
+      data: {
+        status: WorkOrderStatus.PENDING,
+        workflowStep: WorkflowStep.RECEIVED,
+        closedAt: null, // Clear the closed date
+        internalNotes: existingWorkOrder.internalNotes 
+          ? `${existingWorkOrder.internalNotes}\n\n[RESTORED] Work order restored on ${new Date().toISOString()}`
+          : `[RESTORED] Work order restored on ${new Date().toISOString()}`,
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            make: true,
+            model: true,
+            year: true,
+            licensePlate: true,
+            vin: true,
+          },
+        },
+        appointment: {
+          select: {
+            id: true,
+            requestedAt: true,
+            startTime: true,
+            endTime: true,
+          },
+        },
+        serviceAdvisor: {
+          select: {
+            id: true,
+            employeeId: true,
+            department: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        services: {
+          include: {
+            cannedService: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                duration: true,
+                price: true,
+              },
+            },
+          },
+        },
+        inspections: {
+          include: {
+            inspector: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        laborItems: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+              },
+            },
+            technician: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        partsUsed: {
+          include: {
+            part: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                partNumber: true,
+                manufacturer: true,
+              },
+            },
+            installedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          include: {
+            processedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        estimates: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            approvedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return restoredWorkOrder;
+  }
+
+  // Get cancelled work orders (soft deleted)
+  async getCancelledWorkOrders(): Promise<WorkOrderWithDetails[]> {
+    const cancelledWorkOrders = await prisma.workOrder.findMany({
+      where: { 
+        status: WorkOrderStatus.CANCELLED 
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            make: true,
+            model: true,
+            year: true,
+            licensePlate: true,
+            vin: true,
+          },
+        },
+        appointment: {
+          select: {
+            id: true,
+            requestedAt: true,
+            startTime: true,
+            endTime: true,
+          },
+        },
+        serviceAdvisor: {
+          select: {
+            id: true,
+            employeeId: true,
+            department: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        services: {
+          include: {
+            cannedService: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                duration: true,
+                price: true,
+              },
+            },
+          },
+        },
+        inspections: {
+          include: {
+            inspector: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        laborItems: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+              },
+            },
+            technician: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        partsUsed: {
+          include: {
+            part: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                partNumber: true,
+                manufacturer: true,
+              },
+            },
+            installedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          include: {
+            processedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        estimates: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            approvedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        closedAt: 'desc', // Most recently cancelled first
+      },
+    });
+
+    return cancelledWorkOrders;
   }
 
 
