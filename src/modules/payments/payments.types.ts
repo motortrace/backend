@@ -1,21 +1,22 @@
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
-// Payment Processing Types
-export interface PaymentProcessorConfig {
-  provider: 'stripe' | 'paypal' | 'razorpay' | 'manual';
-  apiKey?: string;
-  secretKey?: string;
-  webhookSecret?: string;
-  environment: 'test' | 'live';
+// Simplified Payment Types
+export interface CreateManualPaymentRequest {
+  workOrderId: string;
+  method: PaymentMethod;
+  amount: number;
+  reference?: string;
+  notes?: string;
+  processedById: string;
+  paymentImage?: string; // Base64 or URL of payment receipt/image
 }
 
-// Payment Intent/Request Types
-export interface CreatePaymentIntentRequest {
+export interface CreateOnlinePaymentRequest {
   workOrderId: string;
   amount: number;
   currency?: string;
-  description?: string;
-  metadata?: Record<string, any>;
+  cardToken?: string; // For Stripe token
+  paymentMethodId?: string; // For saved payment methods
   customerEmail?: string;
   customerPhone?: string;
 }
@@ -30,16 +31,6 @@ export interface PaymentIntentResponse {
   metadata?: Record<string, any>;
 }
 
-// Manual Payment Types
-export interface CreateManualPaymentRequest {
-  workOrderId: string;
-  method: PaymentMethod;
-  amount: number;
-  reference?: string;
-  notes?: string;
-  processedById: string;
-}
-
 export interface UpdatePaymentRequest {
   paymentId: string;
   status?: PaymentStatus;
@@ -47,9 +38,9 @@ export interface UpdatePaymentRequest {
   notes?: string;
   refundAmount?: number;
   refundReason?: string;
+  paymentImage?: string; // For manual payments
 }
 
-// Payment Verification Types
 export interface PaymentVerificationRequest {
   paymentIntentId: string;
   provider: 'stripe' | 'paypal' | 'razorpay';
@@ -64,7 +55,6 @@ export interface PaymentVerificationResponse {
   error?: string;
 }
 
-// Payment Refund Types
 export interface CreateRefundRequest {
   paymentId: string;
   amount: number;
@@ -72,7 +62,6 @@ export interface CreateRefundRequest {
   processedById: string;
 }
 
-// Payment Statistics Types
 export interface PaymentStatistics {
   totalPayments: number;
   totalAmount: number;
@@ -89,7 +78,6 @@ export interface PaymentStatistics {
   }>;
 }
 
-// Payment Filters
 export interface PaymentFilters {
   workOrderId?: string;
   method?: PaymentMethod;
@@ -101,7 +89,6 @@ export interface PaymentFilters {
   processedById?: string;
 }
 
-// Webhook Types
 export interface PaymentWebhookData {
   event: string;
   data: {
@@ -115,7 +102,6 @@ export interface PaymentWebhookData {
   };
 }
 
-// Payment Response Types
 export interface PaymentResponse {
   id: string;
   workOrderId: string;
@@ -135,11 +121,11 @@ export interface PaymentResponse {
   notes?: string;
   refundAmount?: number;
   refundReason?: string;
+  paymentImage?: string; // URL to payment receipt image
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Payment Summary Types
 export interface WorkOrderPaymentSummary {
   workOrderId: string;
   workOrderNumber: string;
@@ -151,7 +137,7 @@ export interface WorkOrderPaymentSummary {
   lastPaymentDate?: Date;
 }
 
-// Stripe-specific Types
+// Stripe-specific Types for sandbox testing
 export interface StripePaymentIntent {
   id: string;
   amount: number;
@@ -172,27 +158,6 @@ export interface StripePaymentMethod {
   };
 }
 
-// PayPal-specific Types
-export interface PayPalOrder {
-  id: string;
-  status: string;
-  amount: {
-    currency_code: string;
-    value: string;
-  };
-  intent: string;
-}
-
-// Razorpay-specific Types
-export interface RazorpayOrder {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  receipt: string;
-}
-
-// Payment Gateway Response
 export interface PaymentGatewayResponse {
   success: boolean;
   paymentId?: string;
@@ -202,4 +167,13 @@ export interface PaymentGatewayResponse {
   currency: string;
   error?: string;
   metadata?: Record<string, any>;
+}
+
+// Simplified payment methods - only what's needed
+export enum SimplifiedPaymentMethod {
+  CASH = 'CASH',
+  CREDIT_CARD = 'CREDIT_CARD',
+  DEBIT_CARD = 'DEBIT_CARD',
+  CHEQUE = 'CHEQUE',
+  BANK_TRANSFER = 'BANK_TRANSFER',
 }
