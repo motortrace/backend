@@ -1,18 +1,18 @@
 import Joi from 'joi';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
-// Payment Intent Creation Schema
-export const createPaymentIntentSchema = Joi.object({
+// Online Payment Creation Schema (Credit Card)
+export const createOnlinePaymentSchema = Joi.object({
   workOrderId: Joi.string().required(),
   amount: Joi.number().positive().required(),
   currency: Joi.string().default('USD'),
-  description: Joi.string().optional(),
-  metadata: Joi.object().optional(),
+  cardToken: Joi.string().optional(),
+  paymentMethodId: Joi.string().optional(),
   customerEmail: Joi.string().email().optional(),
   customerPhone: Joi.string().optional(),
 });
 
-// Manual Payment Creation Schema
+// Manual Payment Creation Schema (with image)
 export const createManualPaymentSchema = Joi.object({
   workOrderId: Joi.string().required(),
   method: Joi.string().valid(...Object.values(PaymentMethod)).required(),
@@ -20,6 +20,7 @@ export const createManualPaymentSchema = Joi.object({
   reference: Joi.string().optional(),
   notes: Joi.string().optional(),
   processedById: Joi.string().required(),
+  paymentImage: Joi.string().optional(), // Base64 or URL of payment receipt
 });
 
 // Payment Update Schema
@@ -29,6 +30,7 @@ export const updatePaymentSchema = Joi.object({
   notes: Joi.string().optional(),
   refundAmount: Joi.number().positive().optional(),
   refundReason: Joi.string().optional(),
+  paymentImage: Joi.string().optional(), // For updating payment image
 });
 
 // Payment Verification Schema
@@ -70,9 +72,16 @@ export const webhookValidationSchema = Joi.object({
   }).required(),
 });
 
+// Sandbox Payment Test Schema
+export const sandboxPaymentTestSchema = Joi.object({
+  workOrderId: Joi.string().required(),
+  amount: Joi.number().positive().required(),
+  cardNumber: Joi.string().optional(), // For validation
+});
+
 // Validation Middleware Functions
-export const validateCreatePaymentIntent = (req: any, res: any, next: any) => {
-  const { error } = createPaymentIntentSchema.validate(req.body);
+export const validateCreateOnlinePayment = (req: any, res: any, next: any) => {
+  const { error } = createOnlinePaymentSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,
@@ -149,6 +158,18 @@ export const validateWebhookData = (req: any, res: any, next: any) => {
     return res.status(400).json({
       success: false,
       message: 'Invalid webhook data',
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateSandboxPaymentTest = (req: any, res: any, next: any) => {
+  const { error } = sandboxPaymentTestSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation error',
       error: error.details[0].message,
     });
   }

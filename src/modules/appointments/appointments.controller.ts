@@ -121,7 +121,7 @@ export class AppointmentController {
     try {
       const slotRequest: AppointmentSlotRequest = {
         date: new Date(req.query.date as string),
-        serviceIds: (req.query.serviceIds as string).split(','),
+        serviceIds: req.query.serviceIds ? (req.query.serviceIds as string).split(',') : [], // Make serviceIds optional
       };
 
       const slots = await this.appointmentService.getAvailableSlots(slotRequest);

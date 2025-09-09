@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { PaymentService } from './payments.service';
 import {
-  CreatePaymentIntentRequest,
   CreateManualPaymentRequest,
+  CreateOnlinePaymentRequest,
   UpdatePaymentRequest,
   PaymentVerificationRequest,
   CreateRefundRequest,
@@ -17,16 +17,16 @@ export class PaymentController {
     this.paymentService = new PaymentService();
   }
 
-  // Create payment intent for online payments
+  // Create payment intent for online credit card payments (Stripe sandbox)
   async createPaymentIntent(req: Request, res: Response) {
     try {
-      const paymentIntentData: CreatePaymentIntentRequest = req.body;
+      const paymentIntentData: CreateOnlinePaymentRequest = req.body;
       const paymentIntent = await this.paymentService.createPaymentIntent(paymentIntentData);
 
       res.status(201).json({
         success: true,
         data: paymentIntent,
-        message: 'Payment intent created successfully',
+        message: 'Payment intent created successfully for credit card payment',
       });
     } catch (error) {
       res.status(400).json({
@@ -36,7 +36,26 @@ export class PaymentController {
     }
   }
 
-  // Create manual payment (for cash, check, etc.)
+  // Process online payment (credit card) - sandbox mode
+  async processOnlinePayment(req: Request, res: Response) {
+    try {
+      const paymentData: CreateOnlinePaymentRequest = req.body;
+      const payment = await this.paymentService.processOnlinePayment(paymentData);
+
+      res.status(201).json({
+        success: true,
+        data: payment,
+        message: 'Online payment processed successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to process online payment',
+      });
+    }
+  }
+
+  // Create manual payment (cash, check, etc.) with image upload
   async createManualPayment(req: Request, res: Response) {
     try {
       const paymentData: CreateManualPaymentRequest = req.body;
@@ -45,7 +64,7 @@ export class PaymentController {
       res.status(201).json({
         success: true,
         data: payment,
-        message: 'Manual payment created successfully',
+        message: 'Manual payment recorded successfully with receipt image',
       });
     } catch (error) {
       res.status(400).json({
@@ -55,7 +74,7 @@ export class PaymentController {
     }
   }
 
-  // Verify payment from payment gateway
+  // Verify payment from payment gateway (sandbox mode)
   async verifyPayment(req: Request, res: Response) {
     try {
       const verificationData: PaymentVerificationRequest = req.body;
@@ -74,7 +93,7 @@ export class PaymentController {
     }
   }
 
-  // Process webhook from payment gateway
+  // Process webhook from payment gateway (sandbox mode)
   async processWebhook(req: Request, res: Response) {
     try {
       const webhookData: PaymentWebhookData = req.body;
@@ -240,7 +259,7 @@ export class PaymentController {
   async markAsPaid(req: Request, res: Response) {
     try {
       const { paymentId } = req.params;
-      const { processedById } = req.body;
+      const { processedById, paymentImage } = req.body;
 
       if (!processedById) {
         return res.status(400).json({
@@ -253,6 +272,7 @@ export class PaymentController {
         status: 'PAID',
         notes: 'Marked as paid manually by service advisor',
         paymentId: paymentId,
+        paymentImage,
       });
 
       res.status(200).json({
@@ -268,19 +288,15 @@ export class PaymentController {
     }
   }
 
-  // Get payment methods available
+  // Get simplified payment methods
   async getPaymentMethods(req: Request, res: Response) {
     try {
       const paymentMethods = [
         { value: 'CASH', label: 'Cash' },
         { value: 'CREDIT_CARD', label: 'Credit Card' },
         { value: 'DEBIT_CARD', label: 'Debit Card' },
-        { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-        { value: 'UPI', label: 'UPI' },
         { value: 'CHEQUE', label: 'Cheque' },
-        { value: 'DIGITAL_WALLET', label: 'Digital Wallet' },
-        { value: 'INSURANCE', label: 'Insurance' },
-        { value: 'WARRANTY', label: 'Warranty' },
+        { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
       ];
 
       res.status(200).json({
@@ -296,7 +312,7 @@ export class PaymentController {
     }
   }
 
-  // Get payment statuses available
+  // Get payment statuses
   async getPaymentStatuses(req: Request, res: Response) {
     try {
       const paymentStatuses = [
@@ -320,6 +336,41 @@ export class PaymentController {
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve payment statuses',
+      });
+    }
+  }
+
+  // Test sandbox credit card payment
+  async testSandboxPayment(req: Request, res: Response) {
+    try {
+      const { workOrderId, amount, cardNumber } = req.body;
+
+      // Validate sandbox card number (4242 4242 4242 4242)
+      if (cardNumber && !cardNumber.replace(/\s/g, '').startsWith('4242')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please use a valid sandbox card number (4242 4242 4242 4242)',
+        });
+      }
+
+      const paymentData: CreateOnlinePaymentRequest = {
+        workOrderId,
+        amount,
+        currency: 'USD',
+        customerEmail: 'test@example.com',
+      };
+
+      const payment = await this.paymentService.processOnlinePayment(paymentData);
+
+      res.status(201).json({
+        success: true,
+        data: payment,
+        message: 'Sandbox payment processed successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to process sandbox payment',
       });
     }
   }

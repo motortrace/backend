@@ -141,9 +141,10 @@ export class AppointmentService {
     }
 
     // ShopMonkey Logic: Generate 30-minute time blocks regardless of service duration
+    // Service IDs are now optional - we show all available slots
     const slots: AvailableSlot[] = [];
-    const startTime = this.parseTimeString(operatingHours.openTime!);
-    const endTime = this.parseTimeString(operatingHours.closeTime!);
+    const startTime = this.parseTimeStringForDate(operatingHours.openTime!, date);
+    const endTime = this.parseTimeStringForDate(operatingHours.closeTime!, date);
     const intervalMinutes = capacitySettings.timeBlockIntervalMinutes;
 
     let currentTime = new Date(date);
@@ -532,6 +533,13 @@ export class AppointmentService {
     return date;
   }
 
+  private parseTimeStringForDate(timeString: string, targetDate: Date): Date {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date(targetDate);
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  }
+
   // New helper method: Get time block start time
   private getTimeBlockStart(dateTime: Date, intervalMinutes: number): Date {
     const minutes = dateTime.getMinutes();
@@ -552,8 +560,8 @@ export class AppointmentService {
       return [];
     }
 
-    const startTime = this.parseTimeString(operatingHours.openTime!);
-    const endTime = this.parseTimeString(operatingHours.closeTime!);
+    const startTime = this.parseTimeStringForDate(operatingHours.openTime!, date);
+    const endTime = this.parseTimeStringForDate(operatingHours.closeTime!, date);
     const intervalMinutes = capacitySettings.timeBlockIntervalMinutes;
 
     let currentTime = new Date(date);

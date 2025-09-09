@@ -29,7 +29,7 @@ export interface AvailableSlot {
 
 export interface AppointmentSlotRequest {
   date: Date;
-  serviceIds: string[];
+  serviceIds?: string[]; // Make serviceIds optional
 }
 
 

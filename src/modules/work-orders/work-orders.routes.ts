@@ -11,7 +11,8 @@ router.post('/', authenticateSupabaseToken, requireServiceAdvisor, workOrderCont
 router.get('/', workOrderController.getWorkOrders.bind(workOrderController));
 router.get('/:id', workOrderController.getWorkOrderById.bind(workOrderController));
 router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrder.bind(workOrderController));
-router.delete('/:id', authenticateSupabaseToken, requireManager, workOrderController.deleteWorkOrder.bind(workOrderController));
+router.put('/:id/restore', authenticateSupabaseToken, requireManager, workOrderController.restoreWorkOrder.bind(workOrderController));
+router.get('/cancelled', authenticateSupabaseToken, requireManager, workOrderController.getCancelledWorkOrders.bind(workOrderController));
 
 // Work Order Status Management Routes
 router.put('/:id/status', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderStatus.bind(workOrderController));

@@ -1,8 +1,8 @@
 import { PrismaClient, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import {
-  CreatePaymentIntentRequest,
-  PaymentIntentResponse,
   CreateManualPaymentRequest,
+  CreateOnlinePaymentRequest,
+  PaymentIntentResponse,
   UpdatePaymentRequest,
   PaymentVerificationRequest,
   PaymentVerificationResponse,
@@ -18,8 +18,8 @@ import {
 const prisma = new PrismaClient();
 
 export class PaymentService {
-  // Create payment intent for online payments
-  async createPaymentIntent(data: CreatePaymentIntentRequest): Promise<PaymentIntentResponse> {
+  // Create payment intent for online credit card payments (Stripe sandbox)
+  async createPaymentIntent(data: CreateOnlinePaymentRequest): Promise<PaymentIntentResponse> {
     // Verify work order exists and get estimate amount
     const workOrder = await prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
@@ -36,27 +36,26 @@ export class PaymentService {
     // Use estimate amount if available, otherwise use provided amount
     const amount = workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : data.amount;
 
-    // For now, return a mock payment intent
-    // In production, this would integrate with Stripe, PayPal, etc.
+    // For sandbox testing, return a mock Stripe payment intent
+    // In production, this would create a real Stripe payment intent
     const paymentIntent: PaymentIntentResponse = {
       id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       clientSecret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
       amount,
-      currency: data.currency || 'LKR',
+      currency: data.currency || 'USD',
       status: 'requires_payment_method',
       metadata: {
         workOrderId: data.workOrderId,
         workOrderNumber: workOrder.workOrderNumber,
         customerName: workOrder.customer.name,
         vehicleInfo: `${workOrder.vehicle.make} ${workOrder.vehicle.model}`,
-        ...data.metadata,
       },
     };
 
     return paymentIntent;
   }
 
-  // Create manual payment (for cash, check, etc.)
+  // Create manual payment (cash, check, etc.) with image upload
   async createManualPayment(data: CreateManualPaymentRequest): Promise<PaymentResponse> {
     // Verify work order exists
     const workOrder = await prisma.workOrder.findUnique({
@@ -76,7 +75,7 @@ export class PaymentService {
       throw new Error('Service advisor not found');
     }
 
-    // Create payment record
+    // Create payment record with image
     const payment = await prisma.payment.create({
       data: {
         workOrderId: data.workOrderId,
@@ -87,6 +86,11 @@ export class PaymentService {
         processedById: data.processedById,
         notes: data.notes,
         paidAt: new Date(),
+        // Store payment image URL in notes or create a separate field
+        // For now, we'll store it in notes with a prefix
+        ...(data.paymentImage && {
+          notes: `${data.notes || ''}\n[PAYMENT_IMAGE:${data.paymentImage}]`,
+        }),
       },
       include: {
         processedBy: {
@@ -110,11 +114,48 @@ export class PaymentService {
     return this.mapPaymentToResponse(payment);
   }
 
-  // Verify payment from payment gateway
+  // Process online payment (credit card) - sandbox mode
+  async processOnlinePayment(data: CreateOnlinePaymentRequest): Promise<PaymentResponse> {
+    // Verify work order exists
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: data.workOrderId },
+    });
+
+    if (!workOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // For sandbox testing, simulate successful payment
+    // In production, this would process with Stripe
+    const amount = workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : data.amount;
+    
+    // Generate mock transaction ID
+    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create payment record
+    const payment = await prisma.payment.create({
+      data: {
+        workOrderId: data.workOrderId,
+        method: PaymentMethod.CREDIT_CARD,
+        amount: amount,
+        reference: transactionId,
+        status: PaymentStatus.PAID,
+        paidAt: new Date(),
+        notes: 'Online payment processed via credit card',
+      },
+    });
+
+    // Update work order payment status
+    await this.updateWorkOrderPaymentStatus(data.workOrderId);
+
+    return this.mapPaymentToResponse(payment);
+  }
+
+  // Verify payment from payment gateway (sandbox mode)
   async verifyPayment(data: PaymentVerificationRequest): Promise<PaymentVerificationResponse> {
     try {
+      // In sandbox mode, always return successful verification
       // In production, this would verify with the actual payment provider
-      // For now, we'll simulate verification
       const verification: PaymentVerificationResponse = {
         verified: true,
         status: PaymentStatus.PAID,
@@ -122,22 +163,6 @@ export class PaymentService {
         currency: 'USD',
         transactionId: data.paymentIntentId,
       };
-
-      // If verification is successful, create payment record
-      if (verification.verified) {
-        // Extract work order ID from payment intent metadata
-        // In production, this would come from the payment provider's webhook
-        const workOrderId = 'extracted_from_metadata';
-        
-        // Create payment record
-        await this.createPaymentFromGateway({
-          workOrderId,
-          amount: verification.amount,
-          method: PaymentMethod.CREDIT_CARD,
-          transactionId: verification.transactionId!,
-          status: verification.status,
-        });
-      }
 
       return verification;
     } catch (error) {
@@ -151,7 +176,7 @@ export class PaymentService {
     }
   }
 
-  // Process webhook from payment gateway
+  // Process webhook from payment gateway (sandbox mode)
   async processWebhook(webhookData: PaymentWebhookData): Promise<PaymentGatewayResponse> {
     try {
       const { event, data } = webhookData;
@@ -202,6 +227,10 @@ export class PaymentService {
         notes: data.notes,
         refundAmount: data.refundAmount,
         refundReason: data.refundReason,
+        // Update payment image if provided
+        ...(data.paymentImage && {
+          notes: `${data.notes || payment.notes || ''}\n[PAYMENT_IMAGE:${data.paymentImage}]`,
+        }),
       },
       include: {
         processedBy: {
@@ -493,42 +522,6 @@ export class PaymentService {
     });
   }
 
-  private async createPaymentFromGateway(data: {
-    workOrderId: string;
-    amount: number;
-    method: PaymentMethod;
-    transactionId: string;
-    status: PaymentStatus;
-  }): Promise<PaymentResponse> {
-    const payment = await prisma.payment.create({
-      data: {
-        workOrderId: data.workOrderId,
-        method: data.method,
-        amount: data.amount,
-        reference: data.transactionId,
-        status: data.status,
-        paidAt: new Date(),
-      },
-      include: {
-        processedBy: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    await this.updateWorkOrderPaymentStatus(data.workOrderId);
-    return this.mapPaymentToResponse(payment);
-  }
-
   private async handlePaymentSuccess(data: any): Promise<PaymentGatewayResponse> {
     // Extract work order ID from metadata
     const workOrderId = data.metadata?.workOrderId;
@@ -608,7 +601,52 @@ export class PaymentService {
     };
   }
 
+  private async createPaymentFromGateway(data: {
+    workOrderId: string;
+    amount: number;
+    method: PaymentMethod;
+    transactionId: string;
+    status: PaymentStatus;
+  }): Promise<PaymentResponse> {
+    const payment = await prisma.payment.create({
+      data: {
+        workOrderId: data.workOrderId,
+        method: data.method,
+        amount: data.amount,
+        reference: data.transactionId,
+        status: data.status,
+        paidAt: new Date(),
+      },
+      include: {
+        processedBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await this.updateWorkOrderPaymentStatus(data.workOrderId);
+    return this.mapPaymentToResponse(payment);
+  }
+
   private mapPaymentToResponse(payment: any): PaymentResponse {
+    // Extract payment image from notes if present
+    let paymentImage: string | undefined;
+    if (payment.notes) {
+      const imageMatch = payment.notes.match(/\[PAYMENT_IMAGE:(.*?)\]/);
+      if (imageMatch) {
+        paymentImage = imageMatch[1];
+      }
+    }
+
     return {
       id: payment.id,
       workOrderId: payment.workOrderId,
@@ -621,6 +659,7 @@ export class PaymentService {
       notes: payment.notes,
       refundAmount: payment.refundAmount ? Number(payment.refundAmount) : undefined,
       refundReason: payment.refundReason,
+      paymentImage,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     };

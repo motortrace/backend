@@ -1,28 +1,44 @@
 import { Router } from 'express';
 import { PaymentController } from './payments.controller';
 import {
-  validateCreatePaymentIntent,
+  validateCreateOnlinePayment,
   validateCreateManualPayment,
   validateUpdatePayment,
   validatePaymentVerification,
   validateCreateRefund,
   validatePaymentFilters,
   validateWebhookData,
+  validateSandboxPaymentTest,
 } from './payments.validation';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireManager } from '../auth/supabase/authSupabase.middleware';
 
 const router = Router();
 const paymentController = new PaymentController();
 
-// Payment Intent Routes (for online payments)
+// Online Payment Routes (Credit Card)
 router.post(
   '/payment-intents',
   authenticateSupabaseToken,
-  validateCreatePaymentIntent,
+  validateCreateOnlinePayment,
   paymentController.createPaymentIntent.bind(paymentController)
 );
 
-// Manual Payment Routes (for cash, check, etc.)
+router.post(
+  '/online',
+  authenticateSupabaseToken,
+  validateCreateOnlinePayment,
+  paymentController.processOnlinePayment.bind(paymentController)
+);
+
+// Sandbox Testing Route
+router.post(
+  '/sandbox/test',
+  authenticateSupabaseToken,
+  validateSandboxPaymentTest,
+  paymentController.testSandboxPayment.bind(paymentController)
+);
+
+// Manual Payment Routes (Cash, Check, etc. with image)
 router.post(
   '/manual',
   authenticateSupabaseToken,
@@ -31,7 +47,7 @@ router.post(
   paymentController.createManualPayment.bind(paymentController)
 );
 
-// Payment Verification Routes
+// Payment Verification Routes (Sandbox mode)
 router.post(
   '/verify',
   authenticateSupabaseToken,
@@ -39,21 +55,9 @@ router.post(
   paymentController.verifyPayment.bind(paymentController)
 );
 
-// Webhook Routes (for payment gateway callbacks)
+// Webhook Routes (for payment gateway callbacks - sandbox mode)
 router.post(
   '/webhooks/stripe',
-  validateWebhookData,
-  paymentController.processWebhook.bind(paymentController)
-);
-
-router.post(
-  '/webhooks/paypal',
-  validateWebhookData,
-  paymentController.processWebhook.bind(paymentController)
-);
-
-router.post(
-  '/webhooks/razorpay',
   validateWebhookData,
   paymentController.processWebhook.bind(paymentController)
 );
@@ -105,7 +109,7 @@ router.get(
   paymentController.getPaymentStatistics.bind(paymentController)
 );
 
-// Manual Payment Marking Routes
+// Manual Payment Marking Routes (with image)
 router.post(
   '/:paymentId/mark-as-paid',
   authenticateSupabaseToken,
