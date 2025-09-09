@@ -1,0 +1,258 @@
+import { supabase } from '../../shared/utils/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
+
+export interface UploadResult {
+  success: boolean;
+  url?: string;
+  error?: string;
+}
+
+export class StorageService {
+  private static readonly PROFILE_IMAGES_BUCKET = 'profile-images';
+  private static readonly CAR_IMAGES_BUCKET = 'car-images';
+  private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  private static readonly ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+  // Create a service role client for admin operations
+  private static getServiceClient() {
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+    
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+  }
+
+  /**
+   * Upload a profile image to Supabase Storage
+   */
+  static async uploadProfileImage(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    mimeType: string,
+    userId: string
+  ): Promise<UploadResult> {
+    try {
+      // Validate file size
+      if (file.length > this.MAX_FILE_SIZE) {
+        return {
+          success: false,
+          error: 'File size exceeds 5MB limit'
+        };
+      }
+
+      // Validate MIME type
+      if (!this.ALLOWED_MIME_TYPES.includes(mimeType)) {
+        return {
+          success: false,
+          error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed'
+        };
+      }
+
+      // Generate unique filename
+      const fileExtension = fileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${userId}/${uuidv4()}.${fileExtension}`;
+
+      // Use service client for uploads (bypasses RLS)
+      const serviceClient = this.getServiceClient();
+
+      // Upload to Supabase Storage
+      const { data, error } = await serviceClient.storage
+        .from(this.PROFILE_IMAGES_BUCKET)
+        .upload(uniqueFileName, file, {
+          contentType: mimeType,
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return {
+          success: false,
+          error: 'Failed to upload image to storage'
+        };
+      }
+
+      // Get public URL
+      const { data: urlData } = serviceClient.storage
+        .from(this.PROFILE_IMAGES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return {
+        success: true,
+        url: urlData.publicUrl
+      };
+
+    } catch (error: any) {
+      console.error('Profile image upload error:', error);
+      return {
+        success: false,
+        error: 'Internal server error during image upload'
+      };
+    }
+  }
+
+  /**
+   * Upload a car image to Supabase Storage
+   */
+  static async uploadCarImage(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    mimeType: string,
+    userId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_FILE_SIZE) {
+        return { success: false, error: 'File size exceeds 5MB limit' };
+      }
+      if (!this.ALLOWED_MIME_TYPES.includes(mimeType)) {
+        return { success: false, error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed' };
+      }
+
+      const fileExtension = fileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${userId}/${uuidv4()}.${fileExtension}`;
+
+      const serviceClient = this.getServiceClient();
+
+      const { error } = await serviceClient.storage
+        .from(this.CAR_IMAGES_BUCKET)
+        .upload(uniqueFileName, file, { contentType: mimeType, upsert: false });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload image to storage' };
+      }
+
+      const { data: urlData } = serviceClient.storage
+        .from(this.CAR_IMAGES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Car image upload error:', error);
+      return { success: false, error: 'Internal server error during image upload' };
+    }
+  }
+
+  /**
+   * Delete a profile image from Supabase Storage
+   */
+  static async deleteProfileImage(imageUrl: string): Promise<UploadResult> {
+    try {
+      // Extract file path from URL
+      const urlParts = imageUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const userId = urlParts[urlParts.length - 2];
+      const filePath = `${userId}/${fileName}`;
+
+      // Use service client for deletions (bypasses RLS)
+      const serviceClient = this.getServiceClient();
+      
+      const { error } = await serviceClient.storage
+        .from(this.PROFILE_IMAGES_BUCKET)
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Storage delete error:', error);
+        return {
+          success: false,
+          error: 'Failed to delete image from storage'
+        };
+      }
+
+      return {
+        success: true
+      };
+
+    } catch (error: any) {
+      console.error('Profile image delete error:', error);
+      return {
+        success: false,
+        error: 'Internal server error during image deletion'
+      };
+    }
+  }
+
+  /**
+   * Initialize storage bucket if it doesn't exist
+   */
+  static async initializeStorage(): Promise<void> {
+    try {
+      console.log('🔧 Initializing storage...');
+      console.log('🔧 Supabase URL:', process.env.SUPABASE_URL || 'Not set');
+      console.log('🔧 Supabase Key:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
+
+      // Check if Supabase is configured
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+        console.error('❌ Supabase environment variables not configured');
+        console.error('❌ Please set SUPABASE_URL and SUPABASE_ANON_KEY in your .env file');
+        return;
+      }
+
+      // Use service client for admin operations
+      const serviceClient = this.getServiceClient();
+      
+      // Check if bucket exists
+      const { data: buckets, error: listError } = await serviceClient.storage.listBuckets();
+      
+      if (listError) {
+        console.error('❌ Error listing buckets:', listError);
+        console.error('❌ This usually means Supabase is not properly configured');
+        return;
+      }
+
+      console.log('📦 Available buckets:', buckets?.map(b => b.name) || []);
+
+      const profileBucketExists = buckets?.some(bucket => bucket.name === this.PROFILE_IMAGES_BUCKET);
+      const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
+
+      if (!profileBucketExists) {
+        console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+        
+        // Create bucket using service client
+        const { error: createError } = await serviceClient.storage.createBucket(
+          this.PROFILE_IMAGES_BUCKET,
+          {
+            public: true,
+            allowedMimeTypes: this.ALLOWED_MIME_TYPES,
+            fileSizeLimit: this.MAX_FILE_SIZE
+          }
+        );
+
+        if (createError) {
+          console.error('❌ Error creating bucket:', createError);
+          console.error('❌ Bucket creation failed. Please check your Supabase configuration.');
+          console.error('❌ You may need to create the bucket manually in Supabase Studio');
+        } else {
+          console.log(`✅ Created storage bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+        }
+      } else {
+        console.log(`✅ Storage bucket already exists: ${this.PROFILE_IMAGES_BUCKET}`);
+      }
+
+      if (!carBucketExists) {
+        console.log(`📦 Creating bucket: ${this.CAR_IMAGES_BUCKET}`);
+        const { error: createCarError } = await serviceClient.storage.createBucket(
+          this.CAR_IMAGES_BUCKET,
+          {
+            public: true,
+            allowedMimeTypes: this.ALLOWED_MIME_TYPES,
+            fileSizeLimit: this.MAX_FILE_SIZE
+          }
+        );
+        if (createCarError) {
+          console.error('❌ Error creating car-images bucket:', createCarError);
+        } else {
+          console.log(`✅ Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
+        }
+      } else {
+        console.log(`✅ Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+      }
+    } catch (error) {
+      console.error('❌ Error initializing storage:', error);
+    }
+  }
+}

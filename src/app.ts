@@ -15,12 +15,18 @@ import inspectionTemplatesRoutes from './modules/inspection-templates/inspection
 import paymentsRoutes from './modules/payments/payments.routes';
 import customerRoutes from './modules/customers/customers.routes';
 import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
+import storageRoutes from './modules/storage/storage.routes';
 
 
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:5173', 
+    'http://localhost:3000',
+    'http://10.0.2.2:3000', // Android emulator localhost
+    'http://127.0.0.1:3000'  // Alternative localhost
+  ],
   credentials: true
 }));
 
@@ -39,6 +45,7 @@ app.use('/inspection-templates', inspectionTemplatesRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/customers', customerRoutes);
 app.use('/canned-services', cannedServicesRoutes);
+app.use('/storage', storageRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
