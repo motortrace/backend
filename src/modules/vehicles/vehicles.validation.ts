@@ -24,6 +24,11 @@ export const vehicleIdSchema = z.object({
   id: z.string().cuid(),
 });
 
+// Vehicle ID schema for image routes
+export const vehicleImageIdSchema = z.object({
+  vehicleId: z.string().cuid(),
+});
+
 // Vehicle filters schema
 export const vehicleFiltersSchema = z.object({
   customerId: z.string().cuid().optional(),

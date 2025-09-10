@@ -5,8 +5,10 @@ import {
   createVehicleSchema,
   updateVehicleSchema,
   vehicleIdSchema,
+  vehicleImageIdSchema,
   vehicleFiltersSchema,
 } from './vehicles.validation';
+import { authenticateSupabaseToken } from '../auth/supabase/authSupabase.middleware';
 
 const router = Router();
 const vehiclesController = new VehiclesController();
@@ -58,6 +60,21 @@ router.delete(
   '/:id',
   validateRequest(vehicleIdSchema, 'params'),
   vehiclesController.deleteVehicle.bind(vehiclesController)
+);
+
+// Vehicle image routes (authenticated)
+router.post(
+  '/:vehicleId/image',
+  authenticateSupabaseToken,
+  validateRequest(vehicleImageIdSchema, 'params'),
+  VehiclesController.uploadVehicleImage
+);
+
+router.delete(
+  '/:vehicleId/image',
+  authenticateSupabaseToken,
+  validateRequest(vehicleImageIdSchema, 'params'),
+  vehiclesController.deleteVehicleImage.bind(vehiclesController)
 );
 
 export default router;

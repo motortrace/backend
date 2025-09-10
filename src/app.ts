@@ -14,6 +14,7 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import customerRoutes from './modules/customers/customers.routes';
+import vehiclesRoutes from './modules/vehicles/vehicles.routes';
 import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 import storageRoutes from './modules/storage/storage.routes';
 
@@ -44,6 +45,7 @@ app.use('/inventory', inventoryRoutes);
 app.use('/inspection-templates', inspectionTemplatesRoutes);
 app.use('/payments', paymentsRoutes);
 app.use('/customers', customerRoutes);
+app.use('/vehicles', vehiclesRoutes);
 app.use('/canned-services', cannedServicesRoutes);
 app.use('/storage', storageRoutes);
 

@@ -15,6 +15,7 @@ export interface CreateVehicleRequest {
     year?: number;
     vin?: string;
     licensePlate?: string;
+    imageUrl?: string | null;
   }
   
   // Vehicle response
@@ -26,6 +27,7 @@ export interface CreateVehicleRequest {
     year?: number;
     vin?: string;
     licensePlate?: string;
+    imageUrl?: string | null;
     createdAt: Date;
     updatedAt: Date;
     customer?: {
