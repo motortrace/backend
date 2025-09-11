@@ -75,11 +75,39 @@ export const updateWorkOrderStatusSchema = Joi.object({
   workflowStep: Joi.string().valid(...Object.values(WorkflowStep)).optional(),
 });
 
-// Work Order Assignment Schema
-export const assignWorkOrderSchema = Joi.object({
-  advisorId: Joi.string().optional(),
-  technicianId: Joi.string().optional(),
+// Service Advisor Assignment Schema
+export const assignServiceAdvisorSchema = Joi.object({
+  advisorId: Joi.string().required(),
 });
+
+// Technician to Labor Assignment Schema
+export const assignTechnicianToLaborSchema = Joi.object({
+  technicianId: Joi.string().required(),
+});
+
+// Validation middleware
+export const validateRequest = (schema: Joi.ObjectSchema, location: 'body' | 'query' | 'params' = 'body') => {
+  return (req: any, res: any, next: any) => {
+    try {
+      const data = req[location];
+      const { error } = schema.validate(data);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: error.details,
+        });
+      }
+      next();
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.message,
+      });
+    }
+  };
+};
 
 
 
@@ -167,71 +195,6 @@ export const validateUpdateWorkOrderStatus = (req: any, res: any, next: any) => 
   next();
 };
 
-export const validateAssignWorkOrder = (req: any, res: any, next: any) => {
-  const { error } = assignWorkOrderSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
-
-export const validateCreateWorkOrderEstimate = (req: any, res: any, next: any) => {
-  const { error } = createWorkOrderEstimateSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
-
-export const validateApproveWorkOrderEstimate = (req: any, res: any, next: any) => {
-  const { error } = approveWorkOrderEstimateSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
-
-export const validateCreateWorkOrderLabor = (req: any, res: any, next: any) => {
-  const { error } = createWorkOrderLaborSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
-
-export const validateAssignTechnicianToLabor = (req: any, res: any, next: any) => {
-  const { error } = assignTechnicianToLaborSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
-
-export const validateCreateWorkOrderPart = (req: any, res: any, next: any) => {
-  const { error } = createWorkOrderPartSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      error: error.details[0].message,
-    });
-  }
-  next();
-};
 
 export const validateCreateWorkOrderService = (req: any, res: any, next: any) => {
   const { error } = createWorkOrderServiceSchema.validate(req.body);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { WorkOrderController } from './work-orders.controller';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
-import { validateAssignTechnicianToLabor } from './work-orders.validation';
+import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, validateRequest } from './work-orders.validation';
 
 const router = Router();
 const workOrderController = new WorkOrderController();
@@ -16,7 +16,10 @@ router.get('/cancelled', authenticateSupabaseToken, requireManager, workOrderCon
 
 // Work Order Status Management Routes
 router.put('/:id/status', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderStatus.bind(workOrderController));
-router.put('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignWorkOrder.bind(workOrderController));
+router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignServiceAdvisorSchema, 'body'), workOrderController.assignServiceAdvisor.bind(workOrderController));
+
+// Labor Assignment Routes
+router.put('/labor/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToLabor.bind(workOrderController));
 
 
 

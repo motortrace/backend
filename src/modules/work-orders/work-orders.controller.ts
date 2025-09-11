@@ -257,17 +257,37 @@ export class WorkOrderController {
     }
   }
 
-  async assignWorkOrder(req: Request, res: Response) {
+  async assignServiceAdvisor(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { advisorId, technicianId } = req.body;
+      const { advisorId } = req.body;
 
-      const workOrder = await this.workOrderService.assignWorkOrder(id, advisorId, technicianId);
+      const workOrder = await this.workOrderService.assignServiceAdvisor(id, advisorId);
 
       res.json({
         success: true,
         data: workOrder,
-        message: 'Work order assigned successfully',
+        message: 'Service advisor assigned successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async assignTechnicianToLabor(req: Request, res: Response) {
+    try {
+      const { laborId } = req.params;
+      const { technicianId } = req.body;
+
+      const laborItem = await this.workOrderService.assignTechnicianToLabor(laborId, technicianId);
+
+      res.json({
+        success: true,
+        data: laborItem,
+        message: 'Technician assigned to labor item successfully',
       });
     } catch (error: any) {
       res.status(400).json({

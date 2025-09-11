@@ -434,6 +434,23 @@ export class ServiceAdvisorService {
               notes: true,
             },
           },
+          laborItems: {
+            include: {
+              technician: {
+                select: {
+                  id: true,
+                  employeeId: true,
+                  userProfile: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: filters?.limit || 50,
@@ -491,6 +508,9 @@ export class ServiceAdvisorService {
       customer: workOrder.customer,
       vehicle: workOrder.vehicle,
       appointment: workOrder.appointment,
+      technicians: workOrder.laborItems
+        ?.filter((labor: any) => labor.technician)
+        ?.map((labor: any) => labor.technician) || [],
     };
   }
 

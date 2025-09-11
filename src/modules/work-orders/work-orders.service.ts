@@ -318,7 +318,7 @@ export class WorkOrderService {
       },
     });
 
-    return workOrder;
+    return this.transformWorkOrderForFrontend(workOrder);
   }
 
   // Get work orders with filters
@@ -360,6 +360,7 @@ export class WorkOrderService {
             year: true,
             licensePlate: true,
             vin: true,
+            imageUrl: true,
           },
         },
         appointment: {
@@ -530,7 +531,114 @@ export class WorkOrderService {
       },
     });
 
-         return workOrders;
+    return workOrders.map(workOrder => this.transformWorkOrderForFrontend(workOrder));
+  }
+
+  // Helper method to transform work order data for frontend compatibility
+  private transformWorkOrderForFrontend(workOrder: any): any {
+    const transformed = { ...workOrder };
+
+    // Transform customer name
+    if (transformed.customer && transformed.customer.name) {
+      const nameParts = transformed.customer.name.split(' ');
+      transformed.customer.firstName = nameParts[0] || '';
+      transformed.customer.lastName = nameParts.slice(1).join(' ') || '';
+      delete transformed.customer.name;
+    }
+
+    // Transform service advisor name
+    if (transformed.serviceAdvisor && transformed.serviceAdvisor.userProfile && transformed.serviceAdvisor.userProfile.name) {
+      const nameParts = transformed.serviceAdvisor.userProfile.name.split(' ');
+      transformed.serviceAdvisor.userProfile.firstName = nameParts[0] || '';
+      transformed.serviceAdvisor.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+      delete transformed.serviceAdvisor.userProfile.name;
+    }
+
+    // Transform technician names in labor items
+    if (transformed.laborItems) {
+      transformed.laborItems = transformed.laborItems.map((laborItem: any) => {
+        if (laborItem.technician && laborItem.technician.userProfile && laborItem.technician.userProfile.name) {
+          const nameParts = laborItem.technician.userProfile.name.split(' ');
+          laborItem.technician.userProfile.firstName = nameParts[0] || '';
+          laborItem.technician.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete laborItem.technician.userProfile.name;
+        }
+        return laborItem;
+      });
+    }
+
+    // Transform technician names in inspections
+    if (transformed.inspections) {
+      transformed.inspections = transformed.inspections.map((inspection: any) => {
+        if (inspection.inspector && inspection.inspector.userProfile && inspection.inspector.userProfile.name) {
+          const nameParts = inspection.inspector.userProfile.name.split(' ');
+          inspection.inspector.userProfile.firstName = nameParts[0] || '';
+          inspection.inspector.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete inspection.inspector.userProfile.name;
+        }
+        return inspection;
+      });
+    }
+
+    // Transform technician names in parts used
+    if (transformed.partsUsed) {
+      transformed.partsUsed = transformed.partsUsed.map((part: any) => {
+        if (part.installedBy && part.installedBy.userProfile && part.installedBy.userProfile.name) {
+          const nameParts = part.installedBy.userProfile.name.split(' ');
+          part.installedBy.userProfile.firstName = nameParts[0] || '';
+          part.installedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete part.installedBy.userProfile.name;
+        }
+        return part;
+      });
+    }
+
+    // Transform technician names in payments
+    if (transformed.payments) {
+      transformed.payments = transformed.payments.map((payment: any) => {
+        if (payment.processedBy && payment.processedBy.userProfile && payment.processedBy.userProfile.name) {
+          const nameParts = payment.processedBy.userProfile.name.split(' ');
+          payment.processedBy.userProfile.firstName = nameParts[0] || '';
+          payment.processedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete payment.processedBy.userProfile.name;
+        }
+        return payment;
+      });
+    }
+
+    // Transform technician names in estimates
+    if (transformed.estimates) {
+      transformed.estimates = transformed.estimates.map((estimate: any) => {
+        if (estimate.createdBy && estimate.createdBy.userProfile && estimate.createdBy.userProfile.name) {
+          const nameParts = estimate.createdBy.userProfile.name.split(' ');
+          estimate.createdBy.userProfile.firstName = nameParts[0] || '';
+          estimate.createdBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete estimate.createdBy.userProfile.name;
+        }
+        if (estimate.approvedBy && estimate.approvedBy.userProfile && estimate.approvedBy.userProfile.name) {
+          const nameParts = estimate.approvedBy.userProfile.name.split(' ');
+          estimate.approvedBy.userProfile.firstName = nameParts[0] || '';
+          estimate.approvedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete estimate.approvedBy.userProfile.name;
+        }
+        return estimate;
+      });
+    }
+
+    // Transform technician names in attachments
+    if (transformed.attachments) {
+      transformed.attachments = transformed.attachments.map((attachment: any) => {
+        if (attachment.uploadedBy && attachment.uploadedBy.userProfile && attachment.uploadedBy.userProfile.name) {
+          const nameParts = attachment.uploadedBy.userProfile.name.split(' ');
+          attachment.uploadedBy.userProfile.firstName = nameParts[0] || '';
+          attachment.uploadedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
+          delete attachment.uploadedBy.userProfile.name;
+        }
+        return attachment;
+      });
+    }
+
+    return transformed;
   }
 
   // Get work order by ID
@@ -721,7 +829,7 @@ export class WorkOrderService {
       },
     });
 
-         return workOrder;
+    return workOrder ? this.transformWorkOrderForFrontend(workOrder) : null;
   }
 
   // Update work order
@@ -921,7 +1029,7 @@ export class WorkOrderService {
       },
     });
 
-    return workOrder;
+    return this.transformWorkOrderForFrontend(workOrder);
   }
 
   // Soft delete work order (change status to CANCELLED instead of deleting)
@@ -1753,24 +1861,45 @@ export class WorkOrderService {
     return workOrder;
   }
 
-  // Assign work order
-  async assignWorkOrder(id: string, advisorId?: string, technicianId?: string) {
-    const updateData: any = {};
-
-    if (advisorId) {
-      updateData.advisorId = advisorId;
-    }
-
-    if (technicianId) {
-      updateData.technicianId = technicianId;
-    }
-
+  // Assign service advisor to work order
+  async assignServiceAdvisor(id: string, advisorId: string) {
     const workOrder = await prisma.workOrder.update({
       where: { id },
-      data: updateData,
+      data: { advisorId },
     });
 
     return workOrder;
+  }
+
+  // Assign technician to specific labor item
+  async assignTechnicianToLabor(laborId: string, technicianId: string) {
+    const laborItem = await prisma.workOrderLabor.update({
+      where: { id: laborId },
+      data: { technicianId },
+      include: {
+        technician: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+          },
+        },
+      },
+    });
+
+    return laborItem;
   }
 
   // Get work order statistics

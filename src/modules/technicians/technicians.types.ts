@@ -1,29 +1,32 @@
-export interface CreateServiceAdvisorDto {
+export interface CreateTechnicianDto {
   userProfileId: string;
   employeeId?: string;
-  department?: string;
+  specialization?: string;
+  certifications?: string[];
 }
 
-export interface UpdateServiceAdvisorDto {
+export interface UpdateTechnicianDto {
   employeeId?: string;
-  department?: string;
+  specialization?: string;
+  certifications?: string[];
 }
 
-export interface ServiceAdvisorFilters {
+export interface TechnicianFilters {
   search?: string;
   employeeId?: string;
-  department?: string;
-  hasWorkOrders?: boolean;
-  hasAppointments?: boolean;
+  specialization?: string;
+  hasInspections?: boolean;
+  hasLaborItems?: boolean;
   limit?: number;
   offset?: number;
 }
 
-export interface ServiceAdvisorResponse {
+export interface TechnicianResponse {
   id: string;
   userProfileId: string;
   employeeId?: string;
-  department?: string;
+  specialization?: string;
+  certifications: string[];
   createdAt: Date;
   updatedAt: Date;
   userProfile?: {
@@ -33,19 +36,20 @@ export interface ServiceAdvisorResponse {
     profileImage?: string;
     role: string;
   };
-  workOrdersCount?: number;
-  appointmentsCount?: number;
-  estimatesCount?: number;
+  inspectionsCount?: number;
+  qcChecksCount?: number;
+  laborItemsCount?: number;
+  partInstallationsCount?: number;
 }
 
-export interface ServiceAdvisorStats {
-  totalServiceAdvisors: number;
-  serviceAdvisorsByDepartment: Array<{
-    department: string;
+export interface TechnicianStats {
+  totalTechnicians: number;
+  techniciansBySpecialization: Array<{
+    specialization: string;
     count: number;
   }>;
-  activeServiceAdvisors: number;
-  recentHires: ServiceAdvisorResponse[];
+  activeTechnicians: number;
+  recentHires: TechnicianResponse[];
 }
 
 export interface WorkOrderResponse {

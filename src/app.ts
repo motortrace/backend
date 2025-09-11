@@ -18,6 +18,7 @@ import vehiclesRoutes from './modules/vehicles/vehicles.routes';
 import cannedServicesRoutes from './modules/canned-services/canned-services.routes';
 import storageRoutes from './modules/storage/storage.routes';
 import serviceAdvisorRoutes from './modules/service-advisors/service-advisors.routes';
+import technicianRoutes from './modules/technicians/technicians.routes';
 
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/vehicles', vehiclesRoutes);
 app.use('/canned-services', cannedServicesRoutes);
 app.use('/storage', storageRoutes);
 app.use('/service-advisors', serviceAdvisorRoutes);
+app.use('/technicians', technicianRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
