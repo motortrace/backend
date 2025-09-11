@@ -13,11 +13,42 @@ export class CannedServiceController {
     this.cannedServiceService = new CannedServiceService();
   }
 
-  // Create a new canned service
+  // Simak's method for Create a new canned service 
+  // async createCannedService(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const data: CreateCannedServiceRequest = req.body;
+  //     const cannedService = await this.cannedServiceService.createCannedService(data);
+
+  //     res.status(201).json({
+  //       success: true,
+  //       data: cannedService,
+  //       message: 'Canned service created successfully',
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //       message: 'Failed to create canned service',
+  //     });
+  //   }
+  // }
+
+
+
+
+  // Jabir's updated method for Create a new canned service
   async createCannedService(req: Request, res: Response): Promise<void> {
     try {
-      const data: CreateCannedServiceRequest = req.body;
-      const cannedService = await this.cannedServiceService.createCannedService(data);
+      const data: any = req.body;
+
+      // Check if labor operations are provided
+      const laborOperations = data.laborOperations || [];
+      delete data.laborOperations; // Remove from main data
+
+      const cannedService = await this.cannedServiceService.createCannedServiceWithLabor(
+        data,
+        laborOperations
+      );
 
       res.status(201).json({
         success: true,
@@ -37,8 +68,8 @@ export class CannedServiceController {
   async getCannedServices(req: Request, res: Response): Promise<void> {
     try {
       const filters: CannedServiceFilters = {
-        isAvailable: req.query.isAvailable === 'true' ? true : 
-                    req.query.isAvailable === 'false' ? false : undefined,
+        isAvailable: req.query.isAvailable === 'true' ? true :
+          req.query.isAvailable === 'false' ? false : undefined,
         minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
         maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
         search: req.query.search as string,
@@ -233,8 +264,8 @@ export class CannedServiceController {
     try {
       const { query } = req.query;
       const filters: CannedServiceFilters = {
-        isAvailable: req.query.isAvailable === 'true' ? true : 
-                    req.query.isAvailable === 'false' ? false : undefined,
+        isAvailable: req.query.isAvailable === 'true' ? true :
+          req.query.isAvailable === 'false' ? false : undefined,
         minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
         maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
       };
@@ -270,7 +301,7 @@ export class CannedServiceController {
   async bulkUpdatePrices(req: Request, res: Response): Promise<void> {
     try {
       const { percentageIncrease } = req.body;
-      
+
       if (typeof percentageIncrease !== 'number') {
         res.status(400).json({
           success: false,

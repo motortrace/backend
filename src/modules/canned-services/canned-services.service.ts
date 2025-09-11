@@ -9,6 +9,7 @@ import {
 const prisma = new PrismaClient();
 
 export class CannedServiceService {
+
   // Create a new canned service
   async createCannedService(data: CreateCannedServiceRequest): Promise<CannedService> {
     // Check if code already exists
@@ -34,7 +35,119 @@ export class CannedServiceService {
     return cannedService;
   }
 
-  // Get all canned services with optional filters
+  // New method added by Jabir to support canned service creation with labors functionality
+  async createCannedServiceWithLabor(
+    data: CreateCannedServiceRequest,
+    laborOperations: Array<{ laborCatalogId: string; sequence: number; notes?: string }>
+  ): Promise<any> {
+    // Check if code already exists
+    const existingService = await prisma.cannedService.findUnique({
+      where: { code: data.code },
+    });
+
+    if (existingService) {
+      throw new Error(`Canned service with code '${data.code}' already exists`);
+    }
+
+    // Verify all labor catalog IDs exist
+    const laborCatalogIds = laborOperations.map(op => op.laborCatalogId);
+    const laborCatalogs = await prisma.laborCatalog.findMany({
+      where: {
+        id: { in: laborCatalogIds },
+        isActive: true
+      },
+    });
+
+    if (laborCatalogs.length !== laborCatalogIds.length) {
+      const invalidIds = laborCatalogIds.filter(id =>
+        !laborCatalogs.some(lc => lc.id === id)
+      );
+      throw new Error(`Invalid or inactive labor catalog IDs: ${invalidIds.join(', ')}`);
+    }
+
+    // Create the canned service with labor operations
+    const cannedService = await prisma.cannedService.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        description: data.description,
+        duration: data.duration,
+        price: data.price,
+        isAvailable: data.isAvailable ?? true,
+        laborOperations: {
+          create: laborOperations.map(op => ({
+            laborCatalogId: op.laborCatalogId,
+            sequence: op.sequence,
+            notes: op.notes
+          }))
+        }
+      },
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: true
+          }
+        }
+      }
+    });
+
+    return cannedService;
+  }
+
+  // Simak's method to get all canned services with optional filters
+  // async getCannedServices(filters: CannedServiceFilters = {}): Promise<CannedService[]> {
+  //   const where: any = {};
+
+  //   if (filters.isAvailable !== undefined) {
+  //     where.isAvailable = filters.isAvailable;
+  //   }
+
+  //   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+  //     where.price = {};
+  //     if (filters.minPrice !== undefined) where.price.gte = filters.minPrice;
+  //     if (filters.maxPrice !== undefined) where.price.lte = filters.maxPrice;
+  //   }
+
+  //   if (filters.search) {
+  //     where.OR = [
+  //       { name: { contains: filters.search, mode: 'insensitive' } },
+  //       { description: { contains: filters.search, mode: 'insensitive' } },
+  //       { code: { contains: filters.search, mode: 'insensitive' } },
+  //     ];
+  //   }
+
+  //   const cannedServices = await prisma.cannedService.findMany({
+  //     where,
+  //     orderBy: [
+  //       { isAvailable: 'desc' },
+  //       { name: 'asc' },
+  //     ],
+  //   });
+
+  //   return cannedServices;
+  // }
+
+  // // Get canned service by ID
+  // async getCannedServiceById(id: string): Promise<CannedService | null> {
+  //   const cannedService = await prisma.cannedService.findUnique({
+  //     where: { id },
+  //   });
+
+  //   return cannedService;
+  // }
+
+  // // Get canned service by code
+  // async getCannedServiceByCode(code: string): Promise<CannedService | null> {
+  //   const cannedService = await prisma.cannedService.findUnique({
+  //     where: { code },
+  //   });
+
+  //   return cannedService;
+  // }
+
+
+
+  // Jabir's updated method to get all canned services with optional filters
   async getCannedServices(filters: CannedServiceFilters = {}): Promise<CannedService[]> {
     const where: any = {};
 
@@ -58,31 +171,128 @@ export class CannedServiceService {
 
     const cannedServices = await prisma.cannedService.findMany({
       where,
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+                isActive: true
+              }
+            }
+          },
+          orderBy: {
+            sequence: 'asc'
+          }
+        }
+      },
       orderBy: [
         { isAvailable: 'desc' },
         { name: 'asc' },
       ],
     });
 
+    // Transform to include serviceIds array for frontend compatibility
+    return cannedServices.map(service => ({
+      ...service,
+      serviceIds: service.laborOperations.map(op => op.laborCatalog.id)
+    }));
+
     return cannedServices;
   }
 
-  // Get canned service by ID
-  async getCannedServiceById(id: string): Promise<CannedService | null> {
+  // Simak's method to get a canned service by ID
+  // async getCannedServiceById(id: string): Promise<CannedService | null> {
+  //   const cannedService = await prisma.cannedService.findUnique({
+  //     where: { id },
+  //   });
+
+  //   return cannedService;
+  // }
+
+
+
+
+  // Jabir's updated method to get a canned service by ID
+  async getCannedServiceById(id: string): Promise<any> {
     const cannedService = await prisma.cannedService.findUnique({
       where: { id },
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+                isActive: true
+              }
+            }
+          },
+          orderBy: {
+            sequence: 'asc'
+          }
+        }
+      }
     });
 
-    return cannedService;
+    if (!cannedService) return null;
+
+    // Transform for frontend
+    return {
+      ...cannedService,
+      serviceIds: cannedService.laborOperations.map(op => op.laborCatalog.id)
+    };
   }
 
-  // Get canned service by code
-  async getCannedServiceByCode(code: string): Promise<CannedService | null> {
+
+  // Simak's method to get a canned service by code
+  // async getCannedServiceByCode(code: string): Promise<CannedService | null> {
+  //   const cannedService = await prisma.cannedService.findUnique({
+  //     where: { code },
+  //   });
+
+  //   return cannedService;
+  // }
+
+
+  // Jabir's updated method to get a canned service by code
+  async getCannedServiceByCode(code: string): Promise<any> {
     const cannedService = await prisma.cannedService.findUnique({
       where: { code },
+      include: {
+        laborOperations: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                estimatedHours: true,
+                hourlyRate: true,
+                isActive: true
+              }
+            }
+          },
+          orderBy: {
+            sequence: 'asc'
+          }
+        }
+      }
     });
 
-    return cannedService;
+    if (!cannedService) return null;
+
+    return {
+      ...cannedService,
+      serviceIds: cannedService.laborOperations.map(op => op.laborCatalog.id)
+    };
   }
 
   // Get canned service with detailed information including labor and parts
@@ -145,8 +355,64 @@ export class CannedServiceService {
     };
   }
 
-  // Update canned service
-  async updateCannedService(id: string, data: UpdateCannedServiceRequest): Promise<CannedService> {
+  // Jabir introducing this new private method to support updateCannedService
+  private transformCannedServiceResponse(cannedService: any): any {
+    if (!cannedService) return null;
+
+    return {
+      id: cannedService.id,
+      code: cannedService.code,
+      name: cannedService.name,
+      description: cannedService.description,
+      duration: cannedService.duration,
+      price: cannedService.price,
+      isAvailable: cannedService.isAvailable,
+      createdAt: cannedService.createdAt,
+      updatedAt: cannedService.updatedAt,
+      serviceIds: cannedService.laborOperations?.map((op: any) => op.laborCatalog.id) || [],
+      laborOperations: cannedService.laborOperations?.map((op: any) => ({
+        id: op.id,
+        sequence: op.sequence,
+        notes: op.notes,
+        laborCatalog: {
+          id: op.laborCatalog.id,
+          code: op.laborCatalog.code,
+          name: op.laborCatalog.name,
+          estimatedHours: op.laborCatalog.estimatedHours,
+          hourlyRate: op.laborCatalog.hourlyRate,
+          isActive: op.laborCatalog.isActive
+        }
+      })) || []
+    };
+  }
+
+
+  // Simak's method to update a canned service
+  // async updateCannedService(id: string, data: UpdateCannedServiceRequest): Promise<CannedService> {
+  //   // Check if code is being updated and if it already exists
+  //   if (data.code) {
+  //     const existingService = await prisma.cannedService.findFirst({
+  //       where: {
+  //         code: data.code,
+  //         id: { not: id },
+  //       },
+  //     });
+
+  //     if (existingService) {
+  //       throw new Error(`Canned service with code '${data.code}' already exists`);
+  //     }
+  //   }
+
+  //   const cannedService = await prisma.cannedService.update({
+  //     where: { id },
+  //     data,
+  //   });
+
+  //   return cannedService;
+  // }
+
+  // Jabirs updated method to update a canned service
+  async updateCannedService(id: string, data: UpdateCannedServiceRequest): Promise<any> {
     // Check if code is being updated and if it already exists
     if (data.code) {
       const existingService = await prisma.cannedService.findFirst({
@@ -161,12 +427,110 @@ export class CannedServiceService {
       }
     }
 
-    const cannedService = await prisma.cannedService.update({
-      where: { id },
-      data,
+    // Extract labor operations first and create a clean data object for Prisma
+    const laborOperations = data.laborOperations;
+
+    // Create a Prisma-compatible data object without laborOperations
+    const prismaData: any = {
+      code: data.code,
+      name: data.name,
+      description: data.description,
+      duration: data.duration,
+      price: data.price,
+      isAvailable: data.isAvailable,
+    };
+
+    // Remove undefined properties to avoid Prisma errors
+    Object.keys(prismaData).forEach(key => {
+      if (prismaData[key] === undefined) {
+        delete prismaData[key];
+      }
     });
 
-    return cannedService;
+    // Handle labor operations if provided
+    if (laborOperations !== undefined) {
+      // First, delete existing labor operations
+      await prisma.cannedServiceLabor.deleteMany({
+        where: { cannedServiceId: id }
+      });
+
+      // Then create new ones if provided
+      if (laborOperations.length > 0) {
+        // Validate labor catalog IDs
+        const laborCatalogIds = laborOperations.map(op => op.laborCatalogId);
+        const laborCatalogs = await prisma.laborCatalog.findMany({
+          where: {
+            id: { in: laborCatalogIds },
+            isActive: true
+          },
+        });
+
+        if (laborCatalogs.length !== laborCatalogIds.length) {
+          const invalidIds = laborCatalogIds.filter(id =>
+            !laborCatalogs.some(lc => lc.id === id)
+          );
+          throw new Error(`Invalid or inactive labor catalog IDs: ${invalidIds.join(', ')}`);
+        }
+
+        // Create new labor operations
+        await prisma.cannedServiceLabor.createMany({
+          data: laborOperations.map(op => ({
+            cannedServiceId: id,
+            laborCatalogId: op.laborCatalogId,
+            sequence: op.sequence,
+            notes: op.notes
+          }))
+        });
+      }
+    }
+
+    // Only update if there are actual fields to update (excluding laborOperations)
+    let cannedService;
+    if (Object.keys(prismaData).length > 0) {
+      cannedService = await prisma.cannedService.update({
+        where: { id },
+        data: prismaData,
+        include: {
+          laborOperations: {
+            include: {
+              laborCatalog: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  estimatedHours: true,
+                  hourlyRate: true,
+                  isActive: true
+                }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // If only laborOperations were updated, fetch the updated service
+      cannedService = await prisma.cannedService.findUnique({
+        where: { id },
+        include: {
+          laborOperations: {
+            include: {
+              laborCatalog: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  estimatedHours: true,
+                  hourlyRate: true,
+                  isActive: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    return this.transformCannedServiceResponse(cannedService);
   }
 
   // Delete canned service

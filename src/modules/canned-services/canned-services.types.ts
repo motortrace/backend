@@ -1,14 +1,41 @@
 import Joi from 'joi';
 
+// Simak's interface
+// export interface CreateCannedServiceRequest {
+//   code: string;
+//   name: string;
+//   description?: string;
+//   duration: number; // in minutes
+//   price: number;
+//   isAvailable?: boolean;
+// }
+
+// Jabirs updated interface
 export interface CreateCannedServiceRequest {
   code: string;
   name: string;
   description?: string;
-  duration: number; // in minutes
+  duration: number;
   price: number;
   isAvailable?: boolean;
+  laborOperations?: Array<{
+    laborCatalogId: string;
+    sequence: number;
+    notes?: string;
+  }>;
 }
 
+// Simaks interface
+// export interface UpdateCannedServiceRequest {
+//   code?: string;
+//   name?: string;
+//   description?: string;
+//   duration?: number;
+//   price?: number;
+//   isAvailable?: boolean;
+// }
+
+// Jabirs updated interface
 export interface UpdateCannedServiceRequest {
   code?: string;
   name?: string;
@@ -16,6 +43,11 @@ export interface UpdateCannedServiceRequest {
   duration?: number;
   price?: number;
   isAvailable?: boolean;
+  laborOperations?: Array<{
+    laborCatalogId: string;
+    sequence: number;
+    notes?: string;
+  }>;
 }
 
 export interface CannedServiceFilters {
@@ -66,16 +98,73 @@ export interface CannedServiceDetails {
   partsCategories: CannedServicePartsCategoryDetail[];
 }
 
+// New method added by jabir for frontend compatibilty
+export interface CannedServiceResponse {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  duration: number;
+  price: number | any;
+  isAvailable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  serviceIds: string[]; // For frontend compatibility
+  laborOperations: Array<{
+    id: string;
+    sequence: number;
+    notes?: string;
+    laborCatalog: {
+      id: string;
+      code: string;
+      name: string;
+      estimatedHours: number | any;
+      hourlyRate: number | any;
+      isActive: boolean;
+    };
+  }>;
+}
+
 // Validation schemas
+
+// Simak's old validation schema
+// export const createCannedServiceSchema = Joi.object({
+//   code: Joi.string().required().min(2).max(20),
+//   name: Joi.string().required().min(2).max(100),
+//   description: Joi.string().optional().max(500),
+//   duration: Joi.number().required().min(1).max(480), // 1 minute to 8 hours
+//   price: Joi.number().required().min(0).precision(2),
+//   isAvailable: Joi.boolean().optional().default(true),
+// });
+
+// Jabir's new validation schema
 export const createCannedServiceSchema = Joi.object({
   code: Joi.string().required().min(2).max(20),
   name: Joi.string().required().min(2).max(100),
   description: Joi.string().optional().max(500),
-  duration: Joi.number().required().min(1).max(480), // 1 minute to 8 hours
+  duration: Joi.number().required().min(1).max(480),
   price: Joi.number().required().min(0).precision(2),
   isAvailable: Joi.boolean().optional().default(true),
+  laborOperations: Joi.array().items(
+    Joi.object({
+      laborCatalogId: Joi.string().required(),
+      sequence: Joi.number().required().min(1),
+      notes: Joi.string().optional().max(500)
+    })
+  ).optional()
 });
 
+// Simak's schema
+// export const updateCannedServiceSchema = Joi.object({
+//   code: Joi.string().optional().min(2).max(20),
+//   name: Joi.string().optional().min(2).max(100),
+//   description: Joi.string().optional().max(500),
+//   duration: Joi.number().optional().min(1).max(480),
+//   price: Joi.number().optional().min(0).precision(2),
+//   isAvailable: Joi.boolean().optional(),
+// });
+
+// Jabirs updated schema
 export const updateCannedServiceSchema = Joi.object({
   code: Joi.string().optional().min(2).max(20),
   name: Joi.string().optional().min(2).max(100),
@@ -83,6 +172,13 @@ export const updateCannedServiceSchema = Joi.object({
   duration: Joi.number().optional().min(1).max(480),
   price: Joi.number().optional().min(0).precision(2),
   isAvailable: Joi.boolean().optional(),
+  laborOperations: Joi.array().items(
+    Joi.object({
+      laborCatalogId: Joi.string().required(),
+      sequence: Joi.number().required().min(1),
+      notes: Joi.string().optional().max(500)
+    })
+  ).optional()
 });
 
 export const cannedServiceFiltersSchema = Joi.object({
