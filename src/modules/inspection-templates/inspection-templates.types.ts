@@ -6,6 +6,7 @@ export interface InspectionTemplate {
   name: string;
   description: string | null; // Changed from string | undefined
   category: string | null; // Changed from string | undefined
+  imageUrl: string | null; // URL to template image stored in Supabase bucket
   isActive: boolean;
   sortOrder: number | null; // Changed from number | undefined
   createdAt: Date;
@@ -30,6 +31,7 @@ export interface InspectionTemplateItem {
 export interface WorkOrderInspectionWithTemplate {
   id: string;
   workOrderId: string;
+  workOrderNumber: string | null; // Direct field for work order number
   inspectorId: string;
   templateId: string | null; // Changed from string | undefined
   date: Date;
@@ -37,6 +39,10 @@ export interface WorkOrderInspectionWithTemplate {
   isCompleted: boolean;
   template?: InspectionTemplate | null;
   checklistItems?: InspectionChecklistItem[] | null;
+  workOrder?: {
+    id: string;
+    workOrderNumber: string;
+  } | null;
 }
 
 export interface InspectionChecklistItem {
@@ -57,6 +63,7 @@ export interface CreateInspectionTemplateRequest {
   name: string;
   description?: string;
   category?: string;
+  imageUrl?: string;
   sortOrder?: number;
   templateItems?: CreateTemplateItemRequest[];
 }
@@ -74,6 +81,7 @@ export interface UpdateInspectionTemplateRequest {
   name?: string;
   description?: string;
   category?: string;
+  imageUrl?: string;
   isActive?: boolean;
   sortOrder?: number;
 }

@@ -13,6 +13,13 @@ router.get('/templates/:id', controller.getInspectionTemplate.bind(controller));
 router.put('/templates/:id', controller.updateInspectionTemplate.bind(controller));
 router.delete('/templates/:id', controller.deleteInspectionTemplate.bind(controller));
 
+// Template Image Management Routes
+router.post('/templates/:id/image', 
+  InspectionTemplatesController.getUploadMiddleware(),
+  controller.uploadTemplateImage.bind(controller)
+);
+router.delete('/templates/:id/image', controller.deleteTemplateImage.bind(controller));
+
 // Work Order Inspection Management Routes
 router.post('/work-orders/assign-template', controller.assignTemplateToWorkOrder.bind(controller));
 router.post('/work-orders/create-inspection', controller.createInspectionFromTemplate.bind(controller));
@@ -26,6 +33,11 @@ router.put('/inspections/:id', controller.updateWorkOrderInspection.bind(control
 router.post('/inspections/:inspectionId/checklist-items', controller.addChecklistItem.bind(controller));
 router.put('/checklist-items/:id', controller.updateChecklistItem.bind(controller));
 router.delete('/checklist-items/:id', controller.deleteChecklistItem.bind(controller));
+
+// Inspection Attachment Management Routes
+router.post('/inspections/:inspectionId/attachments', controller.createInspectionAttachment.bind(controller));
+router.get('/inspections/:inspectionId/attachments', controller.getInspectionAttachments.bind(controller));
+router.delete('/attachments/:attachmentId', controller.deleteInspectionAttachment.bind(controller));
 
 // Work Order Inspection Status Routes
 router.get('/work-orders/:workOrderId/inspection-status', controller.getWorkOrderInspectionStatus.bind(controller));

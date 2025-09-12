@@ -281,6 +281,12 @@ export class InspectionTemplatesService {
                 orderBy: { sortOrder: 'asc' }
               }
             }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
           }
         }
       });
@@ -307,7 +313,10 @@ export class InspectionTemplatesService {
       return {
         success: true,
         data: {
-          inspection,
+          inspection: {
+            ...inspection,
+            workOrderNumber: inspection.workOrder?.workOrderNumber || null
+          },
           template,
           checklistItems
         },
@@ -385,6 +394,12 @@ export class InspectionTemplatesService {
                 orderBy: { sortOrder: 'asc' }
               }
             }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
           }
         }
       });
@@ -424,7 +439,10 @@ export class InspectionTemplatesService {
       return {
         success: true,
         data: {
-          inspection,
+          inspection: {
+            ...inspection,
+            workOrderNumber: inspection.workOrder?.workOrderNumber || null
+          },
           template,
           checklistItems: createdChecklistItems
         },
@@ -461,6 +479,12 @@ export class InspectionTemplatesService {
             include: {
               userProfile: true
             }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
           }
         }
       });
@@ -474,7 +498,10 @@ export class InspectionTemplatesService {
 
       return {
         success: true,
-        data: inspection
+        data: {
+          ...inspection,
+          workOrderNumber: inspection.workOrder?.workOrderNumber || null
+        }
       };
     } catch (error) {
       console.error('Error fetching work order inspection:', error);
@@ -542,6 +569,12 @@ export class InspectionTemplatesService {
               include: {
                 userProfile: true
               }
+            },
+            workOrder: {
+              select: {
+                id: true,
+                workOrderNumber: true
+              }
             }
           },
           orderBy: { date: 'desc' },
@@ -555,7 +588,10 @@ export class InspectionTemplatesService {
 
       return {
         success: true,
-        data: inspections,
+        data: inspections.map(inspection => ({
+          ...inspection,
+          workOrderNumber: inspection.workOrder?.workOrderNumber || null
+        })),
         pagination: {
           total,
           page,
@@ -598,13 +634,22 @@ export class InspectionTemplatesService {
             include: {
               userProfile: true
             }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
           }
         }
       });
 
       return {
         success: true,
-        data: inspection,
+        data: {
+          ...inspection,
+          workOrderNumber: inspection.workOrder?.workOrderNumber || null
+        },
         message: 'Work order inspection updated successfully'
       };
     } catch (error) {
@@ -645,6 +690,12 @@ export class InspectionTemplatesService {
                 include: {
                   userProfile: true
                 }
+              },
+              workOrder: {
+                select: {
+                  id: true,
+                  workOrderNumber: true
+                }
               }
             }
           }
@@ -653,7 +704,10 @@ export class InspectionTemplatesService {
 
       return {
         success: true,
-        data: checklistItem.inspection,
+        data: {
+          ...checklistItem.inspection,
+          workOrderNumber: checklistItem.inspection.workOrder?.workOrderNumber || null
+        },
         message: 'Checklist item updated successfully'
       };
     } catch (error) {
@@ -777,6 +831,12 @@ export class InspectionTemplatesService {
           },
           checklistItems: {
             orderBy: { createdAt: 'asc' }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
           }
         },
         orderBy: { date: 'asc' }
@@ -939,6 +999,135 @@ export class InspectionTemplatesService {
       return {
         success: false,
         error: 'Failed to check estimate readiness'
+      };
+    }
+  }
+
+  // Inspection Attachment Management
+  async createInspectionAttachment(
+    inspectionId: string,
+    data: {
+      fileUrl: string;
+      fileName?: string;
+      fileType?: string;
+      fileSize?: number;
+      description?: string;
+    }
+  ) {
+    try {
+      const attachment = await prisma.workOrderInspectionAttachment.create({
+        data: {
+          inspectionId,
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          fileType: data.fileType,
+          fileSize: data.fileSize,
+          description: data.description,
+        },
+        include: {
+          inspection: {
+            select: {
+              id: true,
+              workOrderId: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        data: attachment,
+      };
+    } catch (error) {
+      console.error('Error creating inspection attachment:', error);
+      return {
+        success: false,
+        error: 'Failed to create inspection attachment',
+      };
+    }
+  }
+
+  async getInspectionAttachments(inspectionId: string) {
+    try {
+      const attachments = await prisma.workOrderInspectionAttachment.findMany({
+        where: { inspectionId },
+        orderBy: { uploadedAt: 'desc' },
+      });
+
+      return {
+        success: true,
+        data: attachments,
+      };
+    } catch (error) {
+      console.error('Error fetching inspection attachments:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch inspection attachments',
+      };
+    }
+  }
+
+  async deleteInspectionAttachment(attachmentId: string) {
+    try {
+      await prisma.workOrderInspectionAttachment.delete({
+        where: { id: attachmentId },
+      });
+
+      return {
+        success: true,
+        message: 'Inspection attachment deleted successfully',
+      };
+    } catch (error) {
+      console.error('Error deleting inspection attachment:', error);
+      return {
+        success: false,
+        error: 'Failed to delete inspection attachment',
+      };
+    }
+  }
+
+  // Get all templates for the templates page (no pagination, includes all items)
+  async getAllTemplatesForPage(): Promise<InspectionTemplatesResponse> {
+    try {
+      const templates = await prisma.inspectionTemplate.findMany({
+        include: {
+          templateItems: {
+            orderBy: { sortOrder: 'asc' }
+          },
+          _count: {
+            select: {
+              workOrderInspections: true
+            }
+          }
+        },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { name: 'asc' }
+        ]
+      });
+
+      return {
+        success: true,
+        data: templates,
+        pagination: {
+          page: 1,
+          limit: templates.length,
+          total: templates.length,
+          totalPages: 1
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching all templates for page:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch templates',
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 0,
+          total: 0,
+          totalPages: 0
+        }
       };
     }
   }

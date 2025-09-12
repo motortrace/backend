@@ -328,6 +328,17 @@ export class LaborService {
           select: {
             id: true,
             userProfileId: true,
+            employeeId: true,
+            specialization: true,
+            certifications: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+                phone: true,
+              },
+            },
           },
         },
       },
@@ -358,6 +369,17 @@ export class LaborService {
           select: {
             id: true,
             userProfileId: true,
+            employeeId: true,
+            specialization: true,
+            certifications: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+                phone: true,
+              },
+            },
           },
         },
       },

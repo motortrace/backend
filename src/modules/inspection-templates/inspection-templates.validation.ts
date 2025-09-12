@@ -36,6 +36,9 @@ export const createInspectionTemplateSchema = Joi.object({
   category: Joi.string().optional().max(100).messages({
     'string.max': 'Category cannot exceed 100 characters'
   }),
+  imageUrl: Joi.string().optional().uri().messages({
+    'string.uri': 'Image URL must be a valid URL'
+  }),
   sortOrder: Joi.number().integer().min(0).optional().messages({
     'number.base': 'Sort order must be a number',
     'number.integer': 'Sort order must be an integer',
@@ -57,6 +60,9 @@ export const updateInspectionTemplateSchema = Joi.object({
   }),
   category: Joi.string().optional().max(100).messages({
     'string.max': 'Category cannot exceed 100 characters'
+  }),
+  imageUrl: Joi.string().optional().uri().messages({
+    'string.uri': 'Image URL must be a valid URL'
   }),
   isActive: Joi.boolean().optional(),
   sortOrder: Joi.number().integer().min(0).optional().messages({

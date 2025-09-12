@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { InspectionTemplatesService } from './inspection-templates.service';
+import { StorageService } from '../storage/storage.service';
+import multer from 'multer';
 import {
   validateCreateInspectionTemplate,
   validateUpdateInspectionTemplate,
@@ -12,6 +14,22 @@ import {
   inspectionIdSchema,
   checklistItemIdSchema
 } from './inspection-templates.validation';
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 export class InspectionTemplatesController {
   private service: InspectionTemplatesService;
@@ -562,6 +580,244 @@ export class InspectionTemplatesController {
         error: 'Internal server error'
       });
     }
+  }
+
+  // Inspection Attachment Management
+  async createInspectionAttachment(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      const { fileUrl, fileName, fileType, fileSize, description } = req.body;
+
+      if (!fileUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'File URL is required'
+        });
+      }
+
+      const result = await this.service.createInspectionAttachment(inspectionId, {
+        fileUrl,
+        fileName,
+        fileType,
+        fileSize,
+        description,
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(201).json(result);
+    } catch (error) {
+      console.error('Controller error - createInspectionAttachment:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async getInspectionAttachments(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+
+      const result = await this.service.getInspectionAttachments(inspectionId);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Controller error - getInspectionAttachments:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async deleteInspectionAttachment(req: Request, res: Response) {
+    try {
+      const { attachmentId } = req.params;
+
+      const result = await this.service.deleteInspectionAttachment(attachmentId);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Controller error - deleteInspectionAttachment:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  // Get all templates for the templates page
+  async getAllTemplatesForPage(req: Request, res: Response) {
+    try {
+      const result = await this.service.getAllTemplatesForPage();
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Controller error - getAllTemplatesForPage:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  // Template Image Management
+  async uploadTemplateImage(req: Request, res: Response) {
+    try {
+      const validation = templateIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid template ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: 'No image file provided'
+        });
+      }
+
+      console.log('📤 Uploading template image for template:', validation.value.id);
+
+      // Upload to Supabase Storage
+      const result = await StorageService.uploadTemplateImage(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        validation.value.id
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false,
+          error: result.error || 'Failed to upload image' 
+        });
+      }
+
+      // Update template with image URL
+      const updateResult = await this.service.updateInspectionTemplate(
+        validation.value.id,
+        { imageUrl: result.url }
+      );
+
+      if (!updateResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to update template with image URL'
+        });
+      }
+
+      console.log('✅ Template image uploaded successfully:', result.url);
+
+      res.json({
+        success: true,
+        data: {
+          imageUrl: result.url,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype
+        },
+        message: 'Template image uploaded successfully'
+      });
+
+    } catch (error: any) {
+      console.error('❌ Template image upload error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Internal server error',
+        message: error.message 
+      });
+    }
+  }
+
+  async deleteTemplateImage(req: Request, res: Response) {
+    try {
+      const validation = templateIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid template ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      // Get current template to find image URL
+      const templateResult = await this.service.getInspectionTemplate(validation.value.id);
+      if (!templateResult.success || !templateResult.data) {
+        return res.status(404).json({
+          success: false,
+          error: 'Template not found'
+        });
+      }
+
+      const imageUrl = templateResult.data.imageUrl;
+      if (!imageUrl) {
+        return res.status(400).json({
+          success: false,
+          error: 'Template has no image to delete'
+        });
+      }
+
+      // Delete from Supabase Storage
+      const deleteResult = await StorageService.deleteTemplateImage(imageUrl);
+      if (!deleteResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: deleteResult.error || 'Failed to delete image from storage'
+        });
+      }
+
+      // Update template to remove image URL
+      const updateResult = await this.service.updateInspectionTemplate(
+        validation.value.id,
+        { imageUrl: undefined }
+      );
+
+      if (!updateResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Failed to update template after image deletion'
+        });
+      }
+
+      console.log('✅ Template image deleted successfully');
+
+      res.json({
+        success: true,
+        message: 'Template image deleted successfully'
+      });
+
+    } catch (error: any) {
+      console.error('❌ Template image delete error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Internal server error',
+        message: error.message 
+      });
+    }
+  }
+
+  // Export multer middleware for use in routes
+  static getUploadMiddleware() {
+    return upload.single('templateImage');
   }
 
 

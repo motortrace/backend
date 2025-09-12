@@ -11,6 +11,7 @@ export interface UploadResult {
 export class StorageService {
   private static readonly PROFILE_IMAGES_BUCKET = 'profile-images';
   private static readonly CAR_IMAGES_BUCKET = 'car-images';
+  private static readonly TEMPLATE_IMAGES_BUCKET = 'template-images';
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   private static readonly ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -138,6 +139,74 @@ export class StorageService {
   }
 
   /**
+   * Upload a template image to Supabase Storage
+   */
+  static async uploadTemplateImage(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    mimeType: string,
+    templateId: string
+  ): Promise<UploadResult> {
+    try {
+      // Validate file size
+      if (file.length > this.MAX_FILE_SIZE) {
+        return {
+          success: false,
+          error: 'File size exceeds 5MB limit'
+        };
+      }
+
+      // Validate MIME type
+      if (!this.ALLOWED_MIME_TYPES.includes(mimeType)) {
+        return {
+          success: false,
+          error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed'
+        };
+      }
+
+      // Generate unique filename
+      const fileExtension = fileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${templateId}/${uuidv4()}.${fileExtension}`;
+
+      // Use service client for uploads (bypasses RLS)
+      const serviceClient = this.getServiceClient();
+
+      // Upload to Supabase Storage
+      const { data, error } = await serviceClient.storage
+        .from(this.TEMPLATE_IMAGES_BUCKET)
+        .upload(uniqueFileName, file, {
+          contentType: mimeType,
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return {
+          success: false,
+          error: 'Failed to upload image to storage'
+        };
+      }
+
+      // Get public URL
+      const { data: urlData } = serviceClient.storage
+        .from(this.TEMPLATE_IMAGES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return {
+        success: true,
+        url: urlData.publicUrl
+      };
+
+    } catch (error: any) {
+      console.error('Template image upload error:', error);
+      return {
+        success: false,
+        error: 'Internal server error during image upload'
+      };
+    }
+  }
+
+  /**
    * Delete a profile image from Supabase Storage
    */
   static async deleteProfileImage(imageUrl: string): Promise<UploadResult> {
@@ -177,6 +246,45 @@ export class StorageService {
   }
 
   /**
+   * Delete a template image from Supabase Storage
+   */
+  static async deleteTemplateImage(imageUrl: string): Promise<UploadResult> {
+    try {
+      // Extract file path from URL
+      const urlParts = imageUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const templateId = urlParts[urlParts.length - 2];
+      const filePath = `${templateId}/${fileName}`;
+
+      // Use service client for deletions (bypasses RLS)
+      const serviceClient = this.getServiceClient();
+      
+      const { error } = await serviceClient.storage
+        .from(this.TEMPLATE_IMAGES_BUCKET)
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Storage delete error:', error);
+        return {
+          success: false,
+          error: 'Failed to delete image from storage'
+        };
+      }
+
+      return {
+        success: true
+      };
+
+    } catch (error: any) {
+      console.error('Template image delete error:', error);
+      return {
+        success: false,
+        error: 'Internal server error during image deletion'
+      };
+    }
+  }
+
+  /**
    * Initialize storage bucket if it doesn't exist
    */
   static async initializeStorage(): Promise<void> {
@@ -208,6 +316,7 @@ export class StorageService {
 
       const profileBucketExists = buckets?.some(bucket => bucket.name === this.PROFILE_IMAGES_BUCKET);
       const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
+      const templateBucketExists = buckets?.some(bucket => bucket.name === this.TEMPLATE_IMAGES_BUCKET);
 
       if (!profileBucketExists) {
         console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
@@ -250,6 +359,25 @@ export class StorageService {
         }
       } else {
         console.log(`✅ Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+      }
+
+      if (!templateBucketExists) {
+        console.log(`📦 Creating bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        const { error: createTemplateError } = await serviceClient.storage.createBucket(
+          this.TEMPLATE_IMAGES_BUCKET,
+          {
+            public: true,
+            allowedMimeTypes: this.ALLOWED_MIME_TYPES,
+            fileSizeLimit: this.MAX_FILE_SIZE
+          }
+        );
+        if (createTemplateError) {
+          console.error('❌ Error creating template-images bucket:', createTemplateError);
+        } else {
+          console.log(`✅ Created storage bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        }
+      } else {
+        console.log(`✅ Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
       }
     } catch (error) {
       console.error('❌ Error initializing storage:', error);

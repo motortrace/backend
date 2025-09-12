@@ -31,7 +31,7 @@ router.delete('/catalog/:id', authenticateSupabaseToken, requireManager, laborCo
 
 // Work Order Labor Management Routes
 router.post('/work-order', authenticateSupabaseToken, requireTechnician, validateCreateWorkOrderLabor, laborController.createWorkOrderLabor.bind(laborController));
-router.get('/work-order', authenticateSupabaseToken, requireServiceAdvisor, validateWorkOrderLaborFilter, laborController.getWorkOrderLabors.bind(laborController));
+router.get('/work-order', validateWorkOrderLaborFilter, laborController.getWorkOrderLabors.bind(laborController));
 router.get('/work-order/:id', authenticateSupabaseToken, requireServiceAdvisor, laborController.getWorkOrderLaborById.bind(laborController));
 router.put('/work-order/:id', authenticateSupabaseToken, requireTechnician, validateUpdateWorkOrderLabor, laborController.updateWorkOrderLabor.bind(laborController));
 router.delete('/work-order/:id', authenticateSupabaseToken, requireManager, laborController.deleteWorkOrderLabor.bind(laborController));
