@@ -200,6 +200,7 @@ model WorkOrder {
   services        WorkOrderService[]
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
+  invoices        Invoice[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -841,4 +842,79 @@ model InventoryCategory {
   // Relations
   inventoryItems InventoryItem[]
   cannedServices CannedServicePartsCategory[] // Services that use parts from this category
+}
+
+// Invoice System
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum LineItemType {
+  SERVICE
+  LABOR
+  PART
+  DISCOUNT
+  TAX
+  OTHER
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId     String
+  
+  // Invoice Details
+  issueDate       DateTime      @default(now())
+  dueDate         DateTime?
+  status          InvoiceStatus @default(DRAFT)
+  
+  // Pricing Breakdown
+  subtotalServices Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderService subtotals
+  subtotalLabor    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderLabor subtotals  
+  subtotalParts    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderPart subtotals
+  subtotal         Decimal     @db.Decimal(10,2) @default(0) // Total before tax/discount
+  taxAmount        Decimal     @db.Decimal(10,2) @default(0)
+  discountAmount   Decimal     @db.Decimal(10,2) @default(0)
+  totalAmount      Decimal     @db.Decimal(10,2) @default(0)
+  
+  // Payment Info
+  paidAmount      Decimal     @db.Decimal(10,2) @default(0)
+  balanceDue      Decimal     @db.Decimal(10,2) @default(0)
+  
+  // Metadata
+  notes           String?
+  terms           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  lineItems       InvoiceLineItem[]
+}
+
+model InvoiceLineItem {
+  id          String    @id @default(cuid())
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  
+  // Item Details
+  type        LineItemType
+  description String
+  quantity    Int         @default(1)
+  unitPrice   Decimal     @db.Decimal(10,2)
+  subtotal    Decimal     @db.Decimal(10,2)
+  
+  // References to original items (optional - for tracking)
+  workOrderServiceId String?
+  workOrderLaborId   String?
+  workOrderPartId    String?
+  
+  // Additional details
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
