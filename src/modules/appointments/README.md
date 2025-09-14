@@ -121,6 +121,69 @@ GET /api/appointments/slots/available?date=2024-01-15&serviceIds=service1,servic
 GET /api/appointments/unassigned
 ```
 
+#### Get Confirmed Appointments Without Active Work Orders
+```http
+GET /api/appointments/confirmed-without-work-orders
+```
+
+**Description:** Retrieves appointments that are confirmed but don't have any active work orders (work orders that are not cancelled).
+
+**Authentication:** Requires Supabase token + Service Advisor role
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "appointment_id",
+      "customerId": "customer_id",
+      "vehicleId": "vehicle_id",
+      "requestedAt": "2024-01-15T10:00:00.000Z",
+      "startTime": "2024-01-15T10:00:00.000Z",
+      "endTime": "2024-01-15T12:00:00.000Z",
+      "status": "CONFIRMED",
+      "priority": "NORMAL",
+      "notes": "Customer confirmed appointment",
+      "createdAt": "2024-01-15T09:30:00.000Z",
+      "updatedAt": "2024-01-15T10:15:00.000Z",
+      "assignedToId": "service_advisor_id",
+      "cannedServices": [
+        {
+          "id": "service_id",
+          "code": "OIL001",
+          "name": "Oil Change",
+          "duration": 30,
+          "price": 45.00,
+          "quantity": 1,
+          "notes": "Synthetic oil"
+        }
+      ],
+      "customer": {
+        "id": "customer_id",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "phone": "+1234567890",
+        "profileImage": "https://example.com/profile-image.jpg"
+      },
+      "vehicle": {
+        "id": "vehicle_id",
+        "make": "Toyota",
+        "model": "Camry",
+        "year": 2020,
+        "licensePlate": "ABC123"
+      },
+      "assignedTo": {
+        "id": "service_advisor_id",
+        "supabaseUserId": "supabase_user_id",
+        "profileImage": "https://example.com/advisor-image.jpg"
+      }
+    }
+  ],
+  "message": "Confirmed appointments without active work orders retrieved successfully"
+}
+```
+
 #### Assign Appointment to Service Advisor
 ```http
 POST /api/appointments/{id}/assign

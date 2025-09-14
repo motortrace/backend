@@ -253,23 +253,25 @@ export class InspectionTemplatesService {
         };
       }
 
-      // Verify inspector exists
-      const inspector = await prisma.technician.findUnique({
-        where: { id: inspectorId }
-      });
+      // Verify inspector exists only if provided
+      if (inspectorId) {
+        const inspector = await prisma.technician.findUnique({
+          where: { id: inspectorId }
+        });
 
-      if (!inspector) {
-        return {
-          success: false,
-          error: 'Inspector not found'
-        };
+        if (!inspector) {
+          return {
+            success: false,
+            error: 'Inspector not found'
+          };
+        }
       }
 
       // Create inspection with template
       const inspection = await prisma.workOrderInspection.create({
         data: {
           workOrderId,
-          inspectorId,
+          inspectorId: inspectorId || null,
           templateId,
           notes,
           isCompleted: false
@@ -315,7 +317,7 @@ export class InspectionTemplatesService {
         data: {
           inspection: {
             ...inspection,
-            workOrderNumber: inspection.workOrder?.workOrderNumber || null
+            workOrderNumber: (inspection as any).workOrder?.workOrderNumber || null
           },
           template,
           checklistItems
@@ -366,23 +368,25 @@ export class InspectionTemplatesService {
         };
       }
 
-      // Verify inspector exists
-      const inspector = await prisma.technician.findUnique({
-        where: { id: inspectorId }
-      });
+      // Verify inspector exists only if provided
+      if (inspectorId) {
+        const inspector = await prisma.technician.findUnique({
+          where: { id: inspectorId }
+        });
 
-      if (!inspector) {
-        return {
-          success: false,
-          error: 'Inspector not found'
-        };
+        if (!inspector) {
+          return {
+            success: false,
+            error: 'Inspector not found'
+          };
+        }
       }
 
       // Create inspection with template
       const inspection = await prisma.workOrderInspection.create({
         data: {
           workOrderId,
-          inspectorId,
+          inspectorId: inspectorId || null,
           templateId,
           notes,
           isCompleted: false
@@ -441,7 +445,7 @@ export class InspectionTemplatesService {
         data: {
           inspection: {
             ...inspection,
-            workOrderNumber: inspection.workOrder?.workOrderNumber || null
+            workOrderNumber: (inspection as any).workOrder?.workOrderNumber || null
           },
           template,
           checklistItems: createdChecklistItems
@@ -485,6 +489,12 @@ export class InspectionTemplatesService {
               id: true,
               workOrderNumber: true
             }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
           }
         }
       });
@@ -575,6 +585,12 @@ export class InspectionTemplatesService {
                 id: true,
                 workOrderNumber: true
               }
+            },
+            tireChecks: {
+              orderBy: { position: 'asc' }
+            },
+            attachments: {
+              orderBy: { uploadedAt: 'desc' }
             }
           },
           orderBy: { date: 'desc' },
@@ -640,6 +656,12 @@ export class InspectionTemplatesService {
               id: true,
               workOrderNumber: true
             }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
           }
         }
       });
@@ -696,6 +718,12 @@ export class InspectionTemplatesService {
                   id: true,
                   workOrderNumber: true
                 }
+              },
+              tireChecks: {
+                orderBy: { position: 'asc' }
+              },
+              attachments: {
+                orderBy: { uploadedAt: 'desc' }
               }
             }
           }
@@ -706,7 +734,7 @@ export class InspectionTemplatesService {
         success: true,
         data: {
           ...checklistItem.inspection,
-          workOrderNumber: checklistItem.inspection.workOrder?.workOrderNumber || null
+          workOrderNumber: (checklistItem.inspection as any).workOrder?.workOrderNumber || null
         },
         message: 'Checklist item updated successfully'
       };
@@ -837,6 +865,12 @@ export class InspectionTemplatesService {
               id: true,
               workOrderNumber: true
             }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
           }
         },
         orderBy: { date: 'asc' }
@@ -863,7 +897,7 @@ export class InspectionTemplatesService {
               const inspectionDetails = inspections.map(inspection => ({
           id: inspection.id,
           templateName: inspection.template?.name || 'Custom Inspection',
-          inspectorName: inspection.inspector.userProfile?.name || 'Unknown Inspector',
+          inspectorName: inspection.inspector?.userProfile?.name || 'No Inspector Assigned',
           isCompleted: inspection.isCompleted,
           completedAt: inspection.isCompleted ? inspection.date : undefined,
           checklistItems: inspection.checklistItems.map(item => ({

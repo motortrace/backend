@@ -103,6 +103,7 @@ export interface AppointmentWithServices {
     name: string;
     email?: string;
     phone?: string;
+    profileImage?: string | null;
   };
   vehicle: {
     id: string;
@@ -115,5 +116,6 @@ export interface AppointmentWithServices {
   assignedTo?: {
     id: string;
     supabaseUserId: string;
+    profileImage?: string | null;
   };
 } 

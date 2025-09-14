@@ -1,4 +1,4 @@
-import { ChecklistStatus } from '@prisma/client';
+import { ChecklistStatus, TirePosition, Decimal } from '@prisma/client';
 
 // Base types for inspection templates
 export interface InspectionTemplate {
@@ -32,13 +32,15 @@ export interface WorkOrderInspectionWithTemplate {
   id: string;
   workOrderId: string;
   workOrderNumber: string | null; // Direct field for work order number
-  inspectorId: string;
+  inspectorId: string | null; // Now optional to allow creation without inspector
   templateId: string | null; // Changed from string | undefined
   date: Date;
   notes: string | null; // Changed from string | undefined
   isCompleted: boolean;
   template?: InspectionTemplate | null;
   checklistItems?: InspectionChecklistItem[] | null;
+  tireChecks?: TireInspection[] | null;
+  attachments?: WorkOrderInspectionAttachment[] | null;
   workOrder?: {
     id: string;
     workOrderNumber: string;
@@ -56,6 +58,30 @@ export interface InspectionChecklistItem {
   requiresFollowUp: boolean;
   createdAt: Date;
   templateItem?: InspectionTemplateItem | null;
+}
+
+export interface TireInspection {
+  id: string;
+  inspectionId: string;
+  position: TirePosition;
+  brand: string | null;
+  model: string | null;
+  size: string | null;
+  psi: number | null;
+  treadDepth: Decimal | null;
+  damageNotes: string | null;
+  createdAt: Date;
+}
+
+export interface WorkOrderInspectionAttachment {
+  id: string;
+  inspectionId: string;
+  fileUrl: string;
+  fileName: string | null;
+  fileType: string | null;
+  fileSize: number | null;
+  description: string | null;
+  uploadedAt: Date;
 }
 
 // Request/Response types
@@ -89,7 +115,7 @@ export interface UpdateInspectionTemplateRequest {
 export interface AssignTemplateToWorkOrderRequest {
   workOrderId: string;
   templateId: string;
-  inspectorId: string;
+  inspectorId?: string;
   notes?: string;
 }
 

@@ -81,9 +81,8 @@ export const assignTemplateToWorkOrderSchema = Joi.object({
     'string.empty': 'Template ID is required',
     'any.required': 'Template ID is required'
   }),
-  inspectorId: Joi.string().required().messages({
-    'string.empty': 'Inspector ID is required',
-    'any.required': 'Inspector ID is required'
+  inspectorId: Joi.string().optional().allow(null).messages({
+    'string.empty': 'Inspector ID cannot be empty if provided'
   }),
   notes: Joi.string().optional().max(1000).messages({
     'string.max': 'Notes cannot exceed 1000 characters'

@@ -17,6 +17,7 @@ export interface CreateEstimateRequest {
   taxAmount?: number;
   discountAmount?: number;
   notes?: string;
+  isVisibleToCustomer?: boolean;
   createdById?: string;
 }
 
@@ -28,6 +29,7 @@ export interface UpdateEstimateRequest {
   taxAmount?: number;
   discountAmount?: number;
   notes?: string;
+  isVisibleToCustomer?: boolean;
   approved?: boolean;
   approvedAt?: Date;
   approvedById?: string;
@@ -112,6 +114,7 @@ export interface EstimateWithDetails {
   taxAmount?: number;
   discountAmount?: number;
   notes?: string;
+  isVisibleToCustomer: boolean;
   createdById?: string;
   createdAt: Date;
   approved: boolean;

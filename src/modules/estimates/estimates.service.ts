@@ -147,6 +147,16 @@ export class EstimatesService {
       }
     }
 
+    // Get the latest version for this work order
+    const latestEstimate = await prisma.workOrderEstimate.findFirst({
+      where: { workOrderId: data.workOrderId },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+
+    // Calculate the next version number
+    const nextVersion = latestEstimate ? latestEstimate.version + 1 : 1;
+
     // Calculate subtotals if not provided
     const laborAmount = data.laborAmount || 0;
     const partsAmount = data.partsAmount || 0;
@@ -162,6 +172,7 @@ export class EstimatesService {
     const estimate = await prisma.workOrderEstimate.create({
       data: {
         workOrderId: data.workOrderId,
+        version: nextVersion,
         description: data.description,
         totalAmount: data.totalAmount,
         laborAmount: data.laborAmount,
@@ -169,6 +180,7 @@ export class EstimatesService {
         taxAmount: data.taxAmount,
         discountAmount: data.discountAmount,
         notes: data.notes,
+        isVisibleToCustomer: data.isVisibleToCustomer || false,
         createdById: data.createdById,
       },
       include: {
@@ -985,5 +997,96 @@ export class EstimatesService {
 
     // Return updated estimate
     return await this.getEstimateById(estimateId);
+  }
+
+  // Toggle estimate visibility to customer
+  async toggleEstimateVisibility(estimateId: string, isVisible: boolean): Promise<EstimateWithDetails> {
+    // Validate estimate exists
+    const estimate = await prisma.workOrderEstimate.findUnique({
+      where: { id: estimateId },
+    });
+
+    if (!estimate) {
+      throw new Error('Estimate not found');
+    }
+
+    // Update visibility
+    const updatedEstimate = await prisma.workOrderEstimate.update({
+      where: { id: estimateId },
+      data: { isVisibleToCustomer: isVisible },
+      include: {
+        workOrder: {
+          include: {
+            customer: { select: { id: true, name: true, email: true, phone: true } },
+            vehicle: { select: { id: true, make: true, model: true, year: true, licensePlate: true } },
+          },
+        },
+        createdBy: {
+          include: {
+            userProfile: { select: { id: true, name: true } },
+          },
+        },
+        approvedBy: {
+          include: {
+            userProfile: { select: { id: true, name: true } },
+          },
+        },
+        estimateLaborItems: {
+          include: {
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+          },
+        },
+        estimatePartItems: {
+          include: {
+            part: { select: { id: true, name: true, sku: true, partNumber: true, manufacturer: true } },
+          },
+        },
+        approvals: true,
+      },
+    });
+
+    return this._formatEstimateForOutput(updatedEstimate);
+  }
+
+  // Get estimates visible to customer for a work order
+  async getCustomerVisibleEstimates(workOrderId: string): Promise<EstimateWithDetails[]> {
+    const estimates = await prisma.workOrderEstimate.findMany({
+      where: {
+        workOrderId: workOrderId,
+        isVisibleToCustomer: true,
+      },
+      include: {
+        workOrder: {
+          include: {
+            customer: { select: { id: true, name: true, email: true, phone: true } },
+            vehicle: { select: { id: true, make: true, model: true, year: true, licensePlate: true } },
+          },
+        },
+        createdBy: {
+          include: {
+            userProfile: { select: { id: true, name: true } },
+          },
+        },
+        approvedBy: {
+          include: {
+            userProfile: { select: { id: true, name: true } },
+          },
+        },
+        estimateLaborItems: {
+          include: {
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+          },
+        },
+        estimatePartItems: {
+          include: {
+            part: { select: { id: true, name: true, sku: true, partNumber: true, manufacturer: true } },
+          },
+        },
+        approvals: true,
+      },
+      orderBy: { version: 'desc' },
+    });
+
+    return estimates.map(estimate => this._formatEstimateForOutput(estimate));
   }
 }

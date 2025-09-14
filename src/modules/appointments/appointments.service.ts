@@ -108,9 +108,25 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
     });
 
@@ -346,9 +362,25 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
       orderBy: { startTime: 'asc' },
     });
@@ -366,9 +398,25 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
     });
 
@@ -386,9 +434,25 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
     });
 
@@ -415,11 +479,70 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
       orderBy: { requestedAt: 'asc' },
+    });
+
+    return appointments.map(appointment => this.formatAppointmentWithServices(appointment));
+  }
+
+  // Get confirmed appointments without active work orders
+  async getConfirmedAppointmentsWithoutWorkOrders(): Promise<AppointmentWithServices[]> {
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        status: AppointmentStatus.CONFIRMED,
+        // Exclude appointments that have active work orders
+        workOrder: {
+          is: null // No work order exists for this appointment
+        }
+      },
+      include: {
+        cannedServices: {
+          include: {
+            cannedService: true,
+          },
+        },
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
+        vehicle: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
+        workOrder: true
+      },
+      orderBy: { startTime: 'asc' },
     });
 
     return appointments.map(appointment => this.formatAppointmentWithServices(appointment));
@@ -436,9 +559,25 @@ export class AppointmentService {
             cannedService: true,
           },
         },
-        customer: true,
+        customer: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
         vehicle: true,
-        assignedTo: true,
+        assignedTo: {
+          include: {
+            userProfile: {
+              select: {
+                profileImage: true
+              }
+            }
+          }
+        },
       },
     });
 
@@ -505,6 +644,7 @@ export class AppointmentService {
         name: appointment.customer.name,
         email: appointment.customer.email,
         phone: appointment.customer.phone,
+        profileImage: appointment.customer.userProfile?.profileImage || null,
       },
       vehicle: {
         id: appointment.vehicle.id,
@@ -517,6 +657,7 @@ export class AppointmentService {
       assignedTo: appointment.assignedTo ? {
         id: appointment.assignedTo.id,
         supabaseUserId: appointment.assignedTo.supabaseUserId,
+        profileImage: appointment.assignedTo.userProfile?.profileImage || null,
       } : undefined,
     };
   }

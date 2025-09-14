@@ -198,6 +198,24 @@ export class AppointmentController {
     }
   }
 
+  // Get confirmed appointments without active work orders
+  async getConfirmedAppointmentsWithoutWorkOrders(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getConfirmedAppointmentsWithoutWorkOrders();
+
+      res.json({
+        success: true,
+        data: appointments,
+        message: 'Confirmed appointments without active work orders retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async assignAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;

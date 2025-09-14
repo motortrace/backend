@@ -71,6 +71,19 @@ router.post(
   estimatesController.addCannedServiceToEstimate.bind(estimatesController)
 );
 
+// Toggle estimate visibility to customer
+router.patch(
+  '/:estimateId/toggle-visibility',
+  validateRequest(estimateIdParamSchema, 'params'),
+  estimatesController.toggleEstimateVisibility.bind(estimatesController)
+);
+
+// Get estimates visible to customer for a work order
+router.get(
+  '/customer-visible/:workOrderId',
+  estimatesController.getCustomerVisibleEstimates.bind(estimatesController)
+);
+
 // Estimate labor routes
 router.post(
   '/labor',

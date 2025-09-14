@@ -21,6 +21,9 @@ router.get('/', appointmentController.getAppointments.bind(appointmentController
 // Unassigned Appointments Routes (must come before /:id)
 router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
 
+// Confirmed appointments without active work orders
+router.get('/confirmed-without-work-orders', appointmentController.getConfirmedAppointmentsWithoutWorkOrders.bind(appointmentController));
+
 // Available Slots Routes
 router.get('/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));
 

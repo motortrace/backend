@@ -386,4 +386,45 @@ export class EstimatesController {
       });
     }
   }
+
+  // Toggle estimate visibility to customer
+  async toggleEstimateVisibility(req: Request, res: Response) {
+    try {
+      const { estimateId } = req.params;
+      const { isVisible } = req.body;
+      
+      const estimate = await estimatesService.toggleEstimateVisibility(estimateId, isVisible);
+      
+      res.status(200).json({
+        success: true,
+        data: estimate,
+        message: `Estimate visibility ${isVisible ? 'enabled' : 'disabled'} successfully`,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to toggle estimate visibility',
+      });
+    }
+  }
+
+  // Get estimates visible to customer
+  async getCustomerVisibleEstimates(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      
+      const estimates = await estimatesService.getCustomerVisibleEstimates(workOrderId);
+      
+      res.status(200).json({
+        success: true,
+        data: estimates,
+        message: 'Customer visible estimates retrieved successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to retrieve customer visible estimates',
+      });
+    }
+  }
 }

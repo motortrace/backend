@@ -341,6 +341,7 @@ enum UserRole {
 
 enum WorkOrderStatus {
   PENDING
+  ESTIMATE
   IN_PROGRESS
   WAITING_FOR_PARTS
   QC_PENDING
@@ -560,6 +561,7 @@ model WorkOrderEstimate {
   taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
   discountAmount Decimal? @db.Decimal(10,2) // Any discounts
   notes        String?   // Additional notes about the estimate
+  isVisibleToCustomer Boolean @default(false) // Control customer visibility
   createdBy    ServiceAdvisor? @relation("CreatedEstimates", fields: [createdById], references: [id])
   createdById  String?
   createdAt    DateTime  @default(now())
