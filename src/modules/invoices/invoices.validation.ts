@@ -15,7 +15,6 @@ export const updateInvoiceSchema = Joi.object({
   dueDate: Joi.date().optional(),
   notes: Joi.string().optional(),
   terms: Joi.string().optional(),
-  paidAmount: Joi.number().min(0).optional(),
 });
 
 // Validation middleware

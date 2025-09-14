@@ -16,7 +16,6 @@ export interface UpdateInvoiceRequest {
   dueDate?: Date;
   notes?: string;
   terms?: string;
-  paidAmount?: number;
 }
 
 export interface InvoiceWithDetails {
@@ -33,8 +32,6 @@ export interface InvoiceWithDetails {
   taxAmount: number;
   discountAmount: number;
   totalAmount: number;
-  paidAmount: number;
-  balanceDue: number;
   notes?: string;
   terms?: string;
   createdAt: Date;
@@ -86,9 +83,8 @@ export interface InvoiceStatistics {
   totalInvoices: number;
   draftInvoices: number;
   sentInvoices: number;
-  paidInvoices: number;
+  cancelledInvoices: number;
   overdueInvoices: number;
   totalRevenue: number;
   averageInvoiceAmount: number;
-  totalOutstandingAmount: number;
 }

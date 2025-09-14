@@ -111,11 +111,12 @@ export class InvoicesService {
     const subtotalLabor = workOrder.laborItems.reduce((sum, l) => sum + Number(l.subtotal), 0);
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
     const subtotal = subtotalServices + subtotalLabor + subtotalParts;
-    const taxAmount = Number(workOrder.taxAmount || 0);
+    
+    // Calculate tax on the final subtotal (not on individual services)
+    const taxRate = 0.18; // 18% tax rate - you can make this configurable
+    const taxAmount = subtotal * taxRate;
     const discountAmount = Number(workOrder.discountAmount || 0);
     const totalAmount = subtotal + taxAmount - discountAmount;
-    const paidAmount = Number(workOrder.paidAmount || 0);
-    const balanceDue = totalAmount - paidAmount;
 
     // Create invoice
     const invoice = await prisma.invoice.create({
@@ -130,8 +131,6 @@ export class InvoicesService {
         taxAmount,
         discountAmount,
         totalAmount,
-        paidAmount,
-        balanceDue,
         notes: data.notes,
         terms: data.terms,
       },
@@ -268,8 +267,6 @@ export class InvoicesService {
       taxAmount: Number(invoice.taxAmount),
       discountAmount: Number(invoice.discountAmount),
       totalAmount: Number(invoice.totalAmount),
-      paidAmount: Number(invoice.paidAmount),
-      balanceDue: Number(invoice.balanceDue),
       workOrder: {
         ...invoice.workOrder,
         customer: {
@@ -440,8 +437,6 @@ export class InvoicesService {
       taxAmount: Number(invoice.taxAmount),
       discountAmount: Number(invoice.discountAmount),
       totalAmount: Number(invoice.totalAmount),
-      paidAmount: Number(invoice.paidAmount),
-      balanceDue: Number(invoice.balanceDue),
       workOrder: {
         ...invoice.workOrder,
         customer: {
@@ -478,9 +473,6 @@ export class InvoicesService {
       where: { id: invoiceId },
       data: {
         ...data,
-        balanceDue: data.paidAmount !== undefined ? 
-          Number(invoice.totalAmount) - data.paidAmount : 
-          undefined,
       },
     });
 
@@ -512,22 +504,17 @@ export class InvoicesService {
       totalInvoices,
       draftInvoices,
       sentInvoices,
-      paidInvoices,
+      cancelledInvoices,
       overdueInvoices,
       totalRevenue,
-      totalOutstanding,
     ] = await Promise.all([
       prisma.invoice.count(),
       prisma.invoice.count({ where: { status: InvoiceStatus.DRAFT } }),
       prisma.invoice.count({ where: { status: InvoiceStatus.SENT } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.PAID } }),
+      prisma.invoice.count({ where: { status: InvoiceStatus.CANCELLED } }),
       prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
       prisma.invoice.aggregate({
         _sum: { totalAmount: true },
-        where: { status: InvoiceStatus.PAID },
-      }),
-      prisma.invoice.aggregate({
-        _sum: { balanceDue: true },
         where: { 
           status: { in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE] }
         },
@@ -541,11 +528,10 @@ export class InvoicesService {
       totalInvoices,
       draftInvoices,
       sentInvoices,
-      paidInvoices,
+      cancelledInvoices,
       overdueInvoices,
       totalRevenue: Number(totalRevenue._sum.totalAmount || 0),
       averageInvoiceAmount,
-      totalOutstandingAmount: Number(totalOutstanding._sum.balanceDue || 0),
     };
   }
 }
