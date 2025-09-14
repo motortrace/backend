@@ -296,7 +296,7 @@ export class EstimatesController {
       if (!approvedById) {
         return res.status(400).json({
           success: false,
-          message: 'approvedById is required',
+          message: 'Customer ID (approvedById) is required',
         });
       }
       

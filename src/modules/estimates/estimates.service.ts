@@ -851,13 +851,13 @@ export class EstimatesService {
       throw new Error('Estimate is already approved');
     }
 
-    // Validate service advisor
-    const advisor = await prisma.serviceAdvisor.findUnique({
+    // Validate customer
+    const customer = await prisma.customer.findUnique({
       where: { id: approvedById },
     });
 
-    if (!advisor) {
-      throw new Error('Service advisor not found');
+    if (!customer) {
+      throw new Error('Customer not found');
     }
 
     // Start transaction to approve estimate and create work order items
