@@ -331,11 +331,12 @@ export class InspectionTemplatesController {
         });
       }
 
-      const { notes, isCompleted } = req.body;
-      const updateData: { notes?: string; isCompleted?: boolean } = {};
+      const { notes, isCompleted, inspectorId } = req.body;
+      const updateData: { notes?: string; isCompleted?: boolean; inspectorId?: string } = {};
       
       if (notes !== undefined) updateData.notes = notes;
       if (isCompleted !== undefined) updateData.isCompleted = isCompleted;
+      if (inspectorId !== undefined) updateData.inspectorId = inspectorId;
 
       const result = await this.service.updateWorkOrderInspection(
         idValidation.value.id,

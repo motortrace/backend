@@ -626,7 +626,7 @@ export class InspectionTemplatesService {
 
   async updateWorkOrderInspection(
     id: string,
-    data: { notes?: string; isCompleted?: boolean }
+    data: { notes?: string; isCompleted?: boolean; inspectorId?: string }
   ): Promise<WorkOrderInspectionResponse> {
     try {
       const inspection = await prisma.workOrderInspection.update({
