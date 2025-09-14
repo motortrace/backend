@@ -474,8 +474,8 @@ model WorkOrderInspection {
   id           String              @id @default(cuid())
   workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  inspector    Technician          @relation("Inspections", fields: [inspectorId], references: [id])
-  inspectorId  String
+  inspector    Technician?         @relation("Inspections", fields: [inspectorId], references: [id])
+  inspectorId  String?
   template     InspectionTemplate? @relation(fields: [templateId], references: [id]) // NEW: Link to template used
   templateId   String?             // NEW: Template used for this inspection
   date         DateTime            @default(now())

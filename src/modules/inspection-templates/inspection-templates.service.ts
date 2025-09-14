@@ -271,7 +271,7 @@ export class InspectionTemplatesService {
       const inspection = await prisma.workOrderInspection.create({
         data: {
           workOrderId,
-          inspectorId: inspectorId || null,
+          inspectorId: inspectorId || undefined,
           templateId,
           notes,
           isCompleted: false
@@ -386,7 +386,7 @@ export class InspectionTemplatesService {
       const inspection = await prisma.workOrderInspection.create({
         data: {
           workOrderId,
-          inspectorId: inspectorId || null,
+          inspectorId: inspectorId || undefined,
           templateId,
           notes,
           isCompleted: false
