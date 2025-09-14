@@ -317,6 +317,25 @@ export class WorkOrderController {
     }
   }
 
+  async resetWorkOrderLaborSubtotal(req: Request, res: Response) {
+    try {
+      const { laborId } = req.params;
+
+      const result = await this.workOrderService.resetWorkOrderLaborSubtotal(laborId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order Statistics
   async getWorkOrderStatistics(req: Request, res: Response) {
     try {

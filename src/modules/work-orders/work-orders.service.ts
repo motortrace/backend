@@ -1990,6 +1990,86 @@ export class WorkOrderService {
     });
   }
 
+  // Reset WorkOrderLabor subtotal to original hourlyRate from laborCatalog
+  async resetWorkOrderLaborSubtotal(laborId: string) {
+    // Get the current labor item with its labor catalog
+    const currentLabor = await prisma.workOrderLabor.findUnique({
+      where: { id: laborId },
+      include: {
+        laborCatalog: {
+          select: {
+            id: true,
+            hourlyRate: true,
+          },
+        },
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!currentLabor) {
+      throw new Error('Labor item not found');
+    }
+
+    if (!currentLabor.laborCatalog) {
+      throw new Error('Labor item does not have an associated labor catalog');
+    }
+
+    // Reset subtotal to the original hourlyRate
+    const originalSubtotal = Number(currentLabor.laborCatalog.hourlyRate);
+
+    // Update the labor item
+    const updatedLabor = await prisma.workOrderLabor.update({
+      where: { id: laborId },
+      data: {
+        subtotal: originalSubtotal,
+      },
+      include: {
+        laborCatalog: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            estimatedHours: true,
+            hourlyRate: true,
+          },
+        },
+        technician: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+          },
+        },
+      },
+    });
+
+    // If this labor item is associated with a canned service, update the service subtotal
+    if (currentLabor.cannedServiceId) {
+      await this.updateWorkOrderServiceSubtotal(currentLabor.workOrderId, currentLabor.cannedServiceId);
+    }
+
+    return {
+      ...updatedLabor,
+      message: `Subtotal reset to original hourly rate: $${originalSubtotal}`,
+    };
+  }
+
   // Get work order statistics
   async getWorkOrderStatistics(filters: { startDate?: Date; endDate?: Date }): Promise<WorkOrderStatistics> {
     const where: any = {};

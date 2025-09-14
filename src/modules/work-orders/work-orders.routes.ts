@@ -21,6 +21,7 @@ router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvis
 // Labor Assignment Routes
 router.put('/labor/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToLabor.bind(workOrderController));
 router.put('/labor/:laborId', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateWorkOrderLaborSchema, 'body'), workOrderController.updateWorkOrderLabor.bind(workOrderController));
+router.put('/labor/:laborId/reset-subtotal', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.resetWorkOrderLaborSubtotal.bind(workOrderController));
 
 
 
