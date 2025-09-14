@@ -147,10 +147,12 @@ export interface EstimateWithDetails {
   };
   approvedBy?: {
     id: string;
-    employeeId?: string;
-    userProfile: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    userProfile?: {
       id: string;
-      name?: string;
+      name: string | null;
     };
   };
   estimateLaborItems: EstimateLaborWithDetails[];

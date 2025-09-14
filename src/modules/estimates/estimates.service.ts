@@ -90,12 +90,14 @@ export class EstimatesService {
         },
       } : undefined,
       approvedBy: estimate.approvedBy ? {
-        ...estimate.approvedBy,
-        employeeId: estimate.approvedBy.employeeId || undefined,
-        userProfile: {
-          ...estimate.approvedBy.userProfile,
-          name: estimate.approvedBy.userProfile.name || undefined,
-        },
+        id: estimate.approvedBy.id,
+        name: estimate.approvedBy.name,
+        email: estimate.approvedBy.email,
+        phone: estimate.approvedBy.phone,
+        userProfile: estimate.approvedBy.userProfile ? {
+          id: estimate.approvedBy.userProfile.id,
+          name: estimate.approvedBy.userProfile.name,
+        } : undefined,
       } : undefined,
       estimateLaborItems: estimate.estimateLaborItems.map(item => ({
         ...item,

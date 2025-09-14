@@ -43,7 +43,6 @@ model ServiceAdvisor {
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
   createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
-  approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
   approvals      WorkOrderApproval[] @relation("Approvals")
   processedPayments Payment[] @relation("ProcessedPayments")
 }
@@ -114,6 +113,7 @@ model Customer {
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
   appointments  Appointment[]
+  approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
 }
 
 model Vehicle {
@@ -567,7 +567,7 @@ model WorkOrderEstimate {
   createdAt    DateTime  @default(now())
   approved     Boolean   @default(false)
   approvedAt   DateTime?
-  approvedBy   ServiceAdvisor? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
+  approvedBy   Customer? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
   approvedById String?
   
   // Relations

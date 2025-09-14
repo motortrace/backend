@@ -194,7 +194,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -219,7 +218,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -244,7 +242,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -260,7 +257,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -276,7 +272,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -288,7 +283,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -304,7 +298,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -404,7 +397,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -429,7 +421,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -454,7 +445,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -470,7 +460,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -486,7 +475,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -498,7 +486,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -514,7 +501,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -705,7 +691,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -730,7 +715,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -755,7 +739,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -771,7 +754,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -787,7 +769,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -799,7 +780,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -815,7 +795,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -905,7 +884,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -930,7 +908,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -955,7 +932,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -971,7 +947,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -987,7 +962,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -999,7 +973,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1015,7 +988,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1119,7 +1091,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1144,7 +1115,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1169,7 +1139,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1185,7 +1154,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1201,7 +1169,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1213,7 +1180,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1229,7 +1195,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1333,7 +1298,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1358,7 +1322,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1383,7 +1346,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1399,7 +1361,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1415,7 +1376,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1427,7 +1387,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1443,7 +1402,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1526,7 +1484,6 @@ export class WorkOrderService {
             inspector: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1551,7 +1508,6 @@ export class WorkOrderService {
             technician: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1576,7 +1532,6 @@ export class WorkOrderService {
             installedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1592,7 +1547,6 @@ export class WorkOrderService {
             processedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1608,7 +1562,6 @@ export class WorkOrderService {
             createdBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1620,7 +1573,6 @@ export class WorkOrderService {
             approvedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1636,7 +1588,6 @@ export class WorkOrderService {
             uploadedBy: {
               select: {
                 id: true,
-                employeeId: true,
                 userProfile: {
                   select: {
                     id: true,
@@ -1727,7 +1678,6 @@ export class WorkOrderService {
               technician: {
                 select: {
                   id: true,
-                  employeeId: true,
                   userProfile: {
                     select: {
                       id: true,
@@ -2355,7 +2305,6 @@ export class WorkOrderService {
         approvedBy: {
           select: {
             id: true,
-            employeeId: true,
             userProfile: {
               select: {
                 id: true,
