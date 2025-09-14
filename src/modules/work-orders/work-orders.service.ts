@@ -4,6 +4,7 @@ import {
   UpdateWorkOrderRequest,
   WorkOrderFilters,
   CreateWorkOrderServiceRequest,
+  UpdateWorkOrderLaborRequest,
   CreatePaymentRequest,
   WorkOrderStatistics,
 } from './work-orders.types';
@@ -1850,6 +1851,143 @@ export class WorkOrderService {
     });
 
     return laborItem;
+  }
+
+  // Update work order labor item
+  async updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest) {
+    // Get the current labor item to check if it has a cannedServiceId
+    const currentLabor = await prisma.workOrderLabor.findUnique({
+      where: { id: laborId },
+      select: { 
+        id: true,
+        workOrderId: true,
+        cannedServiceId: true,
+        subtotal: true
+      },
+    });
+
+    if (!currentLabor) {
+      throw new Error('Labor item not found');
+    }
+
+    // Update the labor item
+    const updatedLabor = await prisma.workOrderLabor.update({
+      where: { id: laborId },
+      data: {
+        ...data,
+        // If subtotal is provided, use it; otherwise calculate from hours * rate
+        subtotal: data.subtotal !== undefined ? data.subtotal : 
+                 (data.hours !== undefined && data.rate !== undefined ? data.hours * data.rate : undefined),
+      },
+      include: {
+        laborCatalog: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            estimatedHours: true,
+            hourlyRate: true,
+          },
+        },
+        technician: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+          },
+        },
+      },
+    });
+
+    // If this labor item is associated with a canned service, update the service subtotal
+    if (currentLabor.cannedServiceId) {
+      await this.updateWorkOrderServiceSubtotal(currentLabor.workOrderId, currentLabor.cannedServiceId);
+    }
+
+    return updatedLabor;
+  }
+
+  // Helper method to update WorkOrderService subtotal based on associated labor items
+  private async updateWorkOrderServiceSubtotal(workOrderId: string, cannedServiceId: string) {
+    // Get all labor items for this canned service
+    const laborItems = await prisma.workOrderLabor.findMany({
+      where: {
+        workOrderId: workOrderId,
+        cannedServiceId: cannedServiceId,
+      },
+      select: {
+        subtotal: true,
+      },
+    });
+
+    // Calculate the total subtotal from all labor items
+    const totalLaborSubtotal = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+
+    // Update the WorkOrderService subtotal
+    await prisma.workOrderService.updateMany({
+      where: {
+        workOrderId: workOrderId,
+        cannedServiceId: cannedServiceId,
+      },
+      data: {
+        subtotal: totalLaborSubtotal,
+      },
+    });
+
+    // Also update the work order totals
+    await this.updateWorkOrderTotals(workOrderId);
+  }
+
+  // Helper method to update work order totals
+  private async updateWorkOrderTotals(workOrderId: string) {
+    const [laborItems, partItems, serviceItems] = await Promise.all([
+      prisma.workOrderLabor.findMany({
+        where: { workOrderId },
+        select: { subtotal: true },
+      }),
+      prisma.workOrderPart.findMany({
+        where: { workOrderId },
+        select: { subtotal: true },
+      }),
+      prisma.workOrderService.findMany({
+        where: { workOrderId },
+        select: { subtotal: true },
+      }),
+    ]);
+
+    const subtotalLabor = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const subtotalParts = partItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const subtotalServices = serviceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+
+    // Get existing tax and discount amounts
+    const existingWorkOrder = await prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: { taxAmount: true, discountAmount: true },
+    });
+
+    const taxAmount = Number(existingWorkOrder?.taxAmount || 0);
+    const discountAmount = Number(existingWorkOrder?.discountAmount || 0);
+    const totalAmount = subtotalLabor + subtotalParts + subtotalServices + taxAmount - discountAmount;
+
+    await prisma.workOrder.update({
+      where: { id: workOrderId },
+      data: {
+        subtotalLabor,
+        subtotalParts,
+        totalAmount,
+      },
+    });
   }
 
   // Get work order statistics

@@ -454,7 +454,7 @@ export class EstimatesService {
       }
     }
 
-    const subtotal = data.hours * data.rate;
+    const subtotal = data.rate; // Use flat rate instead of hours × rate
 
     const estimateLabor = await prisma.estimateLabor.create({
       data: {
@@ -517,11 +517,9 @@ export class EstimatesService {
 
     const updateData: any = { ...data };
     
-    // Recalculate subtotal if hours or rate changed
-    if (data.hours !== undefined || data.rate !== undefined) {
-      const hours = data.hours ?? Number(estimateLabor.hours);
-      const rate = data.rate ?? Number(estimateLabor.rate);
-      updateData.subtotal = hours * rate;
+    // Recalculate subtotal if rate changed (use flat rate)
+    if (data.rate !== undefined) {
+      updateData.subtotal = data.rate; // Use flat rate instead of hours × rate
     }
 
     const updatedEstimateLabor = await prisma.estimateLabor.update({
@@ -874,6 +872,40 @@ export class EstimatesService {
         },
       });
 
+      // Group labor items by cannedServiceId to create WorkOrderService entries
+      const laborItemsByCannedService = new Map<string, typeof estimate.estimateLaborItems>();
+      
+      for (const laborItem of estimate.estimateLaborItems) {
+        if (laborItem.cannedServiceId) {
+          if (!laborItemsByCannedService.has(laborItem.cannedServiceId)) {
+            laborItemsByCannedService.set(laborItem.cannedServiceId, []);
+          }
+          laborItemsByCannedService.get(laborItem.cannedServiceId)!.push(laborItem);
+        }
+      }
+
+      // Create WorkOrderService entries for each canned service
+      for (const [cannedServiceId, laborItems] of laborItemsByCannedService) {
+        // Get the canned service to get its price
+        const cannedService = await tx.cannedService.findUnique({
+          where: { id: cannedServiceId },
+        });
+
+        if (cannedService) {
+          await tx.workOrderService.create({
+            data: {
+              workOrderId: estimate.workOrderId,
+              cannedServiceId: cannedServiceId,
+              description: cannedService.name,
+              quantity: 1,
+              unitPrice: cannedService.price,
+              subtotal: cannedService.price,
+              notes: `Created from approved estimate`,
+            },
+          });
+        }
+      }
+
       // Create work order labor items from estimate labor items
       for (const laborItem of estimate.estimateLaborItems) {
         await tx.workOrderLabor.create({
@@ -885,6 +917,7 @@ export class EstimatesService {
             rate: laborItem.rate,
             subtotal: laborItem.subtotal,
             notes: laborItem.notes,
+            cannedServiceId: laborItem.cannedServiceId, // Preserve canned service link
           },
         });
       }
@@ -916,14 +949,20 @@ export class EstimatesService {
         where: { workOrderId: estimate.workOrderId },
         select: { subtotal: true },
       });
+
+      const workOrderServiceItems = await tx.workOrderService.findMany({
+        where: { workOrderId: estimate.workOrderId },
+        select: { subtotal: true },
+      });
       
       const existingWorkOrder = await tx.workOrder.findUnique({ where: { id: estimate.workOrderId }, select: { taxAmount: true, discountAmount: true } });
       
       const subtotalLabor = workOrderLaborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
       const subtotalParts = workOrderPartItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+      const subtotalServices = workOrderServiceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
       const taxAmount = Number(existingWorkOrder?.taxAmount || 0);
       const discountAmount = Number(existingWorkOrder?.discountAmount || 0);
-      const totalAmount = subtotalLabor + subtotalParts + taxAmount - discountAmount;
+      const totalAmount = subtotalLabor + subtotalParts + subtotalServices + taxAmount - discountAmount;
 
       await tx.workOrder.update({
         where: { id: estimate.workOrderId },
@@ -985,7 +1024,7 @@ export class EstimatesService {
               description: laborOp.laborCatalog.name,
               hours: Number(laborOp.laborCatalog.estimatedHours),
               rate: Number(laborOp.laborCatalog.hourlyRate),
-              subtotal: Number(laborOp.laborCatalog.estimatedHours) * Number(laborOp.laborCatalog.hourlyRate),
+              subtotal: Number(laborOp.laborCatalog.hourlyRate), // Use flat rate instead of hours × rate
               notes: laborOp.notes || `From canned service: ${cannedService.name}`,
               customerApproved: false,
               customerNotes: null,

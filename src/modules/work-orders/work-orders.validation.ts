@@ -85,6 +85,19 @@ export const assignTechnicianToLaborSchema = Joi.object({
   technicianId: Joi.string().required(),
 });
 
+// Work Order Labor Update Schema
+export const updateWorkOrderLaborSchema = Joi.object({
+  description: Joi.string().optional(),
+  hours: Joi.number().min(0).optional(),
+  rate: Joi.number().min(0).optional(),
+  subtotal: Joi.number().min(0).optional(),
+  technicianId: Joi.string().optional(),
+  startTime: Joi.date().optional(),
+  endTime: Joi.date().optional(),
+  status: Joi.string().valid(...Object.values(ServiceStatus)).optional(),
+  notes: Joi.string().optional(),
+});
+
 // Validation middleware
 export const validateRequest = (schema: Joi.ObjectSchema, location: 'body' | 'query' | 'params' = 'body') => {
   return (req: any, res: any, next: any) => {

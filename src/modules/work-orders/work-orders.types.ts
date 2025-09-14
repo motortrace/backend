@@ -193,6 +193,7 @@ export interface WorkOrderWithDetails {
     technicianId?: string;
     startTime?: Date;
     endTime?: Date;
+    status: ServiceStatus;
     notes?: string;
     laborCatalog?: {
       id: string;
@@ -319,6 +320,18 @@ export interface CreateWorkOrderServiceRequest {
   description?: string;
   quantity?: number;
   unitPrice?: number;
+  notes?: string;
+}
+
+export interface UpdateWorkOrderLaborRequest {
+  description?: string;
+  hours?: number;
+  rate?: number;
+  subtotal?: number;
+  technicianId?: string;
+  startTime?: Date;
+  endTime?: Date;
+  status?: ServiceStatus;
   notes?: string;
 }
 

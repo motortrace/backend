@@ -297,6 +297,26 @@ export class WorkOrderController {
     }
   }
 
+  async updateWorkOrderLabor(req: Request, res: Response) {
+    try {
+      const { laborId } = req.params;
+      const updateData = req.body;
+
+      const updatedLabor = await this.workOrderService.updateWorkOrderLabor(laborId, updateData);
+
+      res.json({
+        success: true,
+        data: updatedLabor,
+        message: 'Labor item updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order Statistics
   async getWorkOrderStatistics(req: Request, res: Response) {
     try {

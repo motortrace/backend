@@ -633,6 +633,7 @@ model WorkOrderLabor {
   subtotal         Decimal         @db.Decimal(10,2) // hours * rate
   startTime        DateTime?       // When the work started
   endTime          DateTime?       // When the work ended
+  status           ServiceStatus  @default(PENDING) // Status of the labor work
   notes            String?         // Additional notes about the labor
   cannedServiceId  String?         // Reference to canned service if this labor came from one
   serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
