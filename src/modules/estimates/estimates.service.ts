@@ -989,6 +989,7 @@ export class EstimatesService {
               notes: laborOp.notes || `From canned service: ${cannedService.name}`,
               customerApproved: false,
               customerNotes: null,
+              cannedServiceId: cannedServiceId, // Link back to the canned service
             },
           });
       }
