@@ -88,3 +88,18 @@ export interface InvoiceStatistics {
   totalRevenue: number;
   averageInvoiceAmount: number;
 }
+
+// Service Interface (for Dependency Injection)
+export interface IInvoicesService {
+  createInvoice(data: CreateInvoiceRequest): Promise<InvoiceWithDetails>;
+  getInvoiceById(id: string): Promise<InvoiceWithDetails>;
+  getInvoices(
+    filters: InvoiceFilters,
+    page: number,
+    limit: number
+  ): Promise<{ invoices: InvoiceWithDetails[]; total: number }>;
+  getInvoicesByWorkOrder(workOrderId: string): Promise<InvoiceWithDetails[]>;
+  updateInvoice(id: string, data: UpdateInvoiceRequest): Promise<InvoiceWithDetails>;
+  deleteInvoice(id: string): Promise<void>;
+  getInvoiceStatistics(): Promise<InvoiceStatistics>;
+}

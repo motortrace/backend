@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
-import { InvoicesService } from './invoices.service';
 import {
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
   InvoiceFilters,
+  IInvoicesService,
 } from './invoices.types';
 import { asyncHandler } from '../../shared/middleware/async-handler';
 
 export class InvoicesController {
-  private invoicesService = new InvoicesService();
+  constructor(private readonly invoicesService: IInvoicesService) {}
 
   // Create invoice
   createInvoice = asyncHandler(async (req: Request, res: Response) => {

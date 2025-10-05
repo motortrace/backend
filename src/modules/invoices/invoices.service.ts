@@ -1,15 +1,17 @@
-import { InvoiceStatus, LineItemType, Prisma } from '@prisma/client';
+import { InvoiceStatus, LineItemType, Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
   InvoiceWithDetails,
   InvoiceFilters,
   InvoiceStatistics,
+  IInvoicesService,
 } from './invoices.types';
-import prisma from '../../infrastructure/database/prisma';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/custom-errors';
 
-export class InvoicesService {
+export class InvoicesService implements IInvoicesService {
+  constructor(private readonly prisma: PrismaClient) {}
+
   // Generate unique invoice number
   private async generateInvoiceNumber(): Promise<string> {
     const today = new Date();
@@ -20,7 +22,7 @@ export class InvoicesService {
     const startOfMonth = new Date(year, today.getMonth(), 1);
     const endOfMonth = new Date(year, today.getMonth() + 1, 0);
     
-    const invoiceCount = await prisma.invoice.count({
+    const invoiceCount = await this.prisma.invoice.count({
       where: {
         createdAt: {
           gte: startOfMonth,
@@ -36,7 +38,7 @@ export class InvoicesService {
   // Create detailed invoice with line items
   async createInvoice(data: CreateInvoiceRequest): Promise<InvoiceWithDetails> {
     // Get work order with all related data
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
       include: {
         customer: {
@@ -98,7 +100,7 @@ export class InvoicesService {
     }
 
     // Check if invoice already exists
-    const existingInvoice = await prisma.invoice.findFirst({
+    const existingInvoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
@@ -119,7 +121,7 @@ export class InvoicesService {
     const totalAmount = subtotal + taxAmount - discountAmount;
 
     // Create invoice
-    const invoice = await prisma.invoice.create({
+    const invoice = await this.prisma.invoice.create({
       data: {
         invoiceNumber: await this.generateInvoiceNumber(),
         workOrderId: data.workOrderId,
@@ -138,7 +140,7 @@ export class InvoicesService {
 
     // Create line items for services
     for (const service of workOrder.services) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.SERVICE,
@@ -154,7 +156,7 @@ export class InvoicesService {
 
     // Create line items for labor
     for (const labor of workOrder.laborItems) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.LABOR,
@@ -170,7 +172,7 @@ export class InvoicesService {
 
     // Create line items for parts
     for (const part of workOrder.partsUsed) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.PART,
@@ -186,7 +188,7 @@ export class InvoicesService {
 
     // Add tax line item if applicable
     if (taxAmount > 0) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.TAX,
@@ -200,7 +202,7 @@ export class InvoicesService {
 
     // Add discount line item if applicable
     if (discountAmount > 0) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.DISCOUNT,
@@ -218,7 +220,7 @@ export class InvoicesService {
 
   // Get invoice by ID with all details
   async getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
         workOrder: {
@@ -312,7 +314,7 @@ export class InvoicesService {
     }
 
     const [invoices, total] = await Promise.all([
-      prisma.invoice.findMany({
+      this.prisma.invoice.findMany({
         where,
         include: {
           workOrder: {
@@ -347,7 +349,7 @@ export class InvoicesService {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.invoice.count({ where }),
+      this.prisma.invoice.count({ where }),
     ]);
 
     return {
@@ -391,7 +393,7 @@ export class InvoicesService {
 
   // Get invoices for a work order
   async getInvoicesByWorkOrder(workOrderId: string): Promise<InvoiceWithDetails[]> {
-    const invoices = await prisma.invoice.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where: { workOrderId },
       include: {
         workOrder: {
@@ -461,7 +463,7 @@ export class InvoicesService {
 
   // Update invoice
   async updateInvoice(invoiceId: string, data: UpdateInvoiceRequest): Promise<InvoiceWithDetails> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
 
@@ -469,7 +471,7 @@ export class InvoicesService {
       throw new NotFoundError('Invoice', invoiceId);
     }
 
-    const updatedInvoice = await prisma.invoice.update({
+    const updatedInvoice = await this.prisma.invoice.update({
       where: { id: invoiceId },
       data: {
         ...data,
@@ -481,7 +483,7 @@ export class InvoicesService {
 
   // Delete invoice
   async deleteInvoice(invoiceId: string): Promise<void> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
 
@@ -493,7 +495,7 @@ export class InvoicesService {
       throw new BadRequestError('Cannot delete a paid invoice');
     }
 
-    await prisma.invoice.delete({
+    await this.prisma.invoice.delete({
       where: { id: invoiceId },
     });
   }
@@ -508,12 +510,12 @@ export class InvoicesService {
       overdueInvoices,
       totalRevenue,
     ] = await Promise.all([
-      prisma.invoice.count(),
-      prisma.invoice.count({ where: { status: InvoiceStatus.DRAFT } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.SENT } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.CANCELLED } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
-      prisma.invoice.aggregate({
+      this.prisma.invoice.count(),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.DRAFT } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.SENT } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.CANCELLED } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
+      this.prisma.invoice.aggregate({
         _sum: { totalAmount: true },
         where: { 
           status: { in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE] }
