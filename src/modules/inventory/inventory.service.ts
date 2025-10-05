@@ -100,7 +100,7 @@ export class InventoryService {
   }
 
   async createInventoryItem(data: CreateInventoryItemRequest): Promise<InventoryItem> {
-    return await (prisma as any).inventoryItem.create({
+    return await (this.prisma as any).inventoryItem.create({
       data: {
         name: data.name,
         sku: data.sku,

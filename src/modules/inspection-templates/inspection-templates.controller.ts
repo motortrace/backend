@@ -32,11 +32,7 @@ const upload = multer({
 });
 
 export class InspectionTemplatesController {
-  private service: InspectionTemplatesService;
-
-  constructor() {
-    this.service = new InspectionTemplatesService();
-  }
+  constructor(private readonly service: InspectionTemplatesService) {}
 
   // Template Management Endpoints
   async createInspectionTemplate(req: Request, res: Response) {
@@ -823,3 +819,4 @@ export class InspectionTemplatesController {
 
 
 }
+

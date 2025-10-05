@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { InspectionTemplatesController } from './inspection-templates.controller';
+import { InspectionTemplatesService } from './inspection-templates.service';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const controller = new InspectionTemplatesController();
+const service = new InspectionTemplatesService(prisma);
+const controller = new InspectionTemplatesController(service);
 
 // Template Management Routes
 router.post('/templates', controller.createInspectionTemplate.bind(controller));

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PaymentController } from './payments.controller';
+import { PaymentService } from './payments.service';
 import {
   validateCreateOnlinePayment,
   validateCreateManualPayment,
@@ -11,9 +12,11 @@ import {
   validateSandboxPaymentTest,
 } from './payments.validation';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireManager } from '../auth/supabase/authSupabase.middleware';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const paymentController = new PaymentController();
+const paymentService = new PaymentService(prisma);
+const paymentController = new PaymentController(paymentService);
 
 // Online Payment Routes (Credit Card)
 router.post(

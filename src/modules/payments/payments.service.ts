@@ -337,7 +337,7 @@ export class PaymentService {
 
   // Get payments with filters
   async getPayments(filters: PaymentFilters): Promise<PaymentResponse[]> {
-    const where: this.prisma.PaymentWhereInput = {};
+    const where: Prisma.PaymentWhereInput = {};
 
     if (filters.workOrderId) where.workOrderId = filters.workOrderId;
     if (filters.method) where.method = filters.method;
@@ -429,7 +429,7 @@ export class PaymentService {
 
   // Get payment statistics
   async getPaymentStatistics(filters?: PaymentFilters): Promise<PaymentStatistics> {
-    const where: this.prisma.PaymentWhereInput = {};
+    const where: Prisma.PaymentWhereInput = {};
 
     if (filters) {
       if (filters.workOrderId) where.workOrderId = filters.workOrderId;
@@ -665,4 +665,5 @@ export class PaymentService {
     };
   }
 }
+
 

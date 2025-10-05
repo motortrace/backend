@@ -4,6 +4,7 @@ import { VehiclesService } from './vehicles.service';
 import { CreateVehicleRequest, UpdateVehicleRequest, VehicleFilters } from './vehicles.types';
 import { StorageService } from '../storage/storage.service';
 import { AuthenticatedRequest } from '../../shared/types/auth.types';
+import prisma from '../../infrastructure/database/prisma';
 
 // Configure multer for memory storage
 const upload = multer({
@@ -22,11 +23,7 @@ const upload = multer({
 });
 
 export class VehiclesController {
-  private vehiclesService: VehiclesService;
-
-  constructor() {
-    this.vehiclesService = new VehiclesService();
-  }
+  constructor(private readonly vehiclesService: VehiclesService) {}
 
   // Create vehicle
   async createVehicle(req: Request, res: Response) {
@@ -217,7 +214,8 @@ export class VehiclesController {
         }
 
         // Update vehicle with image URL
-        const updatedVehicle = await new VehiclesService().updateVehicle(vehicleId, {
+        const vehiclesService = new VehiclesService(prisma);
+        const updatedVehicle = await vehiclesService.updateVehicle(vehicleId, {
           imageUrl: result.url
         });
 

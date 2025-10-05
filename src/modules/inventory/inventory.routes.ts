@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { InventoryController } from './inventory.controller';
+import { InventoryService } from './inventory.service';
 import {
   validateCreateInventoryItem,
   validateUpdateInventoryItem,
@@ -10,9 +11,11 @@ import {
   validateCreateInventoryCategory,
   validateUpdateInventoryCategory,
 } from './inventory.validation';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const inventoryController = new InventoryController();
+const inventoryService = new InventoryService(prisma);
+const inventoryController = new InventoryController(inventoryService);
 
 // InventoryCategory CRUD operations
 router.post('/categories', validateCreateInventoryCategory, inventoryController.createInventoryCategory.bind(inventoryController));

@@ -7,11 +7,7 @@ import {
 } from './canned-services.types';
 
 export class CannedServiceController {
-  private cannedServiceService: CannedServiceService;
-
-  constructor() {
-    this.cannedServiceService = new CannedServiceService();
-  }
+  constructor(private readonly cannedServiceService: CannedServiceService) {}
 
   // Simak's method for Create a new canned service 
   // async createCannedService(req: Request, res: Response): Promise<void> {
@@ -327,3 +323,4 @@ export class CannedServiceController {
     }
   }
 }
+

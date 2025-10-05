@@ -11,11 +11,7 @@ import {
 } from './payments.types';
 
 export class PaymentController {
-  private paymentService: PaymentService;
-
-  constructor() {
-    this.paymentService = new PaymentService();
-  }
+  constructor(private readonly paymentService: PaymentService) {}
 
   // Create payment intent for online credit card payments (Stripe sandbox)
   async createPaymentIntent(req: Request, res: Response) {
@@ -375,3 +371,4 @@ export class PaymentController {
     }
   }
 }
+

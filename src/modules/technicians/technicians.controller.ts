@@ -3,7 +3,7 @@ import { TechnicianService } from './technicians.service';
 import { CreateTechnicianDto, UpdateTechnicianDto, TechnicianFilters } from './technicians.types';
 
 export class TechnicianController {
-  private technicianService = new TechnicianService();
+  constructor(private readonly technicianService: TechnicianService) {}
 
   // Get all technicians with optional filtering
   async getTechnicians(req: Request, res: Response) {
@@ -271,3 +271,4 @@ export class TechnicianController {
     }
   }
 }
+

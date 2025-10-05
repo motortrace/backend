@@ -1,4 +1,5 @@
-import { ChecklistStatus, TirePosition, Decimal } from '@prisma/client';
+import { ChecklistStatus, TirePosition } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 // Base types for inspection templates
 export interface InspectionTemplate {
