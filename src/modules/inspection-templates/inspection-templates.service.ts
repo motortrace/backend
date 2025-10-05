@@ -18,9 +18,10 @@ import {
   WorkOrderInspectionsResponse,
   TemplateAssignmentResponse
 } from './inspection-templates.types';
-import prisma from '../../infrastructure/database/prisma';
+import { PrismaClient } from '@prisma/client';
 
 export class InspectionTemplatesService {
+  constructor(private readonly prisma: PrismaClient) {}
   // Template Management
   async createInspectionTemplate(
     data: CreateInspectionTemplateRequest
@@ -28,7 +29,7 @@ export class InspectionTemplatesService {
     try {
       const { templateItems, ...templateData } = data;
 
-      const template = await prisma.inspectionTemplate.create({
+      const template = await this.prisma.inspectionTemplate.create({
         data: {
           ...templateData,
           templateItems: templateItems ? {
@@ -62,7 +63,7 @@ export class InspectionTemplatesService {
 
   async getInspectionTemplate(id: string): Promise<InspectionTemplateResponse> {
     try {
-      const template = await prisma.inspectionTemplate.findUnique({
+      const template = await this.prisma.inspectionTemplate.findUnique({
         where: { id },
         include: {
           templateItems: {
@@ -118,7 +119,7 @@ export class InspectionTemplatesService {
       const skip = (page - 1) * limit;
 
       const [templates, total] = await Promise.all([
-        prisma.inspectionTemplate.findMany({
+        this.prisma.inspectionTemplate.findMany({
           where,
           include: {
             templateItems: {
@@ -132,7 +133,7 @@ export class InspectionTemplatesService {
           skip,
           take: limit
         }),
-        prisma.inspectionTemplate.count({ where })
+        this.prisma.inspectionTemplate.count({ where })
       ]);
 
       const totalPages = Math.ceil(total / limit);
@@ -161,7 +162,7 @@ export class InspectionTemplatesService {
     data: UpdateInspectionTemplateRequest
   ): Promise<InspectionTemplateResponse> {
     try {
-      const template = await prisma.inspectionTemplate.update({
+      const template = await this.prisma.inspectionTemplate.update({
         where: { id },
         data,
         include: {
@@ -188,7 +189,7 @@ export class InspectionTemplatesService {
   async deleteInspectionTemplate(id: string): Promise<InspectionTemplateResponse> {
     try {
       // Check if template is being used in any inspections
-      const usageCount = await prisma.workOrderInspection.count({
+      const usageCount = await this.prisma.workOrderInspection.count({
         where: { templateId: id }
       });
 
@@ -199,7 +200,7 @@ export class InspectionTemplatesService {
         };
       }
 
-      await prisma.inspectionTemplate.delete({
+      await this.prisma.inspectionTemplate.delete({
         where: { id }
       });
 
@@ -224,7 +225,7 @@ export class InspectionTemplatesService {
       const { workOrderId, templateId, inspectorId, notes } = data;
 
       // Verify work order exists
-      const workOrder = await prisma.workOrder.findUnique({
+      const workOrder = await this.prisma.workOrder.findUnique({
         where: { id: workOrderId }
       });
 
@@ -236,7 +237,7 @@ export class InspectionTemplatesService {
       }
 
       // Verify template exists and is active
-      const template = await prisma.inspectionTemplate.findFirst({
+      const template = await this.prisma.inspectionTemplate.findFirst({
         where: { id: templateId, isActive: true },
         include: {
           templateItems: {
@@ -254,7 +255,7 @@ export class InspectionTemplatesService {
 
       // Verify inspector exists only if provided
       if (inspectorId) {
-        const inspector = await prisma.technician.findUnique({
+        const inspector = await this.prisma.technician.findUnique({
           where: { id: inspectorId }
         });
 
@@ -267,7 +268,7 @@ export class InspectionTemplatesService {
       }
 
       // Create inspection with template
-      const inspection = await prisma.workOrderInspection.create({
+      const inspection = await this.prisma.workOrderInspection.create({
         data: {
           workOrderId,
           inspectorId: inspectorId || undefined,
@@ -295,7 +296,7 @@ export class InspectionTemplatesService {
       // Create checklist items from template
       const checklistItems = await Promise.all(
         template.templateItems.map(async (templateItem) => {
-          return await prisma.inspectionChecklistItem.create({
+          return await this.prisma.inspectionChecklistItem.create({
             data: {
               inspectionId: inspection.id,
               templateItemId: templateItem.id,
@@ -339,7 +340,7 @@ export class InspectionTemplatesService {
       const { workOrderId, templateId, inspectorId, notes, checklistItems } = data;
 
       // Verify work order exists
-      const workOrder = await prisma.workOrder.findUnique({
+      const workOrder = await this.prisma.workOrder.findUnique({
         where: { id: workOrderId }
       });
 
@@ -351,7 +352,7 @@ export class InspectionTemplatesService {
       }
 
       // Verify template exists and is active
-      const template = await prisma.inspectionTemplate.findFirst({
+      const template = await this.prisma.inspectionTemplate.findFirst({
         where: { id: templateId, isActive: true },
         include: {
           templateItems: {
@@ -369,7 +370,7 @@ export class InspectionTemplatesService {
 
       // Verify inspector exists only if provided
       if (inspectorId) {
-        const inspector = await prisma.technician.findUnique({
+        const inspector = await this.prisma.technician.findUnique({
           where: { id: inspectorId }
         });
 
@@ -382,7 +383,7 @@ export class InspectionTemplatesService {
       }
 
       // Create inspection with template
-      const inspection = await prisma.workOrderInspection.create({
+      const inspection = await this.prisma.workOrderInspection.create({
         data: {
           workOrderId,
           inspectorId: inspectorId || undefined,
@@ -422,7 +423,7 @@ export class InspectionTemplatesService {
           const notes = (item as CreateChecklistItemRequest).notes || null;
           const requiresFollowUp = (item as CreateChecklistItemRequest).requiresFollowUp || false;
           
-          return await prisma.inspectionChecklistItem.create({
+          return await this.prisma.inspectionChecklistItem.create({
             data: {
               inspectionId: inspection.id,
               templateItemId,
@@ -462,7 +463,7 @@ export class InspectionTemplatesService {
 
   async getWorkOrderInspection(id: string): Promise<WorkOrderInspectionResponse> {
     try {
-      const inspection = await prisma.workOrderInspection.findUnique({
+      const inspection = await this.prisma.workOrderInspection.findUnique({
         where: { id },
         include: {
           template: {
@@ -558,7 +559,7 @@ export class InspectionTemplatesService {
       const skip = (page - 1) * limit;
 
       const [inspections, total] = await Promise.all([
-        prisma.workOrderInspection.findMany({
+        this.prisma.workOrderInspection.findMany({
           where,
           include: {
             template: {
@@ -596,7 +597,7 @@ export class InspectionTemplatesService {
           skip,
           take: limit
         }),
-        prisma.workOrderInspection.count({ where })
+        this.prisma.workOrderInspection.count({ where })
       ]);
 
       const totalPages = Math.ceil(total / limit);
@@ -628,7 +629,7 @@ export class InspectionTemplatesService {
     data: { notes?: string; isCompleted?: boolean; inspectorId?: string }
   ): Promise<WorkOrderInspectionResponse> {
     try {
-      const inspection = await prisma.workOrderInspection.update({
+      const inspection = await this.prisma.workOrderInspection.update({
         where: { id },
         data,
         include: {
@@ -688,7 +689,7 @@ export class InspectionTemplatesService {
     data: UpdateChecklistItemRequest
   ): Promise<WorkOrderInspectionResponse> {
     try {
-      const checklistItem = await prisma.inspectionChecklistItem.update({
+      const checklistItem = await this.prisma.inspectionChecklistItem.update({
         where: { id },
         data,
         include: {
@@ -751,7 +752,7 @@ export class InspectionTemplatesService {
     data: CreateChecklistItemRequest
   ): Promise<WorkOrderInspectionResponse> {
     try {
-      await prisma.inspectionChecklistItem.create({
+      await this.prisma.inspectionChecklistItem.create({
         data: {
           inspectionId,
           templateItemId: data.templateItemId,
@@ -776,7 +777,7 @@ export class InspectionTemplatesService {
 
   async deleteChecklistItem(id: string): Promise<WorkOrderInspectionResponse> {
     try {
-      const checklistItem = await prisma.inspectionChecklistItem.findUnique({
+      const checklistItem = await this.prisma.inspectionChecklistItem.findUnique({
         where: { id },
         include: { inspection: true }
       });
@@ -788,7 +789,7 @@ export class InspectionTemplatesService {
         };
       }
 
-      await prisma.inspectionChecklistItem.delete({
+      await this.prisma.inspectionChecklistItem.delete({
         where: { id }
       });
 
@@ -847,7 +848,7 @@ export class InspectionTemplatesService {
   }> {
     try {
       // Get all inspections for the work order
-      const inspections = await prisma.workOrderInspection.findMany({
+      const inspections = await this.prisma.workOrderInspection.findMany({
         where: { workOrderId },
         include: {
           template: true,
@@ -1048,7 +1049,7 @@ export class InspectionTemplatesService {
     }
   ) {
     try {
-      const attachment = await prisma.workOrderInspectionAttachment.create({
+      const attachment = await this.prisma.workOrderInspectionAttachment.create({
         data: {
           inspectionId,
           fileUrl: data.fileUrl,
@@ -1082,7 +1083,7 @@ export class InspectionTemplatesService {
 
   async getInspectionAttachments(inspectionId: string) {
     try {
-      const attachments = await prisma.workOrderInspectionAttachment.findMany({
+      const attachments = await this.prisma.workOrderInspectionAttachment.findMany({
         where: { inspectionId },
         orderBy: { uploadedAt: 'desc' },
       });
@@ -1102,7 +1103,7 @@ export class InspectionTemplatesService {
 
   async deleteInspectionAttachment(attachmentId: string) {
     try {
-      await prisma.workOrderInspectionAttachment.delete({
+      await this.prisma.workOrderInspectionAttachment.delete({
         where: { id: attachmentId },
       });
 
@@ -1122,7 +1123,7 @@ export class InspectionTemplatesService {
   // Get all templates for the templates page (no pagination, includes all items)
   async getAllTemplatesForPage(): Promise<InspectionTemplatesResponse> {
     try {
-      const templates = await prisma.inspectionTemplate.findMany({
+      const templates = await this.prisma.inspectionTemplate.findMany({
         include: {
           templateItems: {
             orderBy: { sortOrder: 'asc' }
@@ -1165,3 +1166,4 @@ export class InspectionTemplatesService {
     }
   }
 }
+

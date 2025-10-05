@@ -15,12 +15,13 @@ import {
   UpdateInventoryCategoryRequest,
   InventoryCategoryWithItems,
 } from './inventory.types';
-import prisma from '../../infrastructure/database/prisma';
+import { PrismaClient } from '@prisma/client';
 
 export class InventoryService {
+  constructor(private readonly prisma: PrismaClient) {}
   // InventoryCategory Methods
   async createInventoryCategory(data: CreateInventoryCategoryRequest) {
-    return await prisma.inventoryCategory.create({
+    return await this.prisma.inventoryCategory.create({
       data: {
         name: data.name,
       },
@@ -28,7 +29,7 @@ export class InventoryService {
   }
 
   async getInventoryCategory(id: string): Promise<InventoryCategoryWithItems | null> {
-    return await prisma.inventoryCategory.findUnique({
+    return await this.prisma.inventoryCategory.findUnique({
       where: { id },
       include: {
         inventoryItems: true,
@@ -42,7 +43,7 @@ export class InventoryService {
   }
 
   async getInventoryCategories(): Promise<InventoryCategoryWithItems[]> {
-    return await prisma.inventoryCategory.findMany({
+    return await this.prisma.inventoryCategory.findMany({
       include: {
         inventoryItems: true,
         _count: {
@@ -58,7 +59,7 @@ export class InventoryService {
   }
 
   async updateInventoryCategory(id: string, data: UpdateInventoryCategoryRequest) {
-    return await prisma.inventoryCategory.update({
+    return await this.prisma.inventoryCategory.update({
       where: { id },
       data: {
         name: data.name,
@@ -69,7 +70,7 @@ export class InventoryService {
   async deleteInventoryCategory(id: string): Promise<boolean> {
     try {
       // Check if category has any inventory items
-      const category = await prisma.inventoryCategory.findUnique({
+      const category = await this.prisma.inventoryCategory.findUnique({
         where: { id },
         include: {
           _count: {
@@ -88,7 +89,7 @@ export class InventoryService {
         throw new Error(`Cannot delete category that has ${category._count.inventoryItems} inventory items`);
       }
 
-      await prisma.inventoryCategory.delete({
+      await this.prisma.inventoryCategory.delete({
         where: { id },
       });
 
@@ -121,7 +122,7 @@ export class InventoryService {
   }
 
   async getInventoryItem(id: string): Promise<InventoryItemWithUsage | null> {
-    return await prisma.inventoryItem.findUnique({
+    return await this.prisma.inventoryItem.findUnique({
       where: { id },
       include: {
         _count: {
@@ -193,7 +194,7 @@ export class InventoryService {
     }
 
     const [items, total] = await Promise.all([
-      prisma.inventoryItem.findMany({
+      this.prisma.inventoryItem.findMany({
         where,
         include: {
           _count: {
@@ -206,7 +207,7 @@ export class InventoryService {
         take: limit,
         orderBy: { name: 'asc' },
       }),
-      prisma.inventoryItem.count({ where }),
+      this.prisma.inventoryItem.count({ where }),
     ]);
 
     return {
@@ -218,20 +219,20 @@ export class InventoryService {
   }
 
   async updateInventoryItem(id: string, data: UpdateInventoryItemRequest): Promise<InventoryItem> {
-    return await prisma.inventoryItem.update({
+    return await this.prisma.inventoryItem.update({
       where: { id },
       data,
     });
   }
 
   async deleteInventoryItem(id: string): Promise<void> {
-    await prisma.inventoryItem.delete({
+    await this.prisma.inventoryItem.delete({
       where: { id },
     });
   }
 
   async adjustInventory(data: InventoryAdjustmentRequest): Promise<InventoryItem> {
-    const item = await prisma.inventoryItem.findUnique({
+    const item = await this.prisma.inventoryItem.findUnique({
       where: { id: data.inventoryItemId },
     });
 
@@ -262,14 +263,14 @@ export class InventoryService {
       throw new Error('Quantity cannot be negative');
     }
 
-    return await prisma.inventoryItem.update({
+    return await this.prisma.inventoryItem.update({
       where: { id: data.inventoryItemId },
       data: { quantity: newQuantity },
     });
   }
 
   async transferInventory(data: InventoryTransferRequest): Promise<void> {
-    await prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       for (const transferItem of data.items) {
         const item = await tx.inventoryItem.findUnique({
           where: { id: transferItem.inventoryItemId },
@@ -306,13 +307,13 @@ export class InventoryService {
       outOfStockItems,
       categoryStats,
     ] = await Promise.all([
-      prisma.inventoryItem.count(),
-      prisma.inventoryItem.aggregate({
+      this.prisma.inventoryItem.count(),
+      this.prisma.inventoryItem.aggregate({
         _sum: {
           quantity: true,
         },
       }),
-      prisma.inventoryItem.count({
+      this.prisma.inventoryItem.count({
         where: {
           AND: [
             { quantity: { gt: 0 } },
@@ -325,10 +326,10 @@ export class InventoryService {
           ],
         },
       }),
-      prisma.inventoryItem.count({
+      this.prisma.inventoryItem.count({
         where: { quantity: 0 },
       }),
-      prisma.inventoryItem.groupBy({
+      this.prisma.inventoryItem.groupBy({
         by: ['categoryId'],
         _count: {
           id: true,
@@ -358,7 +359,7 @@ export class InventoryService {
   }
 
   async getLowStockItems(): Promise<InventoryItem[]> {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await this.prisma.inventoryItem.findMany({
       where: {
         AND: [
           { quantity: { gt: 0 } },
@@ -381,14 +382,14 @@ export class InventoryService {
   }
 
   async getOutOfStockItems(): Promise<InventoryItem[]> {
-    return await prisma.inventoryItem.findMany({
+    return await this.prisma.inventoryItem.findMany({
       where: { quantity: 0 },
       orderBy: { name: 'asc' },
     });
   }
 
   async getInventoryReport(): Promise<InventoryReport[]> {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await this.prisma.inventoryItem.findMany({
       include: {
         workOrderParts: {
           orderBy: { createdAt: 'desc' },
@@ -436,7 +437,7 @@ export class InventoryService {
   }
 
   async getReorderSuggestions(): Promise<ReorderSuggestion[]> {
-    const items = await prisma.inventoryItem.findMany({
+    const items = await this.prisma.inventoryItem.findMany({
       where: {
         OR: [
           { quantity: 0 },
@@ -510,7 +511,7 @@ export class InventoryService {
       if (filter.endDate) where.createdAt.lte = filter.endDate;
     }
 
-    return await prisma.workOrderPart.findMany({
+    return await this.prisma.workOrderPart.findMany({
       where,
       include: {
         workOrder: {
@@ -544,7 +545,7 @@ export class InventoryService {
 
   async bulkUpdateInventory(items: Array<{ id: string; quantity?: number; unitPrice?: number; location?: string; minStockLevel?: number; maxStockLevel?: number; reorderPoint?: number }>): Promise<InventoryItem[]> {
     const updates = items.map((item) =>
-      prisma.inventoryItem.update({
+      this.prisma.inventoryItem.update({
         where: { id: item.id },
         data: {
           quantity: item.quantity,
@@ -557,11 +558,11 @@ export class InventoryService {
       })
     );
 
-    return await prisma.$transaction(updates);
+    return await this.prisma.$transaction(updates);
   }
 
   async getCategories(): Promise<string[]> {
-    const categories = await prisma.inventoryCategory.findMany({
+    const categories = await this.prisma.inventoryCategory.findMany({
       select: { name: true },
       orderBy: { name: 'asc' },
     });
@@ -570,7 +571,7 @@ export class InventoryService {
   }
 
   async getManufacturers(): Promise<string[]> {
-    const manufacturers = await prisma.inventoryItem.findMany({
+    const manufacturers = await this.prisma.inventoryItem.findMany({
       select: { manufacturer: true },
       where: { manufacturer: { not: null } },
       distinct: ['manufacturer'],
@@ -580,7 +581,7 @@ export class InventoryService {
   }
 
   async getSuppliers(): Promise<string[]> {
-    const suppliers = await prisma.inventoryItem.findMany({
+    const suppliers = await this.prisma.inventoryItem.findMany({
       select: { supplier: true },
       where: { supplier: { not: null } },
       distinct: ['supplier'],
@@ -590,7 +591,7 @@ export class InventoryService {
   }
 
   async getLocations(): Promise<string[]> {
-    const locations = await prisma.inventoryItem.findMany({
+    const locations = await this.prisma.inventoryItem.findMany({
       select: { location: true },
       where: { location: { not: null } },
       distinct: ['location'],
@@ -599,3 +600,4 @@ export class InventoryService {
     return locations.map((l) => l.location!);
   }
 }
+
