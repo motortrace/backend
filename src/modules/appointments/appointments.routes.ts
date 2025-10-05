@@ -11,8 +11,14 @@ import {
   validateTimeBlockAvailability,
 } from './appointments.validation';
 
+import prisma from '../../infrastructure/database/prisma';
+import { AppointmentService } from './appointments.service';
+
 const router = Router();
-const appointmentController = new AppointmentController();
+
+// Dependency Injection
+const appointmentService = new AppointmentService(prisma);
+const appointmentController = new AppointmentController(appointmentService);
 
 // Appointment Management Routes
 router.post('/', validateCreateAppointment, appointmentController.createAppointment.bind(appointmentController));

@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { WorkOrderController } from './work-orders.controller';
+import { WorkOrderService } from './work-orders.service';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
 import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, validateRequest } from './work-orders.validation';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const workOrderController = new WorkOrderController();
+
+// Dependency Injection
+const workOrderService = new WorkOrderService(prisma);
+const workOrderController = new WorkOrderController(workOrderService);
 
 // Work Order Management Routes
 router.post('/', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrder.bind(workOrderController));

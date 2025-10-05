@@ -1,15 +1,15 @@
 import { Request, Response } from 'express';
-import { WorkOrderService } from './work-orders.service';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
   WorkOrderFilters,
   CreateWorkOrderServiceRequest,
   CreatePaymentRequest,
+  IWorkOrderService,
 } from './work-orders.types';
 
 export class WorkOrderController {
-  private workOrderService = new WorkOrderService();
+  constructor(private readonly workOrderService: IWorkOrderService) {}
 
   // Work Order Management
   async createWorkOrder(req: any, res: Response) {
