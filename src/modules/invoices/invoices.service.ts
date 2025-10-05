@@ -1,4 +1,4 @@
-import { PrismaClient, InvoiceStatus, LineItemType, Prisma } from '@prisma/client';
+import { InvoiceStatus, LineItemType, Prisma } from '@prisma/client';
 import {
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
@@ -6,8 +6,7 @@ import {
   InvoiceFilters,
   InvoiceStatistics,
 } from './invoices.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class InvoicesService {
   // Generate unique invoice number

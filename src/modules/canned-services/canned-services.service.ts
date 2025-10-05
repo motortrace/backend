@@ -1,12 +1,11 @@
-import { PrismaClient, CannedService } from '@prisma/client';
+import { CannedService } from '@prisma/client';
 import {
   CreateCannedServiceRequest,
   UpdateCannedServiceRequest,
   CannedServiceFilters,
   CannedServiceDetails,
 } from './canned-services.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class CannedServiceService {
 

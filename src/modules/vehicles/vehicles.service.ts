@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateVehicleRequest, UpdateVehicleRequest, VehicleResponse, VehicleFilters, VehicleStatistics } from './vehicles.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class VehiclesService {
   // Create a new vehicle

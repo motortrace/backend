@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { Customer, CreateCustomerDto, UpdateCustomerDto, CustomerFilters } from './customers.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class CustomerService {
   async createCustomer(customerData: CreateCustomerDto): Promise<Customer> {

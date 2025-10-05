@@ -1,4 +1,4 @@
-import { PrismaClient, InventoryItem, WorkOrderPart } from '@prisma/client';
+import { InventoryItem, WorkOrderPart } from '@prisma/client';
 import {
   CreateInventoryItemRequest,
   UpdateInventoryItemRequest,
@@ -15,8 +15,7 @@ import {
   UpdateInventoryCategoryRequest,
   InventoryCategoryWithItems,
 } from './inventory.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class InventoryService {
   // InventoryCategory Methods

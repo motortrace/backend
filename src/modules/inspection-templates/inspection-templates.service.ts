@@ -1,4 +1,4 @@
-import { PrismaClient, ChecklistStatus } from '@prisma/client';
+import { ChecklistStatus } from '@prisma/client';
 import {
   InspectionTemplate,
   InspectionTemplateItem,
@@ -18,8 +18,7 @@ import {
   WorkOrderInspectionsResponse,
   TemplateAssignmentResponse
 } from './inspection-templates.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class InspectionTemplatesService {
   // Template Management

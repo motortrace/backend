@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   CreateEstimateRequest,
   UpdateEstimateRequest,
@@ -12,8 +12,7 @@ import {
   EstimateWithDetails,
   EstimateStatistics,
 } from './estimates.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 // Define a type for the raw estimate object returned by Prisma to use in our helper
 type PrismaEstimate = Prisma.WorkOrderEstimateGetPayload<{

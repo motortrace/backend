@@ -1,4 +1,4 @@
-import { PrismaClient, AppointmentStatus, AppointmentPriority, DayOfWeek } from '@prisma/client';
+import { AppointmentStatus, AppointmentPriority, DayOfWeek } from '@prisma/client';
 import {
   CreateAppointmentRequest,
   UpdateAppointmentRequest,
@@ -12,8 +12,7 @@ import {
   DailyCapacityRequest,
   DailyCapacity,
 } from './appointments.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class AppointmentService {
   // Create a new appointment with ShopMonkey-style booking logic

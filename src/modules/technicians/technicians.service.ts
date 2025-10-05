@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateTechnicianDto, UpdateTechnicianDto, TechnicianFilters, TechnicianResponse, TechnicianStats, WorkOrderResponse } from './technicians.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class TechnicianService {
   // Create a new technician

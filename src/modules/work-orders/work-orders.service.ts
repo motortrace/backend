@@ -1,4 +1,4 @@
-import { PrismaClient, WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, Prisma } from '@prisma/client';
+import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, Prisma } from '@prisma/client';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
@@ -8,8 +8,7 @@ import {
   CreatePaymentRequest,
   WorkOrderStatistics,
 } from './work-orders.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 // Type alias for work order with all includes
 type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{

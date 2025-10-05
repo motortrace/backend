@@ -1,4 +1,4 @@
-import { PrismaClient, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import {
   CreateManualPaymentRequest,
   CreateOnlinePaymentRequest,
@@ -14,8 +14,7 @@ import {
   PaymentGatewayResponse,
   PaymentWebhookData,
 } from './payments.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class PaymentService {
   // Create payment intent for online credit card payments (Stripe sandbox)

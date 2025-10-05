@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import {
   CreateLaborCatalogRequest,
   UpdateLaborCatalogRequest,
@@ -11,8 +10,7 @@ import {
   WorkOrderLaborFilter,
   CreateLaborRequest,
 } from './labor.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class LaborService {
 

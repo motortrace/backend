@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateServiceAdvisorDto, UpdateServiceAdvisorDto, ServiceAdvisorFilters, ServiceAdvisorResponse, ServiceAdvisorStats, WorkOrderResponse } from './service-advisors.types';
-
-const prisma = new PrismaClient();
+import prisma from '../../infrastructure/database/prisma';
 
 export class ServiceAdvisorService {
   // Create a new service advisor
