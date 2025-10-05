@@ -7,6 +7,7 @@ import {
   InvoiceStatistics,
 } from './invoices.types';
 import prisma from '../../infrastructure/database/prisma';
+import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/custom-errors';
 
 export class InvoicesService {
   // Generate unique invoice number
@@ -93,7 +94,7 @@ export class InvoicesService {
     });
 
     if (!workOrder) {
-      throw new Error('Work order not found');
+      throw new NotFoundError('WorkOrder', data.workOrderId);
     }
 
     // Check if invoice already exists
@@ -102,7 +103,7 @@ export class InvoicesService {
     });
 
     if (existingInvoice) {
-      throw new Error('Invoice already exists for this work order');
+      throw new ConflictError('Invoice already exists for this work order');
     }
 
     // Calculate totals
@@ -251,7 +252,7 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
     return {
@@ -465,7 +466,7 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
     const updatedInvoice = await prisma.invoice.update({
@@ -485,11 +486,11 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new Error('Cannot delete a paid invoice');
+      throw new BadRequestError('Cannot delete a paid invoice');
     }
 
     await prisma.invoice.delete({

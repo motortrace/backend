@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import prisma from './infrastructure/database/prisma';
 import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.middleware';
+import { errorHandler, notFoundHandler } from './shared/middleware/error-handler';
 
 import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -94,5 +95,15 @@ app.get('/admin-only', authenticateSupabaseToken, (req: any, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ============================================
+// ERROR HANDLING MIDDLEWARE (Must be LAST!)
+// ============================================
+
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// Global error handler
+app.use(errorHandler);
 
 export default app;
