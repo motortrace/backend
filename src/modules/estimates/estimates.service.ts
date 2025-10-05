@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateEstimateRequest,
   UpdateEstimateRequest,
@@ -11,8 +11,8 @@ import {
   EstimateFilters,
   EstimateWithDetails,
   EstimateStatistics,
+  IEstimatesService,
 } from './estimates.types';
-import prisma from '../../infrastructure/database/prisma';
 
 // Define a type for the raw estimate object returned by Prisma to use in our helper
 type PrismaEstimate = Prisma.WorkOrderEstimateGetPayload<{
@@ -47,11 +47,11 @@ type PrismaEstimate = Prisma.WorkOrderEstimateGetPayload<{
   },
 }>;
 
-
-export class EstimatesService {
+export class EstimatesService implements IEstimatesService {
+  constructor(private readonly prisma: PrismaClient) {}
   /**
    * Private helper to format Prisma estimate object, converting Decimal fields to numbers.
-   * @param estimate - The raw estimate object from Prisma.
+   * @param estimate - The raw estimate object from this.prisma.
    * @returns An estimate object compliant with the EstimateWithDetails type.
    */
   private _formatEstimateForOutput(estimate: PrismaEstimate): EstimateWithDetails {
@@ -125,7 +125,7 @@ export class EstimatesService {
   // Create a new estimate
   async createEstimate(data: CreateEstimateRequest): Promise<EstimateWithDetails> {
     // Validate work order exists
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
       include: {
         customer: { select: { id: true, name: true, email: true, phone: true } },
@@ -139,7 +139,7 @@ export class EstimatesService {
 
     // Validate service advisor if provided
     if (data.createdById) {
-      const advisor = await prisma.serviceAdvisor.findUnique({
+      const advisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id: data.createdById },
       });
 
@@ -149,7 +149,7 @@ export class EstimatesService {
     }
 
     // Get the latest version for this work order
-    const latestEstimate = await prisma.workOrderEstimate.findFirst({
+    const latestEstimate = await this.prisma.workOrderEstimate.findFirst({
       where: { workOrderId: data.workOrderId },
       orderBy: { version: 'desc' },
       select: { version: true },
@@ -170,7 +170,7 @@ export class EstimatesService {
       throw new Error('Total amount does not match calculated subtotals');
     }
 
-    const estimate = await prisma.workOrderEstimate.create({
+    const estimate = await this.prisma.workOrderEstimate.create({
       data: {
         workOrderId: data.workOrderId,
         version: nextVersion,
@@ -220,7 +220,7 @@ export class EstimatesService {
 
   // Get estimate by ID
   async getEstimateById(id: string): Promise<EstimateWithDetails> {
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id },
       include: {
         workOrder: {
@@ -287,7 +287,7 @@ export class EstimatesService {
     }
 
     const [estimates, total] = await Promise.all([
-      prisma.workOrderEstimate.findMany({
+      this.prisma.workOrderEstimate.findMany({
         where,
         include: {
           workOrder: {
@@ -322,7 +322,7 @@ export class EstimatesService {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.workOrderEstimate.count({ where }),
+      this.prisma.workOrderEstimate.count({ where }),
     ]);
 
     return {
@@ -334,7 +334,7 @@ export class EstimatesService {
   // Update estimate
   async updateEstimate(id: string, data: UpdateEstimateRequest): Promise<EstimateWithDetails> {
     // Validate estimate exists
-    const existingEstimate = await prisma.workOrderEstimate.findUnique({
+    const existingEstimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id },
     });
 
@@ -344,7 +344,7 @@ export class EstimatesService {
 
     // Validate service advisor if provided for approval
     if (data.approvedById) {
-      const advisor = await prisma.serviceAdvisor.findUnique({
+      const advisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id: data.approvedById },
       });
 
@@ -368,7 +368,7 @@ export class EstimatesService {
       data.totalAmount = calculatedTotal;
     }
 
-    const estimate = await prisma.workOrderEstimate.update({
+    const estimate = await this.prisma.workOrderEstimate.update({
       where: { id },
       data: {
         ...data,
@@ -410,7 +410,7 @@ export class EstimatesService {
 
   // Delete estimate
   async deleteEstimate(id: string): Promise<void> {
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id },
     });
 
@@ -422,7 +422,7 @@ export class EstimatesService {
       throw new Error('Cannot delete an approved estimate');
     }
 
-    await prisma.workOrderEstimate.delete({
+    await this.prisma.workOrderEstimate.delete({
       where: { id },
     });
   }
@@ -430,7 +430,7 @@ export class EstimatesService {
   // Create estimate labor item
   async createEstimateLabor(data: CreateEstimateLaborRequest) {
     // Validate estimate exists
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id: data.estimateId },
     });
 
@@ -444,7 +444,7 @@ export class EstimatesService {
 
     // Validate labor catalog if provided
     if (data.laborCatalogId) {
-      const laborCatalog = await prisma.laborCatalog.findUnique({
+      const laborCatalog = await this.prisma.laborCatalog.findUnique({
         where: { id: data.laborCatalogId },
       });
 
@@ -455,7 +455,7 @@ export class EstimatesService {
 
     const subtotal = data.rate; // Use flat rate instead of hours × rate
 
-    const estimateLabor = await prisma.estimateLabor.create({
+    const estimateLabor = await this.prisma.estimateLabor.create({
       data: {
         estimateId: data.estimateId,
         laborCatalogId: data.laborCatalogId,
@@ -490,7 +490,7 @@ export class EstimatesService {
 
   // Update estimate labor item
   async updateEstimateLabor(id: string, data: UpdateEstimateLaborRequest) {
-    const estimateLabor = await prisma.estimateLabor.findUnique({
+    const estimateLabor = await this.prisma.estimateLabor.findUnique({
       where: { id },
       include: { estimate: true },
     });
@@ -505,7 +505,7 @@ export class EstimatesService {
 
     // Validate labor catalog if provided
     if (data.laborCatalogId) {
-      const laborCatalog = await prisma.laborCatalog.findUnique({
+      const laborCatalog = await this.prisma.laborCatalog.findUnique({
         where: { id: data.laborCatalogId },
       });
 
@@ -521,7 +521,7 @@ export class EstimatesService {
       updateData.subtotal = data.rate; // Use flat rate instead of hours × rate
     }
 
-    const updatedEstimateLabor = await prisma.estimateLabor.update({
+    const updatedEstimateLabor = await this.prisma.estimateLabor.update({
       where: { id },
       data: updateData,
       include: {
@@ -549,7 +549,7 @@ export class EstimatesService {
 
   // Delete estimate labor item
   async deleteEstimateLabor(id: string): Promise<void> {
-    const estimateLabor = await prisma.estimateLabor.findUnique({
+    const estimateLabor = await this.prisma.estimateLabor.findUnique({
       where: { id },
       include: { estimate: true },
     });
@@ -562,7 +562,7 @@ export class EstimatesService {
       throw new Error('Cannot modify an approved estimate');
     }
 
-    await prisma.estimateLabor.delete({
+    await this.prisma.estimateLabor.delete({
       where: { id },
     });
 
@@ -573,7 +573,7 @@ export class EstimatesService {
   // Create estimate part item
   async createEstimatePart(data: CreateEstimatePartRequest) {
     // Validate estimate exists
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id: data.estimateId },
     });
 
@@ -586,7 +586,7 @@ export class EstimatesService {
     }
 
     // Validate inventory item exists
-    const inventoryItem = await prisma.inventoryItem.findUnique({
+    const inventoryItem = await this.prisma.inventoryItem.findUnique({
       where: { id: data.inventoryItemId },
     });
 
@@ -596,7 +596,7 @@ export class EstimatesService {
 
     const subtotal = data.quantity * data.unitPrice;
 
-    const estimatePart = await prisma.estimatePart.create({
+    const estimatePart = await this.prisma.estimatePart.create({
       data: {
         estimateId: data.estimateId,
         inventoryItemId: data.inventoryItemId,
@@ -628,7 +628,7 @@ export class EstimatesService {
 
   // Update estimate part item
   async updateEstimatePart(id: string, data: UpdateEstimatePartRequest) {
-    const estimatePart = await prisma.estimatePart.findUnique({
+    const estimatePart = await this.prisma.estimatePart.findUnique({
       where: { id },
       include: { estimate: true },
     });
@@ -643,7 +643,7 @@ export class EstimatesService {
 
     // Validate inventory item if provided
     if (data.inventoryItemId) {
-      const inventoryItem = await prisma.inventoryItem.findUnique({
+      const inventoryItem = await this.prisma.inventoryItem.findUnique({
         where: { id: data.inventoryItemId },
       });
 
@@ -661,7 +661,7 @@ export class EstimatesService {
       updateData.subtotal = quantity * unitPrice;
     }
 
-    const updatedEstimatePart = await prisma.estimatePart.update({
+    const updatedEstimatePart = await this.prisma.estimatePart.update({
       where: { id },
       data: updateData,
       include: {
@@ -684,7 +684,7 @@ export class EstimatesService {
 
   // Delete estimate part item
   async deleteEstimatePart(id: string): Promise<void> {
-    const estimatePart = await prisma.estimatePart.findUnique({
+    const estimatePart = await this.prisma.estimatePart.findUnique({
       where: { id },
       include: { estimate: true },
     });
@@ -697,7 +697,7 @@ export class EstimatesService {
       throw new Error('Cannot modify an approved estimate');
     }
 
-    await prisma.estimatePart.delete({
+    await this.prisma.estimatePart.delete({
       where: { id },
     });
 
@@ -708,7 +708,7 @@ export class EstimatesService {
   // Create estimate approval
   async createEstimateApproval(data: CreateEstimateApprovalRequest) {
     // Validate work order exists
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
     });
 
@@ -718,7 +718,7 @@ export class EstimatesService {
 
     // Validate estimate if provided
     if (data.estimateId) {
-      const estimate = await prisma.workOrderEstimate.findUnique({
+      const estimate = await this.prisma.workOrderEstimate.findUnique({
         where: { id: data.estimateId },
       });
 
@@ -727,7 +727,7 @@ export class EstimatesService {
       }
     }
 
-    const approval = await prisma.workOrderApproval.create({
+    const approval = await this.prisma.workOrderApproval.create({
       data: {
         workOrderId: data.workOrderId,
         estimateId: data.estimateId,
@@ -743,7 +743,7 @@ export class EstimatesService {
 
   // Update estimate approval
   async updateEstimateApproval(id: string, data: UpdateEstimateApprovalRequest) {
-    const approval = await prisma.workOrderApproval.findUnique({
+    const approval = await this.prisma.workOrderApproval.findUnique({
       where: { id },
     });
 
@@ -753,7 +753,7 @@ export class EstimatesService {
 
     // Validate service advisor if provided
     if (data.approvedById) {
-      const advisor = await prisma.serviceAdvisor.findUnique({
+      const advisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id: data.approvedById },
       });
 
@@ -762,7 +762,7 @@ export class EstimatesService {
       }
     }
 
-    const updatedApproval = await prisma.workOrderApproval.update({
+    const updatedApproval = await this.prisma.workOrderApproval.update({
       where: { id },
       data: {
         ...data,
@@ -781,10 +781,10 @@ export class EstimatesService {
       pendingEstimates,
       totalValue,
     ] = await Promise.all([
-      prisma.workOrderEstimate.count(),
-      prisma.workOrderEstimate.count({ where: { approved: true } }),
-      prisma.workOrderEstimate.count({ where: { approved: false } }),
-      prisma.workOrderEstimate.aggregate({
+      this.prisma.workOrderEstimate.count(),
+      this.prisma.workOrderEstimate.count({ where: { approved: true } }),
+      this.prisma.workOrderEstimate.count({ where: { approved: false } }),
+      this.prisma.workOrderEstimate.aggregate({
         _sum: { totalAmount: true },
       }),
     ]);
@@ -803,11 +803,11 @@ export class EstimatesService {
   // Helper method to update estimate totals
   private async updateEstimateTotals(estimateId: string): Promise<void> {
     const [laborItems, partItems] = await Promise.all([
-      prisma.estimateLabor.findMany({
+      this.prisma.estimateLabor.findMany({
         where: { estimateId },
         select: { subtotal: true },
       }),
-      prisma.estimatePart.findMany({
+      this.prisma.estimatePart.findMany({
         where: { estimateId },
         select: { subtotal: true },
       }),
@@ -816,12 +816,12 @@ export class EstimatesService {
     const laborAmount = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const partsAmount = partItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     // Note: This helper only updates labor and parts. Tax and discount are preserved.
-    const existingEstimate = await prisma.workOrderEstimate.findUnique({ where: { id: estimateId }, select: { taxAmount: true, discountAmount: true } });
+    const existingEstimate = await this.prisma.workOrderEstimate.findUnique({ where: { id: estimateId }, select: { taxAmount: true, discountAmount: true } });
     const taxAmount = Number(existingEstimate?.taxAmount || 0);
     const discountAmount = Number(existingEstimate?.discountAmount || 0);
     const totalAmount = laborAmount + partsAmount + taxAmount - discountAmount;
 
-    await prisma.workOrderEstimate.update({
+    await this.prisma.workOrderEstimate.update({
       where: { id: estimateId },
       data: {
         laborAmount,
@@ -833,7 +833,7 @@ export class EstimatesService {
 
   // Approve estimate and create work order labor/parts
   async approveEstimate(estimateId: string, approvedById: string): Promise<void> {
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id: estimateId },
       include: {
         estimateLaborItems: true,
@@ -851,7 +851,7 @@ export class EstimatesService {
     }
 
     // Validate customer
-    const customer = await prisma.customer.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id: approvedById },
     });
 
@@ -860,7 +860,7 @@ export class EstimatesService {
     }
 
     // Start transaction to approve estimate and create work order items
-    await prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // Approve the estimate
       await tx.workOrderEstimate.update({
         where: { id: estimateId },
@@ -978,7 +978,7 @@ export class EstimatesService {
   // Add canned service labor to estimate
   async addCannedServiceToEstimate(estimateId: string, cannedServiceId: string): Promise<EstimateWithDetails> {
     // Validate estimate exists
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id: estimateId },
       include: {
         estimateLaborItems: true,
@@ -991,7 +991,7 @@ export class EstimatesService {
     }
 
     // Validate canned service exists and get its labor operations
-    const cannedService = await prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findUnique({
       where: { id: cannedServiceId },
       include: {
         laborOperations: {
@@ -1016,7 +1016,7 @@ export class EstimatesService {
     // Add each labor operation from the canned service to the estimate
     for (const laborOp of cannedService.laborOperations) {
       if(laborOp.laborCatalog) { // Ensure labor catalog item exists
-          await prisma.estimateLabor.create({
+          await this.prisma.estimateLabor.create({
             data: {
               estimateId: estimateId,
               laborCatalogId: laborOp.laborCatalogId,
@@ -1043,7 +1043,7 @@ export class EstimatesService {
   // Toggle estimate visibility to customer
   async toggleEstimateVisibility(estimateId: string, isVisible: boolean): Promise<EstimateWithDetails> {
     // Validate estimate exists
-    const estimate = await prisma.workOrderEstimate.findUnique({
+    const estimate = await this.prisma.workOrderEstimate.findUnique({
       where: { id: estimateId },
     });
 
@@ -1052,7 +1052,7 @@ export class EstimatesService {
     }
 
     // Update visibility
-    const updatedEstimate = await prisma.workOrderEstimate.update({
+    const updatedEstimate = await this.prisma.workOrderEstimate.update({
       where: { id: estimateId },
       data: { isVisibleToCustomer: isVisible },
       include: {
@@ -1091,7 +1091,7 @@ export class EstimatesService {
 
   // Get estimates visible to customer for a work order
   async getCustomerVisibleEstimates(workOrderId: string): Promise<EstimateWithDetails[]> {
-    const estimates = await prisma.workOrderEstimate.findMany({
+    const estimates = await this.prisma.workOrderEstimate.findMany({
       where: {
         workOrderId: workOrderId,
         isVisibleToCustomer: true,

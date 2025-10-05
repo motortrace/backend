@@ -81,3 +81,16 @@ export interface CustomerResponse {
   message: string;
   error?: string;
 }
+
+// Service Interface (for Dependency Injection)
+export interface ICustomerService {
+  createCustomer(customerData: CreateCustomerDto): Promise<Customer>;
+  getCustomerById(id: string): Promise<Customer | null>;
+  getCustomerByUserProfileId(userProfileId: string): Promise<Customer | null>;
+  getCustomers(filters: CustomerFilters): Promise<Customer[]>;
+  updateCustomer(id: string, customerData: UpdateCustomerDto): Promise<Customer>;
+  deleteCustomer(id: string): Promise<void>;
+  getCustomerVehicles(customerId: string): Promise<any>;
+  getCustomerWorkOrders(customerId: string): Promise<any>;
+  getCustomerAppointments(customerId: string): Promise<any>;
+}

@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { EstimatesService } from './estimates.service';
 import {
   CreateEstimateRequest,
   UpdateEstimateRequest,
@@ -10,16 +9,16 @@ import {
   CreateEstimateApprovalRequest,
   UpdateEstimateApprovalRequest,
   EstimateFilters,
+  IEstimatesService,
 } from './estimates.types';
 
-const estimatesService = new EstimatesService();
-
 export class EstimatesController {
+  constructor(private readonly estimatesService: IEstimatesService) {}
   // Create a new estimate
   async createEstimate(req: Request, res: Response) {
     try {
       const data: CreateEstimateRequest = req.body;
-      const estimate = await estimatesService.createEstimate(data);
+      const estimate = await this.estimatesService.createEstimate(data);
       
       res.status(201).json({
         success: true,
@@ -38,7 +37,7 @@ export class EstimatesController {
   async getEstimateById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const estimate = await estimatesService.getEstimateById(id);
+      const estimate = await this.estimatesService.getEstimateById(id);
       
       res.status(200).json({
         success: true,
@@ -59,7 +58,7 @@ export class EstimatesController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       
-      const result = await estimatesService.getEstimates(filters, page, limit);
+      const result = await this.estimatesService.getEstimates(filters, page, limit);
       
       res.status(200).json({
         success: true,
@@ -84,7 +83,7 @@ export class EstimatesController {
     try {
       const { id } = req.params;
       const data: UpdateEstimateRequest = req.body;
-      const estimate = await estimatesService.updateEstimate(id, data);
+      const estimate = await this.estimatesService.updateEstimate(id, data);
       
       res.status(200).json({
         success: true,
@@ -103,7 +102,7 @@ export class EstimatesController {
   async deleteEstimate(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await estimatesService.deleteEstimate(id);
+      await this.estimatesService.deleteEstimate(id);
       
       res.status(200).json({
         success: true,
@@ -121,7 +120,7 @@ export class EstimatesController {
   async createEstimateLabor(req: Request, res: Response) {
     try {
       const data: CreateEstimateLaborRequest = req.body;
-      const estimateLabor = await estimatesService.createEstimateLabor(data);
+      const estimateLabor = await this.estimatesService.createEstimateLabor(data);
       
       res.status(201).json({
         success: true,
@@ -141,7 +140,7 @@ export class EstimatesController {
     try {
       const { id } = req.params;
       const data: UpdateEstimateLaborRequest = req.body;
-      const estimateLabor = await estimatesService.updateEstimateLabor(id, data);
+      const estimateLabor = await this.estimatesService.updateEstimateLabor(id, data);
       
       res.status(200).json({
         success: true,
@@ -160,7 +159,7 @@ export class EstimatesController {
   async deleteEstimateLabor(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await estimatesService.deleteEstimateLabor(id);
+      await this.estimatesService.deleteEstimateLabor(id);
       
       res.status(200).json({
         success: true,
@@ -178,7 +177,7 @@ export class EstimatesController {
   async createEstimatePart(req: Request, res: Response) {
     try {
       const data: CreateEstimatePartRequest = req.body;
-      const estimatePart = await estimatesService.createEstimatePart(data);
+      const estimatePart = await this.estimatesService.createEstimatePart(data);
       
       res.status(201).json({
         success: true,
@@ -198,7 +197,7 @@ export class EstimatesController {
     try {
       const { id } = req.params;
       const data: UpdateEstimatePartRequest = req.body;
-      const estimatePart = await estimatesService.updateEstimatePart(id, data);
+      const estimatePart = await this.estimatesService.updateEstimatePart(id, data);
       
       res.status(200).json({
         success: true,
@@ -217,7 +216,7 @@ export class EstimatesController {
   async deleteEstimatePart(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await estimatesService.deleteEstimatePart(id);
+      await this.estimatesService.deleteEstimatePart(id);
       
       res.status(200).json({
         success: true,
@@ -235,7 +234,7 @@ export class EstimatesController {
   async createEstimateApproval(req: Request, res: Response) {
     try {
       const data: CreateEstimateApprovalRequest = req.body;
-      const approval = await estimatesService.createEstimateApproval(data);
+      const approval = await this.estimatesService.createEstimateApproval(data);
       
       res.status(201).json({
         success: true,
@@ -255,7 +254,7 @@ export class EstimatesController {
     try {
       const { id } = req.params;
       const data: UpdateEstimateApprovalRequest = req.body;
-      const approval = await estimatesService.updateEstimateApproval(id, data);
+      const approval = await this.estimatesService.updateEstimateApproval(id, data);
       
       res.status(200).json({
         success: true,
@@ -273,7 +272,7 @@ export class EstimatesController {
   // Get estimate statistics
   async getEstimateStatistics(req: Request, res: Response) {
     try {
-      const statistics = await estimatesService.getEstimateStatistics();
+      const statistics = await this.estimatesService.getEstimateStatistics();
       
       res.status(200).json({
         success: true,
@@ -300,7 +299,7 @@ export class EstimatesController {
         });
       }
       
-      await estimatesService.approveEstimate(id, approvedById);
+      await this.estimatesService.approveEstimate(id, approvedById);
       
       res.status(200).json({
         success: true,
@@ -325,7 +324,7 @@ export class EstimatesController {
         customerNotes,
       };
       
-      const estimateLabor = await estimatesService.updateEstimateLabor(id, data);
+      const estimateLabor = await this.estimatesService.updateEstimateLabor(id, data);
       
       res.status(200).json({
         success: true,
@@ -351,7 +350,7 @@ export class EstimatesController {
         customerNotes,
       };
       
-      const estimatePart = await estimatesService.updateEstimatePart(id, data);
+      const estimatePart = await this.estimatesService.updateEstimatePart(id, data);
       
       res.status(200).json({
         success: true,
@@ -372,7 +371,7 @@ export class EstimatesController {
       const { estimateId } = req.params;
       const { cannedServiceId } = req.body;
       
-      const estimate = await estimatesService.addCannedServiceToEstimate(estimateId, cannedServiceId);
+      const estimate = await this.estimatesService.addCannedServiceToEstimate(estimateId, cannedServiceId);
       
       res.status(200).json({
         success: true,
@@ -393,7 +392,7 @@ export class EstimatesController {
       const { estimateId } = req.params;
       const { isVisible } = req.body;
       
-      const estimate = await estimatesService.toggleEstimateVisibility(estimateId, isVisible);
+      const estimate = await this.estimatesService.toggleEstimateVisibility(estimateId, isVisible);
       
       res.status(200).json({
         success: true,
@@ -413,7 +412,7 @@ export class EstimatesController {
     try {
       const { workOrderId } = req.params;
       
-      const estimates = await estimatesService.getCustomerVisibleEstimates(workOrderId);
+      const estimates = await this.estimatesService.getCustomerVisibleEstimates(workOrderId);
       
       res.status(200).json({
         success: true,

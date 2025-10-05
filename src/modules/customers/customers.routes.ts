@@ -1,14 +1,19 @@
 import { Router } from 'express';
 import { CustomerController } from './customers.controller';
+import { CustomerService } from './customers.service';
 import { authenticateSupabaseToken, requireManager } from '../auth/supabase/authSupabase.middleware';
 import {
   validateCreateCustomer,
   validateUpdateCustomer,
   validateCustomerFilters,
 } from './customers.validation';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const customerController = new CustomerController();
+
+// Dependency Injection
+const customerService = new CustomerService(prisma);
+const customerController = new CustomerController(customerService);
 
 // All routes require authentication
 router.use(authenticateSupabaseToken);
