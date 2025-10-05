@@ -240,7 +240,7 @@ export class ServiceRecommendationsService {
       throw new Error('Vehicle not found');
     }
 
-    const currentMileage = vehicle.vehicleMileage?.currentMileage || 0;
+    const currentMileage = vehicle.vehicleMileage[0]?.currentMileage || 0;
 
     return {
       vehicleId,
@@ -249,7 +249,7 @@ export class ServiceRecommendationsService {
       year: vehicle.year || undefined,
       currentMileage,
       drivingCondition: vehicle.vehicleProfile?.drivingCondition || 'NORMAL',
-      serviceInterval: vehicle.vehicleProfile?.serviceInterval || 'STANDARD',
+      serviceInterval: vehicle.vehicleProfile?.preferredServiceInterval || 'STANDARD',
       engineType: vehicle.vehicleProfile?.engineType || undefined,
       transmissionType: vehicle.vehicleProfile?.transmissionType || undefined,
       fuelType: vehicle.vehicleProfile?.fuelType || undefined

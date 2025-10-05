@@ -207,6 +207,7 @@ model WorkOrder {
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
   serviceHistory  VehicleServiceHistory[]
+  invoice         Invoice?
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -1066,4 +1067,70 @@ model VehicleMileage {
   entries MileageEntry[]
 
   @@index([vehicleId])
+}
+
+// Invoice Management
+enum InvoiceStatus {
+ DRAFT
+ SENT
+ PAID
+ OVERDUE
+ CANCELLED
+}
+
+enum LineItemType {
+ SERVICE
+ LABOR
+ PART
+ DISCOUNT
+ TAX
+ OTHER
+}
+
+model Invoice {
+  id             String      @id @default(cuid())
+  invoiceNumber  String      @unique
+  workOrder      WorkOrder   @relation(fields: [workOrderId], references: [id])
+  workOrderId    String      @unique
+ issueDate      DateTime    @default(now())
+ dueDate        DateTime?
+ status         InvoiceStatus @default(DRAFT)
+ subtotalServices Decimal?  @db.Decimal(10,2) @default(0)
+ subtotalLabor   Decimal?   @db.Decimal(10,2) @default(0)
+ subtotalParts   Decimal?   @db.Decimal(10,2) @default(0)
+ subtotal        Decimal     @db.Decimal(10,2) @default(0)
+ taxAmount       Decimal     @db.Decimal(10,2) @default(0)
+ discountAmount  Decimal     @db.Decimal(10,2) @default(0)
+ totalAmount     Decimal     @db.Decimal(10,2) @default(0)
+ paidAmount      Decimal     @db.Decimal(10,2) @default(0)
+ balanceDue      Decimal     @db.Decimal(10,2) @default(0)
+ notes           String?
+ terms           String?
+ createdAt       DateTime    @default(now())
+ updatedAt       DateTime    @updatedAt
+
+ // Relations
+ lineItems InvoiceLineItem[]
+
+ @@index([workOrderId])
+ @@index([status])
+}
+
+model InvoiceLineItem {
+ id               String      @id @default(cuid())
+ invoice          Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+ invoiceId        String
+ type             LineItemType
+ description      String
+ quantity         Int         @default(1)
+ unitPrice        Decimal     @db.Decimal(10,2)
+ subtotal         Decimal     @db.Decimal(10,2)
+ workOrderServiceId String?
+ workOrderLaborId   String?
+ workOrderPartId    String?
+ notes            String?
+ createdAt        DateTime    @default(now())
+ updatedAt        DateTime    @updatedAt
+
+ @@index([invoiceId])
 }

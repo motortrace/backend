@@ -28,6 +28,21 @@ export class VehiclesController {
     this.vehiclesService = new VehiclesService();
   }
 
+  // Helper to normalize image URLs for mobile clients
+  private static normalizeImageUrl(imagePath: string | null | undefined, req: Request): string | null {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) {
+      // For mobile clients, replace 127.0.0.1 with the API host IP so they can access Supabase storage
+      const isMobileClient = req.headers['x-client-type'] === 'mobile';
+      if (isMobileClient && imagePath.includes('127.0.0.1')) {
+        const host = req.get('host')?.split(':')[0] || '10.0.2.2';
+        return imagePath.replace('127.0.0.1', host);
+      }
+      return imagePath;
+    }
+    return imagePath;
+  }
+
   // Create vehicle
   async createVehicle(req: Request, res: Response) {
     try {
@@ -51,7 +66,12 @@ export class VehiclesController {
     try {
       const { id } = req.params;
       const vehicle = await this.vehiclesService.getVehicleById(id);
-      
+
+      // Normalize image URL for mobile clients
+      if (vehicle.imageUrl) {
+        vehicle.imageUrl = VehiclesController.normalizeImageUrl(vehicle.imageUrl, req);
+      }
+
       res.json({
         message: 'Vehicle retrieved successfully',
         data: vehicle,
@@ -69,7 +89,14 @@ export class VehiclesController {
     try {
       const filters: VehicleFilters = req.query;
       const vehicles = await this.vehiclesService.getVehicles(filters);
-      
+
+      // Normalize image URLs for mobile clients
+      vehicles.forEach(vehicle => {
+        if (vehicle.imageUrl) {
+          vehicle.imageUrl = VehiclesController.normalizeImageUrl(vehicle.imageUrl, req);
+        }
+      });
+
       res.json({
         message: 'Vehicles retrieved successfully',
         data: vehicles,
@@ -124,7 +151,14 @@ export class VehiclesController {
     try {
       const { customerId } = req.params;
       const vehicles = await this.vehiclesService.getVehiclesByCustomer(customerId);
-      
+
+      // Normalize image URLs for mobile clients
+      vehicles.forEach(vehicle => {
+        if (vehicle.imageUrl) {
+          vehicle.imageUrl = VehiclesController.normalizeImageUrl(vehicle.imageUrl, req);
+        }
+      });
+
       res.json({
         message: 'Customer vehicles retrieved successfully',
         data: vehicles,
@@ -221,13 +255,19 @@ export class VehiclesController {
           imageUrl: result.url
         });
 
+        // Normalize image URL for mobile clients
+        const normalizedImageUrl = VehiclesController.normalizeImageUrl(result.url, req);
+
         console.log('✅ Vehicle image uploaded successfully:', result.url);
 
         res.json({
           success: true,
           data: {
-            vehicle: updatedVehicle,
-            imageUrl: result.url,
+            vehicle: {
+              ...updatedVehicle,
+              imageUrl: normalizedImageUrl
+            },
+            imageUrl: normalizedImageUrl,
             fileName: req.file.originalname,
             fileSize: req.file.size,
             mimeType: req.file.mimetype

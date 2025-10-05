@@ -253,9 +253,17 @@ export async function getHeader(req: AuthenticatedRequest, res: Response) {
 
     // Build absolute profile image URL for mobile clients (Android emulator cannot resolve localhost)
     const apiBaseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const isMobileClient = req.headers['x-client-type'] === 'mobile';
     const normalizeImageUrl = (imagePath: string | null | undefined): string | null => {
       if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
+      if (imagePath.startsWith('http')) {
+        // For mobile clients, replace 127.0.0.1 with the API host IP so they can access Supabase storage
+        if (isMobileClient && imagePath.includes('127.0.0.1')) {
+          const host = req.get('host')?.split(':')[0] || '10.0.2.2';
+          return imagePath.replace('127.0.0.1', host);
+        }
+        return imagePath;
+      }
       const base = apiBaseUrl;
       const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
       return `${base}${path}`;
@@ -310,9 +318,17 @@ export async function getProfile(req: AuthenticatedRequest, res: Response) {
     }
 
     const apiBaseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const isMobileClient = req.headers['x-client-type'] === 'mobile';
     const normalizeImageUrl = (imagePath: string | null | undefined): string | null => {
       if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
+      if (imagePath.startsWith('http')) {
+        // For mobile clients, replace 127.0.0.1 with the API host IP so they can access Supabase storage
+        if (isMobileClient && imagePath.includes('127.0.0.1')) {
+          const host = req.get('host')?.split(':')[0] || '10.0.2.2';
+          return imagePath.replace('127.0.0.1', host);
+        }
+        return imagePath;
+      }
       const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
       return `${apiBaseUrl}${path}`;
     };
@@ -358,9 +374,17 @@ export async function updateProfile(req: AuthenticatedRequest, res: Response) {
     });
 
     const apiBaseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const isMobileClient = req.headers['x-client-type'] === 'mobile';
     const normalizeImageUrl = (imagePath: string | null | undefined): string | null => {
       if (!imagePath) return null;
-      if (imagePath.startsWith('http')) return imagePath;
+      if (imagePath.startsWith('http')) {
+        // For mobile clients, replace 127.0.0.1 with the API host IP so they can access Supabase storage
+        if (isMobileClient && imagePath.includes('127.0.0.1')) {
+          const host = req.get('host')?.split(':')[0] || '10.0.2.2';
+          return imagePath.replace('127.0.0.1', host);
+        }
+        return imagePath;
+      }
       const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
       return `${apiBaseUrl}${path}`;
     };
