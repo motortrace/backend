@@ -1,39 +1,48 @@
 import { Router } from 'express';
 import { authenticateSupabaseToken } from './authSupabase.middleware';
-import { signUp, signIn, signOut, getMe, completeOnboarding, googleAuth, getHeader, deleteAccount, requestPasswordReset, resetPassword, changePassword, verifyResetToken, verifyOTP, getProfile, updateProfile } from './authSupabase.controller';
+import { AuthSupabaseController } from './authSupabase.controller';
+import { AuthSupabaseService } from './authSupabase.service';
+import prisma from '../../../infrastructure/database/prisma';
+import { emailService } from '../../../shared/utils/email.helper';
+import { otpService } from '../../../shared/utils/otp.helper';
 
 const router = Router();
 
-router.post('/signup', signUp);
-router.post('/login', signIn);
-router.post('/logout', authenticateSupabaseToken, signOut);
-router.get('/header', authenticateSupabaseToken, getHeader);
+// Dependency Injection - Create instances
+const authService = new AuthSupabaseService();
+const authController = new AuthSupabaseController(authService, emailService, otpService, prisma);
+
+// Bind controller methods to preserve 'this' context
+router.post('/signup', authController.signUp.bind(authController));
+router.post('/login', authController.signIn.bind(authController));
+router.post('/logout', authenticateSupabaseToken, authController.signOut.bind(authController));
+router.get('/header', authenticateSupabaseToken, authController.getHeader.bind(authController));
 
 // New route
-router.get('/me', authenticateSupabaseToken, getMe);
+router.get('/me', authenticateSupabaseToken, authController.getMe.bind(authController));
 
 // Profile routes
-router.get('/profile', authenticateSupabaseToken, getProfile);
-router.put('/profile', authenticateSupabaseToken, updateProfile);
+router.get('/profile', authenticateSupabaseToken, authController.getProfile.bind(authController));
+router.put('/profile', authenticateSupabaseToken, authController.updateProfile.bind(authController));
 
 // Onboarding route
-router.post('/onboarding', authenticateSupabaseToken, completeOnboarding);
+router.post('/onboarding', authenticateSupabaseToken, authController.completeOnboarding.bind(authController));
 
 // Google authentication route
-router.post('/google', googleAuth);
+router.post('/google', authController.googleAuth.bind(authController));
 
 // Test endpoint (remove this after debugging)
 router.get('/test', (req, res) => {
   res.json({ message: 'Auth routes are working!' });
 });
 
-router.delete('/delete-account', authenticateSupabaseToken, deleteAccount);
+router.delete('/delete-account', authenticateSupabaseToken, authController.deleteAccount.bind(authController));
 
 // Password reset routes
-router.post('/forgot-password', requestPasswordReset);
-router.post('/verify-otp', verifyOTP);
-router.post('/reset-password', resetPassword);
-router.post('/change-password', authenticateSupabaseToken, changePassword);
-router.post('/verify-reset-token', verifyResetToken);
+router.post('/forgot-password', authController.requestPasswordReset.bind(authController));
+router.post('/verify-otp', authController.verifyOTP.bind(authController));
+router.post('/reset-password', authController.resetPassword.bind(authController));
+router.post('/change-password', authenticateSupabaseToken, authController.changePassword.bind(authController));
+router.post('/verify-reset-token', authController.verifyResetToken.bind(authController));
 
 export default router;
