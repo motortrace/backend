@@ -25,8 +25,17 @@ export class AuthSupabaseController {
         res.status(400).json({ error: 'Email and password are required' });
         return;
       }
-      const data = await this.authService.signUp(email, password, role);
-      res.status(201).json({ message: 'User registered successfully', data });
+      
+      // ✅ CUSTOMER ONLY: Mobile app signup is for customers only
+      // Staff users are created manually by admins via separate endpoint
+      const userRole = role || 'customer';
+      
+      const data = await this.authService.signUp(email, password, userRole);
+      res.status(201).json({ 
+        message: 'User registered successfully', 
+        data,
+        note: 'Customer users must complete onboarding. Staff users are created by admins.'
+      });
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Registration failed' });
     }
@@ -136,6 +145,16 @@ export class AuthSupabaseController {
         return;
       }
 
+      // ✅ CUSTOMER ONLY: Only customers go through onboarding
+      // Staff users are created complete by admins
+      if (req.user.role !== 'customer') {
+        res.status(403).json({ 
+          error: 'Onboarding is only for customer users',
+          message: 'Staff users are created complete by admins'
+        });
+        return;
+      }
+
       const { name, contact, profileImageUrl } = req.body;
 
       console.log('📝 Onboarding data:', { name, contact, profileImageUrl });
@@ -149,7 +168,7 @@ export class AuthSupabaseController {
 
       // Save onboarding data to database
       try {
-        // Create or update user profile
+        // Create or update user profile - ONLY store profile data, NOT auth data
         const userProfile = await this.prisma.userProfile.upsert({
           where: { supabaseUserId: req.user.id },
           update: {
@@ -163,44 +182,41 @@ export class AuthSupabaseController {
             name,
             phone: contact,
             profileImage: profileImageUrl || null,
+            role: 'CUSTOMER', // Explicitly set role for customers
             isRegistrationComplete: true
           }
         });
 
         console.log('✅ User profile saved:', userProfile);
 
-        // If user is a customer, create customer record
-        if (req.user.role === 'customer') {
-          const customer = await this.prisma.customer.upsert({
-            where: { userProfileId: userProfile.id },
-            update: {
-              name,
-              email: req.user.email,
-              phone: contact
-            },
-            create: {
-              userProfileId: userProfile.id,
-              name,
-              email: req.user.email,
-              phone: contact
-            }
-          });
+        // Create customer record (linked to UserProfile)
+        const customer = await this.prisma.customer.upsert({
+          where: { userProfileId: userProfile.id },
+          update: {
+            name,
+            email: req.user.email,
+            phone: contact
+          },
+          create: {
+            userProfileId: userProfile.id,
+            name,
+            email: req.user.email,
+            phone: contact
+          }
+        });
 
-          console.log('✅ Customer record saved:', customer);
-        }
+        console.log('✅ Customer record saved:', customer);
 
-        // Also mark registration complete in Supabase user metadata so login returns it
+        // ✅ OPTIMIZED: Only store completion flag in Supabase metadata
+        // Profile data (name, phone, image) is stored ONLY in PostgreSQL
         try {
           await this.supabaseAdmin.auth.admin.updateUserById(req.user.id, {
             user_metadata: {
-              ...(typeof (req.user as any).user_metadata === 'object' ? (req.user as any).user_metadata : {}),
-              isRegistrationComplete: true,
-              name,
-              phone: contact,
-              profileImageUrl: profileImageUrl || null
+              role: 'customer',
+              isRegistrationComplete: true
             }
           });
-          console.log('✅ Supabase user metadata updated with registration completion');
+          console.log('✅ Supabase user metadata updated with registration completion flag');
         } catch (metaErr) {
           console.warn('⚠️ Failed to update Supabase user metadata:', metaErr);
         }

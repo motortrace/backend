@@ -13,17 +13,22 @@ export async function getUserRole(supabaseUserId: string): Promise<UserRoleInfo 
   try {
     // Check if user has a UserProfile
     const userProfile = await prisma.userProfile.findUnique({
-      where: { supabaseUserId }
+      where: { supabaseUserId },
+      select: { role: true }
     });
 
-    if (userProfile) {
-      // For now, assume all users are customers until schema is updated
-      const isStaff = false;
+    if (userProfile && userProfile.role) {
+      // Map database role to auth role
+      const authRole = mapDatabaseRoleToAuthRole(userProfile.role);
+      
+      // Staff roles: everyone except CUSTOMER
+      const isStaff = userProfile.role !== UserRole.CUSTOMER;
+      const isCustomer = userProfile.role === UserRole.CUSTOMER;
       
       return {
-        role: 'customer' as AuthUserRole,
+        role: authRole,
         isStaff,
-        isCustomer: true
+        isCustomer
       };
     }
 
