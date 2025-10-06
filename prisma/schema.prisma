@@ -28,6 +28,8 @@ model UserProfile {
   inventoryManager InventoryManager?
   manager        Manager?
   admin          Admin?
+  uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
+  uploadedInspectionAttachments WorkOrderInspectionAttachment[] @relation("UploadedInspectionAttachments")
 }
 
 model ServiceAdvisor {
@@ -72,9 +74,6 @@ model InventoryManager {
   department     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-
-  // Relations
-  uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
 }
 
 model Manager {
@@ -546,6 +545,8 @@ model WorkOrderInspectionAttachment {
   fileType     String?    // e.g., "image/jpeg", "application/pdf"
   fileSize     Int?       // File size in bytes
   description  String?    // Description of what the attachment shows
+  uploadedBy   UserProfile? @relation("UploadedInspectionAttachments", fields: [uploadedById], references: [id])
+  uploadedById String?
   uploadedAt   DateTime   @default(now())
 }
 
@@ -741,7 +742,7 @@ model WorkOrderAttachment {
   fileSize     Int?       // File size in bytes
   description  String?    // Description of what the attachment shows
   category     AttachmentCategory @default(GENERAL) // Category of attachment
-  uploadedBy   InventoryManager? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
+  uploadedBy   UserProfile? @relation("UploadedAttachments", fields: [uploadedById], references: [id])
   uploadedById String?
   uploadedAt   DateTime   @default(now())
 }

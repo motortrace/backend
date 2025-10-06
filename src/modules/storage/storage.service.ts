@@ -12,8 +12,15 @@ export class StorageService {
   private static readonly PROFILE_IMAGES_BUCKET = 'profile-images';
   private static readonly CAR_IMAGES_BUCKET = 'car-images';
   private static readonly TEMPLATE_IMAGES_BUCKET = 'template-images';
+  private static readonly WORK_ORDER_ATTACHMENTS_BUCKET = 'work-order-attachments';
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  private static readonly MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB for attachments
   private static readonly ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  private static readonly ALLOWED_ATTACHMENT_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/jpg',
+    'application/pdf', 
+    'video/mp4', 'video/quicktime'
+  ];
 
   // Create a service role client for admin operations
   private static getServiceClient() {
@@ -135,6 +142,90 @@ export class StorageService {
     } catch (error: any) {
       console.error('Car image upload error:', error);
       return { success: false, error: 'Internal server error during image upload' };
+    }
+  }
+
+  /**
+   * Upload a work order attachment to Supabase Storage
+   */
+  static async uploadWorkOrderAttachment(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    mimeType: string,
+    workOrderId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_ATTACHMENT_SIZE) {
+        return { success: false, error: 'File size exceeds 10MB limit' };
+      }
+      if (!this.ALLOWED_ATTACHMENT_TYPES.includes(mimeType)) {
+        return { success: false, error: 'Invalid file type. Only images, PDFs, and videos are allowed' };
+      }
+
+      const fileExtension = fileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+
+      const serviceClient = this.getServiceClient();
+
+      const { error } = await serviceClient.storage
+        .from(this.WORK_ORDER_ATTACHMENTS_BUCKET)
+        .upload(uniqueFileName, file, { contentType: mimeType, upsert: false });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload attachment to storage' };
+      }
+
+      const { data: urlData } = serviceClient.storage
+        .from(this.WORK_ORDER_ATTACHMENTS_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Work order attachment upload error:', error);
+      return { success: false, error: 'Internal server error during attachment upload' };
+    }
+  }
+
+  /**
+   * Upload an inspection attachment to Supabase Storage
+   */
+  static async uploadInspectionAttachment(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    mimeType: string,
+    inspectionId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_ATTACHMENT_SIZE) {
+        return { success: false, error: 'File size exceeds 10MB limit' };
+      }
+      if (!this.ALLOWED_ATTACHMENT_TYPES.includes(mimeType)) {
+        return { success: false, error: 'Invalid file type. Only images, PDFs, and videos are allowed' };
+      }
+
+      const fileExtension = fileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${inspectionId}/${uuidv4()}.${fileExtension}`;
+
+      const serviceClient = this.getServiceClient();
+
+      const { error } = await serviceClient.storage
+        .from(this.WORK_ORDER_ATTACHMENTS_BUCKET)
+        .upload(uniqueFileName, file, { contentType: mimeType, upsert: false });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload attachment to storage' };
+      }
+
+      const { data: urlData } = serviceClient.storage
+        .from(this.WORK_ORDER_ATTACHMENTS_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Inspection attachment upload error:', error);
+      return { success: false, error: 'Internal server error during attachment upload' };
     }
   }
 
@@ -317,6 +408,7 @@ export class StorageService {
       const profileBucketExists = buckets?.some(bucket => bucket.name === this.PROFILE_IMAGES_BUCKET);
       const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
       const templateBucketExists = buckets?.some(bucket => bucket.name === this.TEMPLATE_IMAGES_BUCKET);
+      const workOrderAttachmentsBucketExists = buckets?.some(bucket => bucket.name === this.WORK_ORDER_ATTACHMENTS_BUCKET);
 
       if (!profileBucketExists) {
         console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
@@ -378,6 +470,25 @@ export class StorageService {
         }
       } else {
         console.log(`✅ Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
+      }
+
+      if (!workOrderAttachmentsBucketExists) {
+        console.log(`📦 Creating bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        const { error: createAttachmentsError } = await serviceClient.storage.createBucket(
+          this.WORK_ORDER_ATTACHMENTS_BUCKET,
+          {
+            public: true,
+            allowedMimeTypes: this.ALLOWED_ATTACHMENT_TYPES,
+            fileSizeLimit: this.MAX_ATTACHMENT_SIZE
+          }
+        );
+        if (createAttachmentsError) {
+          console.error('❌ Error creating work-order-attachments bucket:', createAttachmentsError);
+        } else {
+          console.log(`✅ Created storage bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        }
+      } else {
+        console.log(`✅ Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
       }
     } catch (error) {
       console.error('❌ Error initializing storage:', error);

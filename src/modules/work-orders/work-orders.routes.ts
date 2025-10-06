@@ -39,7 +39,7 @@ router.post('/:workOrderId/payments', authenticateSupabaseToken, requireServiceA
 router.get('/:workOrderId/payments', workOrderController.getWorkOrderPayments.bind(workOrderController));
 
 // Work Order Attachments Routes
-router.post('/:workOrderId/attachments', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.uploadWorkOrderAttachment.bind(workOrderController));
+router.post('/:workOrderId/attachments', authenticateSupabaseToken, requireTechnician, workOrderController.uploadAttachmentMiddleware, workOrderController.uploadWorkOrderAttachment.bind(workOrderController));
 router.get('/:workOrderId/attachments', workOrderController.getWorkOrderAttachments.bind(workOrderController));
 
 // Work Order Inspections Routes

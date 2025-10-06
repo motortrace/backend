@@ -1037,6 +1037,14 @@ export class InspectionTemplatesService {
     }
   }
 
+  // Get UserProfile by Supabase ID
+  async getUserProfileBySupabaseId(supabaseUserId: string) {
+    return await this.prisma.userProfile.findUnique({
+      where: { supabaseUserId },
+      select: { id: true, name: true }
+    });
+  }
+
   // Inspection Attachment Management
   async createInspectionAttachment(
     inspectionId: string,
@@ -1046,6 +1054,7 @@ export class InspectionTemplatesService {
       fileType?: string;
       fileSize?: number;
       description?: string;
+      uploadedById?: string;
     }
   ) {
     try {
@@ -1057,14 +1066,7 @@ export class InspectionTemplatesService {
           fileType: data.fileType,
           fileSize: data.fileSize,
           description: data.description,
-        },
-        include: {
-          inspection: {
-            select: {
-              id: true,
-              workOrderId: true,
-            },
-          },
+          uploadedById: data.uploadedById,
         },
       });
 
@@ -1085,6 +1087,9 @@ export class InspectionTemplatesService {
     try {
       const attachments = await this.prisma.workOrderInspectionAttachment.findMany({
         where: { inspectionId },
+        include: {
+          uploadedBy: { select: { id: true, name: true } },
+        },
         orderBy: { uploadedAt: 'desc' },
       });
 

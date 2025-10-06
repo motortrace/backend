@@ -368,6 +368,7 @@ export interface WorkOrderStatistics {
 
 // Service Interface (for Dependency Injection)
 export interface IWorkOrderService {
+  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
   createWorkOrder(data: CreateWorkOrderRequest): Promise<any>;
   getWorkOrders(filters: WorkOrderFilters): Promise<any[]>;
   getWorkOrderById(id: string): Promise<any>;

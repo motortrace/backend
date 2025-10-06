@@ -583,21 +583,43 @@ export class InspectionTemplatesController {
   async createInspectionAttachment(req: Request, res: Response) {
     try {
       const { inspectionId } = req.params;
-      const { fileUrl, fileName, fileType, fileSize, description } = req.body;
+      const { description } = req.body;
+      const file = req.file;
+      const authReq = req as any; // Cast to access user property
 
-      if (!fileUrl) {
+      if (!file) {
         return res.status(400).json({
           success: false,
-          error: 'File URL is required'
+          error: 'File is required'
+        });
+      }
+
+      // Get UserProfile ID from Supabase user ID
+      const userProfile = await this.service.getUserProfileBySupabaseId(authReq.user.id);
+      const uploadedById = userProfile?.id;
+
+      // Upload file to storage
+      const uploadResult = await StorageService.uploadInspectionAttachment(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        inspectionId
+      );
+
+      if (!uploadResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: uploadResult.error || 'Failed to upload file'
         });
       }
 
       const result = await this.service.createInspectionAttachment(inspectionId, {
-        fileUrl,
-        fileName,
-        fileType,
-        fileSize,
+        fileUrl: uploadResult.url!,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSize: file.size,
         description,
+        uploadedById,
       });
 
       if (!result.success) {
@@ -815,6 +837,10 @@ export class InspectionTemplatesController {
   // Export multer middleware for use in routes
   static getUploadMiddleware() {
     return upload.single('templateImage');
+  }
+
+  static getAttachmentUploadMiddleware() {
+    return upload.single('file');
   }
 
 

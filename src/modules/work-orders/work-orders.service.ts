@@ -23,12 +23,21 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     estimates: { include: { createdBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } }; approvedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    attachments: { include: { uploadedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
+    attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
   };
 }>;
 
 export class WorkOrderService {
   constructor(private readonly prisma: PrismaClient) {}
+  
+  // Get UserProfile by Supabase ID
+  async getUserProfileBySupabaseId(supabaseUserId: string) {
+    return await this.prisma.userProfile.findUnique({
+      where: { supabaseUserId },
+      select: { id: true, name: true }
+    });
+  }
+
   // Generate unique work order number
   private async generateWorkOrderNumber(): Promise<string> {
     const today = new Date();
@@ -296,17 +305,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -499,17 +498,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -615,11 +604,11 @@ export class WorkOrderService {
     // Transform technician names in attachments
     if (transformed.attachments) {
       transformed.attachments = transformed.attachments.map((attachment: any) => {
-        if (attachment.uploadedBy && attachment.uploadedBy.userProfile && attachment.uploadedBy.userProfile.name) {
-          const nameParts = attachment.uploadedBy.userProfile.name.split(' ');
-          attachment.uploadedBy.userProfile.firstName = nameParts[0] || '';
-          attachment.uploadedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
-          delete attachment.uploadedBy.userProfile.name;
+        if (attachment.uploadedBy && attachment.uploadedBy.name) {
+          const nameParts = attachment.uploadedBy.name.split(' ');
+          attachment.uploadedBy.firstName = nameParts[0] || '';
+          attachment.uploadedBy.lastName = nameParts.slice(1).join(' ') || '';
+          delete attachment.uploadedBy.name;
         }
         return attachment;
       });
@@ -793,17 +782,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -986,17 +965,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1193,17 +1162,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1400,17 +1359,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1586,17 +1535,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -2277,20 +2216,6 @@ export class WorkOrderService {
         workOrderId,
         ...data,
       },
-      include: {
-        uploadedBy: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     return attachment;
@@ -2310,13 +2235,7 @@ export class WorkOrderService {
         uploadedBy: {
           select: {
             id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            name: true,
           },
         },
       },
@@ -2605,4 +2524,5 @@ export class WorkOrderService {
     });
   }
 }
+
 

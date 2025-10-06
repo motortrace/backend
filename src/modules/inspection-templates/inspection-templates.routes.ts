@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { InspectionTemplatesController } from './inspection-templates.controller';
 import { InspectionTemplatesService } from './inspection-templates.service';
 import prisma from '../../infrastructure/database/prisma';
+import { authenticateSupabaseToken, requireTechnician } from '../auth/supabase/authSupabase.middleware';
 
 const router = Router();
 const service = new InspectionTemplatesService(prisma);
@@ -38,7 +39,12 @@ router.put('/checklist-items/:id', controller.updateChecklistItem.bind(controlle
 router.delete('/checklist-items/:id', controller.deleteChecklistItem.bind(controller));
 
 // Inspection Attachment Management Routes
-router.post('/inspections/:inspectionId/attachments', controller.createInspectionAttachment.bind(controller));
+router.post('/inspections/:inspectionId/attachments', 
+  authenticateSupabaseToken, 
+  requireTechnician,
+  InspectionTemplatesController.getAttachmentUploadMiddleware(),
+  controller.createInspectionAttachment.bind(controller)
+);
 router.get('/inspections/:inspectionId/attachments', controller.getInspectionAttachments.bind(controller));
 router.delete('/attachments/:attachmentId', controller.deleteInspectionAttachment.bind(controller));
 
