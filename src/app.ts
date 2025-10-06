@@ -1,6 +1,8 @@
 // src/app.ts
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger.config';
 import prisma from './infrastructure/database/prisma';
 import { authenticateSupabaseToken } from './modules/auth/supabase/authSupabase.middleware';
 import { errorHandler, notFoundHandler } from './shared/middleware/error-handler';
@@ -37,6 +39,21 @@ app.use(cors({
 
 app.use(express.json());
 
+// ============================================
+// SWAGGER API DOCUMENTATION
+// ============================================
+// Swagger UI available at http://localhost:3000/api-docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customSiteTitle: 'MotorTrace API Documentation',
+  customCss: '.swagger-ui .topbar { display: none }',
+}));
+
+// Swagger JSON specification endpoint
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // mounting section
 app.use('/auth', authSupabaseRoutes);
