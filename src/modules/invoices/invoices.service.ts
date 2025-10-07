@@ -119,10 +119,10 @@ export class InvoicesService implements IInvoicesService {
     }
 
     // Calculate totals
+    // NOTE: Labor is tracking-only, NOT billable - only services and parts are invoiced
     const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
-    const subtotalLabor = workOrder.laborItems.reduce((sum, l) => sum + Number(l.subtotal), 0);
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
-    const subtotal = subtotalServices + subtotalLabor + subtotalParts;
+    const subtotal = subtotalServices + subtotalParts;
     
     // Calculate tax on the final subtotal (not on individual services)
     const taxRate = 0.18; // 18% tax rate - you can make this configurable
@@ -137,7 +137,7 @@ export class InvoicesService implements IInvoicesService {
         workOrderId: data.workOrderId,
         dueDate: data.dueDate,
         subtotalServices,
-        subtotalLabor,
+        subtotalLabor: 0, // Labor is tracking-only, not billable
         subtotalParts,
         subtotal,
         taxAmount,
@@ -154,7 +154,7 @@ export class InvoicesService implements IInvoicesService {
         data: {
           invoiceId: invoice.id,
           type: LineItemType.SERVICE,
-          description: service.description || service.cannedService.name,
+          description: service.description || service.cannedService?.name || 'Service',
           quantity: service.quantity,
           unitPrice: service.unitPrice,
           subtotal: service.subtotal,
@@ -164,23 +164,8 @@ export class InvoicesService implements IInvoicesService {
       });
     }
 
-    // Create line items ONLY for standalone labor (not part of a canned service)
-    // Labor items that belong to a service (have cannedServiceId) are already included in the service price
-    const standaloneLabor = workOrder.laborItems.filter(labor => !labor.cannedServiceId);
-    for (const labor of standaloneLabor) {
-      await this.prisma.invoiceLineItem.create({
-        data: {
-          invoiceId: invoice.id,
-          type: LineItemType.LABOR,
-          description: labor.description,
-          quantity: 1,
-          unitPrice: labor.subtotal, // Flat rate
-          subtotal: labor.subtotal,
-          workOrderLaborId: labor.id,
-          notes: labor.notes,
-        },
-      });
-    }
+    // NOTE: Labor items are NOT invoiced separately - they are for tracking work only
+    // Customer pays for SERVICES (which may include labor operations), not individual labor items
 
     // Create line items for parts
     for (const part of workOrder.partsUsed) {
