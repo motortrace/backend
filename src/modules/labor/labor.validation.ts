@@ -42,6 +42,7 @@ export const updateWorkOrderLaborSchema = Joi.object({
   technicianId: Joi.string().optional(),
   startTime: Joi.date().optional(),
   endTime: Joi.date().optional(),
+  status: Joi.string().valid('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED').optional(),
   notes: Joi.string().optional(),
 });
 
