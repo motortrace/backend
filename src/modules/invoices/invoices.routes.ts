@@ -18,6 +18,7 @@ router.get('/statistics', authenticateSupabaseToken, requireManager, invoicesCon
 
 // Invoice by ID Routes
 router.get('/:id', invoicesController.getInvoiceById);
+router.get('/:id/pdf', invoicesController.generateInvoicePDF); // Generate PDF
 router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateInvoiceSchema, 'body'), invoicesController.updateInvoice);
 router.delete('/:id', authenticateSupabaseToken, requireManager, invoicesController.deleteInvoice);
 

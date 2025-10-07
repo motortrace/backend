@@ -8,6 +8,9 @@ import {
   IInvoicesService,
 } from './invoices.types';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/custom-errors';
+import { PDFInvoice } from '@h1dd3nsn1p3r/pdf-invoice';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export class InvoicesService implements IInvoicesService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -154,8 +157,10 @@ export class InvoicesService implements IInvoicesService {
       });
     }
 
-    // Create line items for labor
-    for (const labor of workOrder.laborItems) {
+    // Create line items ONLY for standalone labor (not part of a canned service)
+    // Labor items that belong to a service (have cannedServiceId) are already included in the service price
+    const standaloneLabor = workOrder.laborItems.filter(labor => !labor.cannedServiceId);
+    for (const labor of standaloneLabor) {
       await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
@@ -535,5 +540,127 @@ export class InvoicesService implements IInvoicesService {
       totalRevenue: Number(totalRevenue._sum.totalAmount || 0),
       averageInvoiceAmount,
     };
+  }
+
+  // Generate PDF invoice
+  async generateInvoicePDF(invoiceId: string): Promise<string> {
+    // Get invoice with all details
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        workOrder: {
+          include: {
+            customer: true,
+            vehicle: true,
+          },
+        },
+        lineItems: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundError('Invoice', invoiceId);
+    }
+
+    // Create temporary directory if it doesn't exist
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Generate file path
+    const fileName = `invoice-${invoice.invoiceNumber}-${Date.now()}.pdf`;
+    const tempFilePath = path.join(tempDir, fileName);
+
+    // Transform data to PDF invoice format
+    const payload = {
+      company: {
+        name: "MotorTrace Auto Service",
+        address: "123 Service Center Drive\nCity, State 12345",
+        phone: "Tel: (555) 123-4567",
+        email: "Email: service@motortrace.com",
+        website: "Web: https://www.motortrace.com",
+        taxId: "Tax ID: 12-3456789",
+      },
+      customer: {
+        name: invoice.workOrder.customer.name,
+        email: invoice.workOrder.customer.email || undefined,
+        phone: invoice.workOrder.customer.phone || undefined,
+      },
+      invoice: {
+        number: invoice.invoiceNumber,
+        date: invoice.createdAt.toLocaleDateString('en-US'),
+        dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'),
+        status: this.getInvoiceStatusLabel(invoice.status),
+        locale: "en-US",
+        currency: "USD",
+        path: tempFilePath,
+      },
+      items: invoice.lineItems.map(item => ({
+        name: item.description,
+        quantity: item.quantity,
+        price: Number(item.unitPrice),
+        tax: 0, // Tax is already calculated separately
+      })),
+      note: {
+        text: invoice.notes || "Thank you for your business!",
+        italic: true,
+      },
+    };
+
+    // Generate PDF
+    const pdfInvoice = new PDFInvoice(payload);
+    const generatedPath = await pdfInvoice.create();
+
+    // Wait a bit to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Verify the file exists and has content
+    if (!fs.existsSync(generatedPath)) {
+      throw new Error('PDF file was not generated');
+    }
+
+    const stats = fs.statSync(generatedPath);
+    if (stats.size === 0) {
+      throw new Error('Generated PDF is empty');
+    }
+
+    console.log(`PDF generated at: ${generatedPath}, size: ${stats.size} bytes`);
+
+    // Read the generated PDF file
+    const pdfBuffer = fs.readFileSync(generatedPath);
+
+    // Upload to Supabase Storage
+    const { StorageService } = require('../storage/storage.service');
+    const uploadResult = await StorageService.uploadInvoicePDF(
+      pdfBuffer,
+      fileName,
+      invoiceId
+    );
+
+    // Delete the temporary file
+    fs.unlinkSync(generatedPath);
+
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Failed to upload PDF to storage');
+    }
+
+    return uploadResult.url!;
+  }
+
+  // Helper to get readable invoice status
+  private getInvoiceStatusLabel(status: InvoiceStatus): string {
+    const statusMap: Record<InvoiceStatus, string> = {
+      [InvoiceStatus.DRAFT]: 'Draft',
+      [InvoiceStatus.SENT]: 'Sent',
+      [InvoiceStatus.PAID]: 'Paid',
+      [InvoiceStatus.OVERDUE]: 'Overdue',
+      [InvoiceStatus.CANCELLED]: 'Cancelled',
+    };
+    return statusMap[status] || 'Draft';
   }
 }

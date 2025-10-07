@@ -102,4 +102,5 @@ export interface IInvoicesService {
   updateInvoice(id: string, data: UpdateInvoiceRequest): Promise<InvoiceWithDetails>;
   deleteInvoice(id: string): Promise<void>;
   getInvoiceStatistics(): Promise<InvoiceStatistics>;
+  generateInvoicePDF(invoiceId: string): Promise<string>;
 }

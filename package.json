@@ -11,6 +11,7 @@
     "test-appointment-system": "ts-node scripts/test-appointment-system.ts"
   },
   "dependencies": {
+    "@h1dd3nsn1p3r/pdf-invoice": "^1.0.10",
     "@prisma/client": "^6.13.0",
     "@supabase/supabase-js": "^2.53.0",
     "@types/multer": "^2.0.0",

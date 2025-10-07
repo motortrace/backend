@@ -13,8 +13,10 @@ export class StorageService {
   private static readonly CAR_IMAGES_BUCKET = 'car-images';
   private static readonly TEMPLATE_IMAGES_BUCKET = 'template-images';
   private static readonly WORK_ORDER_ATTACHMENTS_BUCKET = 'work-order-attachments';
+  private static readonly INVOICES_BUCKET = 'invoices';
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   private static readonly MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB for attachments
+  private static readonly MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB for PDFs
   private static readonly ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
   private static readonly ALLOWED_ATTACHMENT_TYPES = [
     'image/jpeg', 'image/png', 'image/webp', 'image/jpg',
@@ -298,6 +300,44 @@ export class StorageService {
   }
 
   /**
+   * Upload an invoice PDF to Supabase Storage
+   */
+  static async uploadInvoicePDF(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    invoiceId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_PDF_SIZE) {
+        return { success: false, error: 'File size exceeds 20MB limit' };
+      }
+
+      const fileExtension = fileName.split('.').pop() || 'pdf';
+      const uniqueFileName = `${invoiceId}/${fileName}`;
+
+      const serviceClient = this.getServiceClient();
+
+      const { error } = await serviceClient.storage
+        .from(this.INVOICES_BUCKET)
+        .upload(uniqueFileName, file, { contentType: 'application/pdf', upsert: true });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload PDF to storage' };
+      }
+
+      const { data: urlData } = serviceClient.storage
+        .from(this.INVOICES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Invoice PDF upload error:', error);
+      return { success: false, error: 'Internal server error during PDF upload' };
+    }
+  }
+
+  /**
    * Delete a profile image from Supabase Storage
    */
   static async deleteProfileImage(imageUrl: string): Promise<UploadResult> {
@@ -409,6 +449,7 @@ export class StorageService {
       const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
       const templateBucketExists = buckets?.some(bucket => bucket.name === this.TEMPLATE_IMAGES_BUCKET);
       const workOrderAttachmentsBucketExists = buckets?.some(bucket => bucket.name === this.WORK_ORDER_ATTACHMENTS_BUCKET);
+      const invoicesBucketExists = buckets?.some(bucket => bucket.name === this.INVOICES_BUCKET);
 
       if (!profileBucketExists) {
         console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
@@ -489,6 +530,25 @@ export class StorageService {
         }
       } else {
         console.log(`✅ Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+      }
+
+      if (!invoicesBucketExists) {
+        console.log(`📦 Creating bucket: ${this.INVOICES_BUCKET}`);
+        const { error: createInvoicesError } = await serviceClient.storage.createBucket(
+          this.INVOICES_BUCKET,
+          {
+            public: true,
+            allowedMimeTypes: ['application/pdf'],
+            fileSizeLimit: this.MAX_PDF_SIZE
+          }
+        );
+        if (createInvoicesError) {
+          console.error('❌ Error creating invoices bucket:', createInvoicesError);
+        } else {
+          console.log(`✅ Created storage bucket: ${this.INVOICES_BUCKET}`);
+        }
+      } else {
+        console.log(`✅ Storage bucket already exists: ${this.INVOICES_BUCKET}`);
       }
     } catch (error) {
       console.error('❌ Error initializing storage:', error);

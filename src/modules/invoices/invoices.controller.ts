@@ -113,4 +113,19 @@ export class InvoicesController {
       data: statistics,
     });
   });
+
+  // Generate PDF invoice
+  generateInvoicePDF = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const pdfUrl = await this.invoicesService.generateInvoicePDF(id);
+
+    // Return the PDF URL
+    res.status(200).json({
+      success: true,
+      message: 'Invoice PDF generated successfully',
+      data: {
+        url: pdfUrl
+      }
+    });
+  });
 }
