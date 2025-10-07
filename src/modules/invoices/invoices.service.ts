@@ -124,11 +124,23 @@ export class InvoicesService implements IInvoicesService {
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
     const subtotal = subtotalServices + subtotalParts;
     
-    // Calculate tax on the final subtotal (not on individual services)
-    const taxRate = 0.18; // 18% tax rate - you can make this configurable
-    const taxAmount = subtotal * taxRate;
-    const discountAmount = Number(workOrder.discountAmount || 0);
-    const totalAmount = subtotal + taxAmount - discountAmount;
+    // Calculate discount amount (handles both FIXED and PERCENTAGE)
+    let discountAmount = 0;
+    if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
+      if (workOrder.discountType === 'PERCENTAGE') {
+        // Calculate percentage discount
+        discountAmount = subtotal * (Number(workOrder.discountAmount) / 100);
+      } else {
+        // Fixed discount amount (default if discountType not set or is 'FIXED')
+        discountAmount = Number(workOrder.discountAmount);
+      }
+    }
+    
+    // Calculate tax AFTER discount is applied (standard practice)
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxRate = 0.18; // 18% VAT - you can make this configurable
+    const taxAmount = subtotalAfterDiscount * taxRate;
+    const totalAmount = subtotalAfterDiscount + taxAmount;
 
     // Create invoice
     const invoice = await this.prisma.invoice.create({
@@ -720,33 +732,38 @@ export class InvoicesService implements IInvoicesService {
               stack: [
                 {
                   columns: [
-                    { width: '*', text: 'Subtotal:', alignment: 'right', bold: true },
-                    { width: 100, text: formatCurrency(Number(invoice.subtotal)), alignment: 'right' },
+                    { width: '*', text: 'Subtotal:', alignment: 'right' as const, bold: true },
+                    { width: 100, text: formatCurrency(Number(invoice.subtotal)), alignment: 'right' as const },
                   ],
-                  margin: [0, 0, 0, 5],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
                 },
+                ...(Number(invoice.discountAmount || 0) > 0 ? [{
+                  columns: [
+                    { 
+                      width: '*' as const, 
+                      text: `Discount${(invoice.workOrder as any).discountReason ? ` (${(invoice.workOrder as any).discountReason})` : ''}:`, 
+                      alignment: 'right' as const, 
+                      bold: true 
+                    },
+                    { width: 100, text: `-${formatCurrency(Number(invoice.discountAmount))}`, alignment: 'right' as const, color: '#cc0000' },
+                  ],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
+                }] : []),
                 {
                   columns: [
-                    { width: '*', text: 'Discount:', alignment: 'right', bold: true },
-                    { width: 100, text: formatCurrency(Number(invoice.discountAmount || 0)), alignment: 'right' },
+                    { width: '*', text: 'VAT (18%):', alignment: 'right' as const, bold: true },
+                    { width: 100, text: formatCurrency(Number(invoice.taxAmount)), alignment: 'right' as const },
                   ],
-                  margin: [0, 0, 0, 5],
-                },
-                {
-                  columns: [
-                    { width: '*', text: 'VAT (18%):', alignment: 'right', bold: true },
-                    { width: 100, text: formatCurrency(Number(invoice.taxAmount)), alignment: 'right' },
-                  ],
-                  margin: [0, 0, 0, 5],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
                 },
                 {
                   canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }],
-                  margin: [0, 5, 0, 5],
+                  margin: [0, 5, 0, 5] as [number, number, number, number],
                 },
                 {
                   columns: [
-                    { width: '*', text: 'TOTAL:', alignment: 'right', bold: true, fontSize: 14 },
-                    { width: 100, text: formatCurrency(Number(invoice.totalAmount)), alignment: 'right', bold: true, fontSize: 14 },
+                    { width: '*', text: 'TOTAL:', alignment: 'right' as const, bold: true, fontSize: 14 },
+                    { width: 100, text: formatCurrency(Number(invoice.totalAmount)), alignment: 'right' as const, bold: true, fontSize: 14 },
                   ],
                 },
               ],
