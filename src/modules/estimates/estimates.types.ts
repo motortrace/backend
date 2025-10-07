@@ -180,8 +180,8 @@ export interface EstimateLaborWithDetails {
     id: string;
     code: string;
     name: string;
-    estimatedHours: number;
-    hourlyRate: number;
+    estimatedMinutes: number;
+    skillLevel: number;
     category?: string;
   };
 }
@@ -242,3 +242,4 @@ export interface IEstimatesService {
   toggleEstimateVisibility(estimateId: string, isVisible: boolean): Promise<EstimateWithDetails>;
   getCustomerVisibleEstimates(workOrderId: string): Promise<EstimateWithDetails[]>;
 }
+

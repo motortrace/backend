@@ -1,10 +1,12 @@
 import { LaborCatalog, WorkOrderLabor } from '@prisma/client';
 
+// Labor is for tracking only - pricing happens at service level
 export interface CreateLaborRequest {
   workOrderId: string;
+  serviceId: string;  // Labor must belong to a service
+  laborCatalogId?: string;
   description: string;
-  hours: number;
-  rate: number;
+  estimatedMinutes?: number;
   technicianId?: string;
   startTime?: Date;
   endTime?: Date;
@@ -15,8 +17,8 @@ export interface CreateLaborCatalogRequest {
   code: string;
   name: string;
   description?: string;
-  estimatedHours: number;
-  hourlyRate: number;
+  estimatedMinutes: number;
+  skillLevel?: string;
   category?: string;
   isActive?: boolean;
 }
@@ -25,19 +27,18 @@ export interface UpdateLaborCatalogRequest {
   code?: string;
   name?: string;
   description?: string;
-  estimatedHours?: number;
-  hourlyRate?: number;
+  estimatedMinutes?: number;
+  skillLevel?: string;
   category?: string;
   isActive?: boolean;
 }
 
 export interface CreateWorkOrderLaborRequest {
   workOrderId: string;
-  cannedServiceId?: string;
+  serviceId: string;  // Required - labor must belong to a service
   laborCatalogId?: string;
   description: string;
-  hours: number;
-  rate: number;
+  estimatedMinutes?: number;
   technicianId?: string;
   startTime?: Date;
   endTime?: Date;
@@ -45,14 +46,15 @@ export interface CreateWorkOrderLaborRequest {
 }
 
 export interface UpdateWorkOrderLaborRequest {
-  cannedServiceId?: string;
+  serviceId?: string;
   laborCatalogId?: string;
   description?: string;
-  hours?: number;
-  rate?: number;
+  estimatedMinutes?: number;
+  actualMinutes?: number;
   technicianId?: string;
   startTime?: Date;
   endTime?: Date;
+  status?: string;
   notes?: string;
 }
 
@@ -81,8 +83,8 @@ export interface WorkOrderLaborWithDetails extends WorkOrderLabor {
 }
 
 export interface LaborSummary {
-  totalHours: number;
-  totalCost: number;
+  totalMinutes: number;
+  totalEstimatedMinutes: number;
   laborItems: WorkOrderLaborWithDetails[];
 }
 

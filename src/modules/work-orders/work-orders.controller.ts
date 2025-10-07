@@ -27,21 +27,20 @@ export class WorkOrderController {
   async createWorkOrder(req: any, res: Response) {
     try {
       const workOrderData: CreateWorkOrderRequest = req.body;
-
-      const workOrder = await this.workOrderService.createWorkOrder(workOrderData);
-
+      const workOrderId = await this.workOrderService.createWorkOrder(workOrderData);
       res.status(201).json({
         success: true,
-        data: workOrder,
+        workOrderId,
         message: 'Work order created successfully',
       });
     } catch (error: any) {
       res.status(400).json({
         success: false,
-        error: error.message,
+        message: error.message || 'Something went wrong',
       });
     }
   }
+
 
   async getWorkOrders(req: Request, res: Response) {
     try {
@@ -135,40 +134,40 @@ export class WorkOrderController {
     }
   }
 
-  async restoreWorkOrder(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
+  // async restoreWorkOrder(req: Request, res: Response) {
+  //   try {
+  //     const { id } = req.params;
+  //     const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
 
-      res.json({
-        success: true,
-        data: restoredWorkOrder,
-        message: 'Work order restored successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: restoredWorkOrder,
+  //       message: 'Work order restored successfully',
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
-  async getCancelledWorkOrders(req: Request, res: Response) {
-    try {
-      const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
+  // async getCancelledWorkOrders(req: Request, res: Response) {
+  //   try {
+  //     const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
 
-      res.json({
-        success: true,
-        data: cancelledWorkOrders,
-        message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: cancelledWorkOrders,
+  //       message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
   // Work Order Services
   async createWorkOrderService(req: Request, res: Response) {

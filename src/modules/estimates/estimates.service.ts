@@ -35,7 +35,7 @@ type PrismaEstimate = Prisma.WorkOrderEstimateGetPayload<{
     },
     estimateLaborItems: {
       include: {
-        laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+        laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
       },
     },
     estimatePartItems: {
@@ -106,8 +106,8 @@ export class EstimatesService implements IEstimatesService {
         serviceDiscountAmount: item.serviceDiscountAmount ? Number(item.serviceDiscountAmount) : undefined,
         laborCatalog: item.laborCatalog ? {
           ...item.laborCatalog,
-          estimatedHours: Number(item.laborCatalog.estimatedHours),
-          hourlyRate: Number(item.laborCatalog.hourlyRate),
+          estimatedMinutes: Number(item.laborCatalog.estimatedHours),
+          skillLevel: Number(item.laborCatalog.hourlyRate),
           category: item.laborCatalog.category || undefined,
         } : undefined,
       })),
@@ -203,7 +203,7 @@ export class EstimatesService implements IEstimatesService {
         },
         estimateLaborItems: {
           include: {
-            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
           },
         },
         estimatePartItems: {
@@ -241,7 +241,7 @@ export class EstimatesService implements IEstimatesService {
         },
         estimateLaborItems: {
           include: {
-            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
           },
         },
         estimatePartItems: {
@@ -308,7 +308,7 @@ export class EstimatesService implements IEstimatesService {
           },
           estimateLaborItems: {
             include: {
-              laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+              laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
             },
           },
           estimatePartItems: {
@@ -393,7 +393,7 @@ export class EstimatesService implements IEstimatesService {
         },
         estimateLaborItems: {
           include: {
-            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
           },
         },
         estimatePartItems: {
@@ -466,7 +466,7 @@ export class EstimatesService implements IEstimatesService {
         notes: data.notes,
       },
       include: {
-        laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+        laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
       },
     });
 
@@ -481,8 +481,8 @@ export class EstimatesService implements IEstimatesService {
       subtotal: Number(estimateLabor.subtotal),
       laborCatalog: estimateLabor.laborCatalog ? {
         ...estimateLabor.laborCatalog,
-        estimatedHours: Number(estimateLabor.laborCatalog.estimatedHours),
-        hourlyRate: Number(estimateLabor.laborCatalog.hourlyRate),
+        estimatedMinutes: Number(estimateLabor.laborCatalog.estimatedHours),
+        skillLevel: Number(estimateLabor.laborCatalog.hourlyRate),
         category: estimateLabor.laborCatalog.category || undefined,
       } : undefined,
     };
@@ -525,7 +525,7 @@ export class EstimatesService implements IEstimatesService {
       where: { id },
       data: updateData,
       include: {
-        laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+        laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
       },
     });
 
@@ -540,8 +540,8 @@ export class EstimatesService implements IEstimatesService {
       subtotal: Number(updatedEstimateLabor.subtotal),
       laborCatalog: updatedEstimateLabor.laborCatalog ? {
         ...updatedEstimateLabor.laborCatalog,
-        estimatedHours: Number(updatedEstimateLabor.laborCatalog.estimatedHours),
-        hourlyRate: Number(updatedEstimateLabor.laborCatalog.hourlyRate),
+        estimatedMinutes: Number(updatedEstimateLabor.laborCatalog.estimatedHours),
+        skillLevel: Number(updatedEstimateLabor.laborCatalog.hourlyRate),
         category: updatedEstimateLabor.laborCatalog.category || undefined,
       } : undefined,
     };
@@ -1074,7 +1074,7 @@ export class EstimatesService implements IEstimatesService {
         },
         estimateLaborItems: {
           include: {
-            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
           },
         },
         estimatePartItems: {
@@ -1115,7 +1115,7 @@ export class EstimatesService implements IEstimatesService {
         },
         estimateLaborItems: {
           include: {
-            laborCatalog: { select: { id: true, code: true, name: true, estimatedHours: true, hourlyRate: true, category: true } },
+            laborCatalog: { select: { id: true, code: true, name: true, estimatedMinutes: true, skillLevel: true, category: true } },
           },
         },
         estimatePartItems: {
@@ -1131,3 +1131,4 @@ export class EstimatesService implements IEstimatesService {
     return estimates.map(estimate => this._formatEstimateForOutput(estimate));
   }
 }
+

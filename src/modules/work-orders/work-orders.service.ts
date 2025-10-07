@@ -65,7 +65,7 @@ export class WorkOrderService {
   }
 
   // Create a new work order
-  async createWorkOrder(data: CreateWorkOrderRequest): Promise<WorkOrderWithDetails> {
+  async createWorkOrder(data: CreateWorkOrderRequest): Promise<any> {
     const { cannedServiceIds = [], quantities = [], prices = [], serviceNotes = [], ...workOrderData } = data;
 
     // Generate unique work order number
@@ -137,6 +137,7 @@ export class WorkOrderService {
         services: {
           create: cannedServiceIds.map((serviceId, index) => ({
             cannedServiceId: serviceId,
+            description: `Service ${index + 1}`, // Placeholder - should fetch from canned service
             quantity: quantities[index] || 1,
             unitPrice: prices[index] || 0,
             subtotal: (quantities[index] || 1) * (prices[index] || 0),
@@ -144,174 +145,9 @@ export class WorkOrderService {
           })),
         },
       },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            licensePlate: true,
-            vin: true,
-          },
-        },
-        appointment: {
-          select: {
-            id: true,
-            requestedAt: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
-        serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        services: {
-          include: {
-            cannedService: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                duration: true,
-                price: true,
-              },
-            },
-          },
-        },
-        inspections: {
-          include: {
-            inspector: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        laborItems: {
-          include: {
-            laborCatalog: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                estimatedHours: true,
-                hourlyRate: true,
-              },
-            },
-            technician: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        partsUsed: {
-          include: {
-            part: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                partNumber: true,
-                manufacturer: true,
-              },
-            },
-            installedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payments: {
-          include: {
-            processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        attachments: {
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
     });
 
-    return this.transformWorkOrderForFrontend(workOrder);
+    return workOrder.id;
   }
 
   // Get work orders with filters
@@ -414,8 +250,7 @@ export class WorkOrderService {
                 id: true,
                 code: true,
                 name: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
               },
             },
             technician: {
@@ -698,8 +533,7 @@ export class WorkOrderService {
                 id: true,
                 code: true,
                 name: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
               },
             },
             technician: {
@@ -792,7 +626,7 @@ export class WorkOrderService {
   }
 
   // Update work order
-  async updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<WorkOrderWithDetails> {
+  async updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<any> {
     const updateData: any = { ...data };
 
     // Convert date strings to Date objects
@@ -804,178 +638,13 @@ export class WorkOrderService {
     const workOrder = await this.prisma.workOrder.update({
       where: { id },
       data: updateData,
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            licensePlate: true,
-            vin: true,
-          },
-        },
-        appointment: {
-          select: {
-            id: true,
-            requestedAt: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
-        serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        services: {
-          include: {
-            cannedService: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                duration: true,
-                price: true,
-              },
-            },
-          },
-        },
-        inspections: {
-          include: {
-            inspector: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        laborItems: {
-          include: {
-            laborCatalog: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                estimatedHours: true,
-                hourlyRate: true,
-              },
-            },
-            technician: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        partsUsed: {
-          include: {
-            part: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                partNumber: true,
-                manufacturer: true,
-              },
-            },
-            installedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payments: {
-          include: {
-            processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        attachments: {
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
     });
 
-    return this.transformWorkOrderForFrontend(workOrder);
+    return workOrder.id;
   }
 
   // Soft delete work order (change status to CANCELLED instead of deleting)
-  async deleteWorkOrder(id: string): Promise<WorkOrderWithDetails> {
+  async deleteWorkOrder(id: string): Promise<any> {
     // First check if work order exists
     const existingWorkOrder = await this.prisma.workOrder.findUnique({
       where: { id },
@@ -1000,552 +669,387 @@ export class WorkOrderService {
         internalNotes: existingWorkOrder.internalNotes 
           ? `${existingWorkOrder.internalNotes}\n\n[CANCELLED] Work order cancelled on ${new Date().toISOString()}`
           : `[CANCELLED] Work order cancelled on ${new Date().toISOString()}`,
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            licensePlate: true,
-            vin: true,
-          },
-        },
-        appointment: {
-          select: {
-            id: true,
-            requestedAt: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
-        serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        services: {
-          include: {
-            cannedService: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                duration: true,
-                price: true,
-              },
-            },
-          },
-        },
-        inspections: {
-          include: {
-            inspector: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        laborItems: {
-          include: {
-            laborCatalog: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                estimatedHours: true,
-                hourlyRate: true,
-              },
-            },
-            technician: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        partsUsed: {
-          include: {
-            part: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                partNumber: true,
-                manufacturer: true,
-              },
-            },
-            installedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payments: {
-          include: {
-            processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        attachments: {
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
+      }
     });
 
     return cancelledWorkOrder;
   }
 
   // Restore cancelled work order (change status back from CANCELLED)
-  async restoreWorkOrder(id: string): Promise<WorkOrderWithDetails> {
-    // First check if work order exists
-    const existingWorkOrder = await this.prisma.workOrder.findUnique({
-      where: { id },
-    });
+  // async restoreWorkOrder(id: string): Promise<WorkOrderWithDetails> {
+  //   // First check if work order exists
+  //   const existingWorkOrder = await this.prisma.workOrder.findUnique({
+  //     where: { id },
+  //   });
 
-    if (!existingWorkOrder) {
-      throw new Error('Work order not found');
-    }
+  //   if (!existingWorkOrder) {
+  //     throw new Error('Work order not found');
+  //   }
 
-    // Check if work order is actually cancelled
-    if (existingWorkOrder.status !== WorkOrderStatus.CANCELLED) {
-      throw new Error('Work order is not cancelled and cannot be restored');
-    }
+  //   // Check if work order is actually cancelled
+  //   if (existingWorkOrder.status !== WorkOrderStatus.CANCELLED) {
+  //     throw new Error('Work order is not cancelled and cannot be restored');
+  //   }
 
-    // Restore by changing status back to PENDING and updating workflow step
-    const restoredWorkOrder = await this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        status: WorkOrderStatus.PENDING,
-        workflowStep: WorkflowStep.RECEIVED,
-        closedAt: null, // Clear the closed date
-        internalNotes: existingWorkOrder.internalNotes 
-          ? `${existingWorkOrder.internalNotes}\n\n[RESTORED] Work order restored on ${new Date().toISOString()}`
-          : `[RESTORED] Work order restored on ${new Date().toISOString()}`,
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            licensePlate: true,
-            vin: true,
-          },
-        },
-        appointment: {
-          select: {
-            id: true,
-            requestedAt: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
-        serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        services: {
-          include: {
-            cannedService: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                duration: true,
-                price: true,
-              },
-            },
-          },
-        },
-        inspections: {
-          include: {
-            inspector: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        laborItems: {
-          include: {
-            laborCatalog: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                estimatedHours: true,
-                hourlyRate: true,
-              },
-            },
-            technician: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        partsUsed: {
-          include: {
-            part: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                partNumber: true,
-                manufacturer: true,
-              },
-            },
-            installedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payments: {
-          include: {
-            processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        attachments: {
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
-    });
+  //   // Restore by changing status back to PENDING and updating workflow step
+  //   const restoredWorkOrder = await this.prisma.workOrder.update({
+  //     where: { id },
+  //     data: {
+  //       status: WorkOrderStatus.PENDING,
+  //       workflowStep: WorkflowStep.RECEIVED,
+  //       closedAt: null, // Clear the closed date
+  //       internalNotes: existingWorkOrder.internalNotes 
+  //         ? `${existingWorkOrder.internalNotes}\n\n[RESTORED] Work order restored on ${new Date().toISOString()}`
+  //         : `[RESTORED] Work order restored on ${new Date().toISOString()}`,
+  //     },
+  //     include: {
+  //       customer: {
+  //         select: {
+  //           id: true,
+  //           name: true,
+  //           email: true,
+  //           phone: true,
+  //         },
+  //       },
+  //       vehicle: {
+  //         select: {
+  //           id: true,
+  //           make: true,
+  //           model: true,
+  //           year: true,
+  //           licensePlate: true,
+  //           vin: true,
+  //         },
+  //       },
+  //       appointment: {
+  //         select: {
+  //           id: true,
+  //           requestedAt: true,
+  //           startTime: true,
+  //           endTime: true,
+  //         },
+  //       },
+  //       serviceAdvisor: {
+  //         select: {
+  //           id: true,
+  //           employeeId: true,
+  //           department: true,
+  //           userProfile: {
+  //             select: {
+  //               id: true,
+  //               name: true,
+  //               phone: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //       services: {
+  //         include: {
+  //           cannedService: {
+  //             select: {
+  //               id: true,
+  //               code: true,
+  //               name: true,
+  //               description: true,
+  //               duration: true,
+  //               price: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //       inspections: {
+  //         include: {
+  //           inspector: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       laborItems: {
+  //         include: {
+  //           laborCatalog: {
+  //             select: {
+  //               id: true,
+  //               code: true,
+  //               name: true,
+  //               estimatedHours: true,
+  //               hourlyRate: true,
+  //             },
+  //           },
+  //           technician: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       partsUsed: {
+  //         include: {
+  //           part: {
+  //             select: {
+  //               id: true,
+  //               name: true,
+  //               sku: true,
+  //               partNumber: true,
+  //               manufacturer: true,
+  //             },
+  //           },
+  //           installedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       payments: {
+  //         include: {
+  //           processedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       estimates: {
+  //         include: {
+  //           createdBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //           approvedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       attachments: {
+  //         include: {
+  //           uploadedBy: { select: { id: true, name: true } },
+  //         },
+  //       },
+  //     },
+  //   });
 
-    return restoredWorkOrder;
-  }
+  //   return restoredWorkOrder;
+  // }
 
   // Get cancelled work orders (soft deleted)
-  async getCancelledWorkOrders(): Promise<WorkOrderWithDetails[]> {
-    const cancelledWorkOrders = await this.prisma.workOrder.findMany({
-      where: { 
-        status: WorkOrderStatus.CANCELLED 
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-          },
-        },
-        vehicle: {
-          select: {
-            id: true,
-            make: true,
-            model: true,
-            year: true,
-            licensePlate: true,
-            vin: true,
-          },
-        },
-        appointment: {
-          select: {
-            id: true,
-            requestedAt: true,
-            startTime: true,
-            endTime: true,
-          },
-        },
-        serviceAdvisor: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        services: {
-          include: {
-            cannedService: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                duration: true,
-                price: true,
-              },
-            },
-          },
-        },
-        inspections: {
-          include: {
-            inspector: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        laborItems: {
-          include: {
-            laborCatalog: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                estimatedHours: true,
-                hourlyRate: true,
-              },
-            },
-            technician: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        partsUsed: {
-          include: {
-            part: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                partNumber: true,
-                manufacturer: true,
-              },
-            },
-            installedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        payments: {
-          include: {
-            processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        attachments: {
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
-      orderBy: {
-        closedAt: 'desc', // Most recently cancelled first
-      },
-    });
+  // async getCancelledWorkOrders(): Promise<WorkOrderWithDetails[]> {
+  //   const cancelledWorkOrders = await this.prisma.workOrder.findMany({
+  //     where: { 
+  //       status: WorkOrderStatus.CANCELLED 
+  //     },
+  //     include: {
+  //       customer: {
+  //         select: {
+  //           id: true,
+  //           name: true,
+  //           email: true,
+  //           phone: true,
+  //         },
+  //       },
+  //       vehicle: {
+  //         select: {
+  //           id: true,
+  //           make: true,
+  //           model: true,
+  //           year: true,
+  //           licensePlate: true,
+  //           vin: true,
+  //         },
+  //       },
+  //       appointment: {
+  //         select: {
+  //           id: true,
+  //           requestedAt: true,
+  //           startTime: true,
+  //           endTime: true,
+  //         },
+  //       },
+  //       serviceAdvisor: {
+  //         select: {
+  //           id: true,
+  //           employeeId: true,
+  //           department: true,
+  //           userProfile: {
+  //             select: {
+  //               id: true,
+  //               name: true,
+  //               phone: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //       services: {
+  //         include: {
+  //           cannedService: {
+  //             select: {
+  //               id: true,
+  //               code: true,
+  //               name: true,
+  //               description: true,
+  //               duration: true,
+  //               price: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //       inspections: {
+  //         include: {
+  //           inspector: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       laborItems: {
+  //         include: {
+  //           laborCatalog: {
+  //             select: {
+  //               id: true,
+  //               code: true,
+  //               name: true,
+  //               estimatedHours: true,
+  //               hourlyRate: true,
+  //             },
+  //           },
+  //           technician: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       partsUsed: {
+  //         include: {
+  //           part: {
+  //             select: {
+  //               id: true,
+  //               name: true,
+  //               sku: true,
+  //               partNumber: true,
+  //               manufacturer: true,
+  //             },
+  //           },
+  //           installedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       payments: {
+  //         include: {
+  //           processedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       estimates: {
+  //         include: {
+  //           createdBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //           approvedBy: {
+  //             select: {
+  //               id: true,
+  //               userProfile: {
+  //                 select: {
+  //                   id: true,
+  //                   name: true,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         },
+  //       },
+  //       attachments: {
+  //         include: {
+  //           uploadedBy: { select: { id: true, name: true } },
+  //         },
+  //       },
+  //     },
+  //     orderBy: {
+  //       closedAt: 'desc', // Most recently cancelled first
+  //     },
+  //   });
 
-    return cancelledWorkOrders;
-  }
+  //   return cancelledWorkOrders;
+  // }
 
 
 
@@ -1569,7 +1073,7 @@ export class WorkOrderService {
       throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
     }
 
-    // Create the work order service
+    // Create the work order service (this is what the customer pays for)
     const service = await this.prisma.workOrderService.create({
       data: {
         ...data,
@@ -1577,71 +1081,33 @@ export class WorkOrderService {
         unitPrice: data.unitPrice || Number(cannedService.price),
         subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
       },
-      include: {
-        cannedService: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            description: true,
-            duration: true,
-            price: true,
-          },
-        },
-      },
     });
 
-    // Automatically create labor entries for this canned service
+    // Automatically create labor entries for this service (for tracking work, not billing)
     if (cannedService.laborOperations.length > 0) {
-      const laborEntries = await Promise.all(
+      await Promise.all(
         cannedService.laborOperations.map(async (laborOp) => {
           return await this.prisma.workOrderLabor.create({
             data: {
               workOrderId: data.workOrderId,
+              serviceId: service.id,  // Link to parent service (REQUIRED)
               laborCatalogId: laborOp.laborCatalogId,
               description: laborOp.laborCatalog.name,
-              hours: Number(laborOp.laborCatalog.estimatedHours),
-              rate: Number(laborOp.laborCatalog.hourlyRate),
-              subtotal: Number(laborOp.laborCatalog.estimatedHours) * Number(laborOp.laborCatalog.hourlyRate),
+              estimatedMinutes: laborOp.estimatedMinutes || laborOp.laborCatalog.estimatedMinutes,
               notes: laborOp.notes || `Auto-generated from canned service: ${cannedService.name}`,
-            },
-            include: {
-              laborCatalog: {
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                  estimatedHours: true,
-                  hourlyRate: true,
-                },
-              },
-              technician: {
-                select: {
-                  id: true,
-                  userProfile: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                },
-              },
             },
           });
         })
       );
 
-      // Return both the service and the created labor entries
       return {
-        service,
-        laborEntries,
-        message: `Created service and ${laborEntries.length} labor entries automatically`,
+        serviceId: service.id,
+        message: `Created service and ${cannedService.laborOperations.length} labor entries automatically`,
       };
     }
 
     return {
-      service,
-      laborEntries: [],
+      serviceId: service.id,
       message: 'Created service (no labor entries found for this canned service)',
     };
   }
@@ -1794,107 +1260,25 @@ export class WorkOrderService {
 
   // Update work order labor item
   async updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest) {
-    // Get the current labor item to check if it has a cannedServiceId
-    const currentLabor = await this.prisma.workOrderLabor.findUnique({
-      where: { id: laborId },
-      select: { 
-        id: true,
-        workOrderId: true,
-        cannedServiceId: true,
-        subtotal: true
-      },
-    });
-
-    if (!currentLabor) {
-      throw new Error('Labor item not found');
-    }
-
-    // Update the labor item
-    const updatedLabor = await this.prisma.workOrderLabor.update({
+    // Update the labor item (no subtotal - labor is for tracking only)
+    await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         ...data,
-        // If subtotal is provided, use it; otherwise calculate from hours * rate
-        subtotal: data.subtotal !== undefined ? data.subtotal : 
-                 (data.hours !== undefined && data.rate !== undefined ? data.hours * data.rate : undefined),
-      },
-      include: {
-        laborCatalog: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            estimatedHours: true,
-            hourlyRate: true,
-          },
-        },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        workOrder: {
-          select: {
-            id: true,
-            workOrderNumber: true,
-          },
-        },
       },
     });
 
-    // If this labor item is associated with a canned service, update the service subtotal
-    if (currentLabor.cannedServiceId) {
-      await this.updateWorkOrderServiceSubtotal(currentLabor.workOrderId, currentLabor.cannedServiceId);
-    }
-
-    return updatedLabor;
+    return { id: laborId };
   }
 
-  // Helper method to update WorkOrderService subtotal based on associated labor items
-  private async updateWorkOrderServiceSubtotal(workOrderId: string, cannedServiceId: string) {
-    // Get all labor items for this canned service
-    const laborItems = await this.prisma.workOrderLabor.findMany({
-      where: {
-        workOrderId: workOrderId,
-        cannedServiceId: cannedServiceId,
-      },
-      select: {
-        subtotal: true,
-      },
-    });
-
-    // Calculate the total subtotal from all labor items
-    const totalLaborSubtotal = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
-
-    // Update the WorkOrderService subtotal
-    await this.prisma.workOrderService.updateMany({
-      where: {
-        workOrderId: workOrderId,
-        cannedServiceId: cannedServiceId,
-      },
-      data: {
-        subtotal: totalLaborSubtotal,
-      },
-    });
-
-    // Also update the work order totals
-    await this.updateWorkOrderTotals(workOrderId);
-  }
+  // REMOVED: updateWorkOrderServiceSubtotal()
+  // Services have fixed prices (unitPrice × quantity), not calculated from labor
+  // Labor is for tracking work only, not for billing
 
   // Helper method to update work order totals
+  // NOTE: Only services and parts are billable. Labor is for tracking only.
   private async updateWorkOrderTotals(workOrderId: string) {
-    const [laborItems, partItems, serviceItems] = await Promise.all([
-      this.prisma.workOrderLabor.findMany({
-        where: { workOrderId },
-        select: { subtotal: true },
-      }),
+    const [partItems, serviceItems] = await Promise.all([
       this.prisma.workOrderPart.findMany({
         where: { workOrderId },
         select: { subtotal: true },
@@ -1905,9 +1289,9 @@ export class WorkOrderService {
       }),
     ]);
 
-    const subtotalLabor = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const subtotalParts = partItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const subtotalServices = serviceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const subtotal = subtotalParts + subtotalServices;
 
     // Get existing tax and discount amounts
     const existingWorkOrder = await this.prisma.workOrder.findUnique({
@@ -1917,95 +1301,32 @@ export class WorkOrderService {
 
     const taxAmount = Number(existingWorkOrder?.taxAmount || 0);
     const discountAmount = Number(existingWorkOrder?.discountAmount || 0);
-    const totalAmount = subtotalLabor + subtotalParts + subtotalServices + taxAmount - discountAmount;
+    const totalAmount = subtotal + taxAmount - discountAmount;
 
     await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
-        subtotalLabor,
+        subtotalServices,
         subtotalParts,
+        subtotal,
         totalAmount,
       },
     });
   }
 
-  // Reset WorkOrderLabor subtotal to original hourlyRate from laborCatalog
+  // REMOVED: resetWorkOrderLaborSubtotal()
+  // Labor items don't have subtotals in the new architecture
+  // Labor is for tracking work only, not for billing
   async resetWorkOrderLaborSubtotal(laborId: string) {
-    // Get the current labor item with its labor catalog
-    const currentLabor = await this.prisma.workOrderLabor.findUnique({
-      where: { id: laborId },
-      include: {
-        laborCatalog: {
-          select: {
-            id: true,
-            hourlyRate: true,
-          },
-        },
-        workOrder: {
-          select: {
-            id: true,
-            workOrderNumber: true,
-          },
-        },
-      },
-    });
+    throw new Error('Method not supported: Labor items no longer have subtotals. Services have the pricing.');
+  }
 
-    if (!currentLabor) {
-      throw new Error('Labor item not found');
-    }
-
-    if (!currentLabor.laborCatalog) {
-      throw new Error('Labor item does not have an associated labor catalog');
-    }
-
-    // Reset subtotal to the original hourlyRate
-    const originalSubtotal = Number(currentLabor.laborCatalog.hourlyRate);
-
-    // Update the labor item
-    const updatedLabor = await this.prisma.workOrderLabor.update({
-      where: { id: laborId },
-      data: {
-        subtotal: originalSubtotal,
-      },
-      include: {
-        laborCatalog: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            estimatedHours: true,
-            hourlyRate: true,
-          },
-        },
-        technician: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        workOrder: {
-          select: {
-            id: true,
-            workOrderNumber: true,
-          },
-        },
-      },
-    });
-
-    // If this labor item is associated with a canned service, update the service subtotal
-    if (currentLabor.cannedServiceId) {
-      await this.updateWorkOrderServiceSubtotal(currentLabor.workOrderId, currentLabor.cannedServiceId);
-    }
-
+  // STUB KEPT: Method exists in interface/controller but should not be used
+  // TODO: Remove from interface and controller in future cleanup
+  private __resetWorkOrderLaborSubtotal_REMOVED__() {
+    // Original implementation removed - labor has no subtotals anymore
     return {
-      ...updatedLabor,
-      message: `Subtotal reset to original hourly rate: $${originalSubtotal}`,
+      message: 'This method has been deprecated. Labor items no longer have subtotals in the service-based pricing model.',
     };
   }
 
@@ -2041,9 +1362,9 @@ export class WorkOrderService {
       this.prisma.workOrderLabor.groupBy({
         by: ['technicianId'],
         where: { workOrder: where },
-        _sum: { hours: true },
-        _count: { workOrderId: true },
-        orderBy: { _count: { workOrderId: 'desc' } },
+        _sum: { estimatedMinutes: true, actualMinutes: true },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
         take: 5,
       }),
       this.prisma.workOrderService.groupBy({
@@ -2071,7 +1392,7 @@ export class WorkOrderService {
     });
 
     // Get service names
-    const serviceIds = topServices.map(s => s.cannedServiceId);
+    const serviceIds = topServices.map(s => s.cannedServiceId).filter(Boolean) as string[];
     const services = await this.prisma.cannedService.findMany({
       where: { id: { in: serviceIds } },
       select: {
@@ -2090,17 +1411,21 @@ export class WorkOrderService {
       averageCompletionTime: 0, // TODO: Calculate average completion time
       topTechnicians: topTechnicians.map(t => {
         const technician = technicians.find(tech => tech.id === t.technicianId);
+        const estimatedMins = Number(t._sum?.estimatedMinutes || 0);
+        const actualMins = Number(t._sum?.actualMinutes || 0);
+        const totalMinutes = actualMins > 0 ? actualMins : estimatedMins;
+        const totalHours = Math.round((totalMinutes / 60) * 100) / 100;  // Convert to hours with 2 decimals
         return {
           technicianId: t.technicianId || '',
           technicianName: technician?.userProfile?.name || 'Unknown',
-          completedWorkOrders: t._count.workOrderId,
-          totalHours: Number(t._sum.hours) || 0,
+          completedWorkOrders: t._count?.id || 0,
+          totalHours,
         };
       }),
       topServices: topServices.map(s => {
         const service = services.find(serv => serv.id === s.cannedServiceId);
         return {
-          serviceId: s.cannedServiceId,
+          serviceId: s.cannedServiceId || '',
           serviceName: service?.name || 'Unknown',
           usageCount: s._count.id,
           totalRevenue: Number(s._sum.subtotal) || 0,
@@ -2394,11 +1719,11 @@ export class WorkOrderService {
       throw new Error('Work order not found');
     }
 
-    // Calculate totals (only labor and parts, no services)
-    const laborTotal = workOrder.laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    // NOTE: In new architecture, labor doesn't have subtotals - only parts are billable here
+    // Services (which may include labor operations) have their own pricing
     const partsTotal = workOrder.partsUsed.reduce((sum, item) => sum + Number(item.subtotal), 0);
     
-    const subtotal = laborTotal + partsTotal;
+    const subtotal = partsTotal;
     const taxAmount = subtotal * 0.1; // 10% tax - you can make this configurable
     const totalAmount = subtotal + taxAmount;
 
@@ -2411,13 +1736,13 @@ export class WorkOrderService {
       data: {
         workOrderId,
         version: 1,
-        description: `Estimate generated from labor and parts for ${workOrder.workOrderNumber}`,
+        description: `Estimate generated from parts for ${workOrder.workOrderNumber}`,
         totalAmount,
-        laborAmount: laborTotal,
+        laborAmount: 0,  // Labor is tracked separately, not billed directly
         partsAmount: partsTotal,
         taxAmount,
         discountAmount: 0,
-        notes: 'Estimate automatically generated from recorded labor and parts',
+        notes: 'Estimate automatically generated from recorded parts (labor tracked in services)',
         createdById,
         approved: true, // Auto-approve since it's based on actual work
         approvedAt: new Date(),
@@ -2460,7 +1785,6 @@ export class WorkOrderService {
         status: 'IN_PROGRESS' as WorkOrderStatus,
         workflowStep: 'APPROVAL' as WorkflowStep,
         estimatedTotal: totalAmount,
-        subtotalLabor: laborTotal,
         subtotalParts: partsTotal,
         totalAmount: totalAmount,
         taxAmount: taxAmount,
@@ -2474,7 +1798,6 @@ export class WorkOrderService {
         status: 'IN_PROGRESS',
         workflowStep: 'APPROVAL',
         estimatedTotal: totalAmount,
-        subtotalLabor: laborTotal,
         subtotalParts: partsTotal,
         totalAmount: totalAmount,
         taxAmount: taxAmount
