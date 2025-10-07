@@ -1614,6 +1614,193 @@ export class WorkOrderService {
     return qc;
   }
 
+  // Customer Approval Methods
+
+  // Approve a service (and all its labor items)
+  async approveService(serviceId: string, customerId: string, notes?: string) {
+    const service = await this.prisma.workOrderService.findUnique({
+      where: { id: serviceId },
+      include: { workOrder: true },
+    });
+
+    if (!service) {
+      throw new Error('Service not found');
+    }
+
+    // Verify customer owns this work order
+    if (service.workOrder.customerId !== customerId) {
+      throw new Error('Unauthorized: This service does not belong to your work order');
+    }
+
+    // Update service approval
+    await this.prisma.workOrderService.update({
+      where: { id: serviceId },
+      data: {
+        customerApproved: true,
+        customerRejected: false,
+        approvedAt: new Date(),
+        customerNotes: notes,
+        status: ServiceStatus.PENDING, // Ready to start work
+      },
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(service.workOrderId);
+
+    return { message: 'Service approved successfully' };
+  }
+
+  // Reject a service
+  async rejectService(serviceId: string, customerId: string, reason?: string) {
+    const service = await this.prisma.workOrderService.findUnique({
+      where: { id: serviceId },
+      include: { workOrder: true },
+    });
+
+    if (!service) {
+      throw new Error('Service not found');
+    }
+
+    // Verify customer owns this work order
+    if (service.workOrder.customerId !== customerId) {
+      throw new Error('Unauthorized: This service does not belong to your work order');
+    }
+
+    // Update service rejection
+    await this.prisma.workOrderService.update({
+      where: { id: serviceId },
+      data: {
+        customerApproved: false,
+        customerRejected: true,
+        rejectedAt: new Date(),
+        customerNotes: reason,
+        status: ServiceStatus.CANCELLED,
+      },
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(service.workOrderId);
+
+    return { message: 'Service rejected' };
+  }
+
+  // Approve a part
+  async approvePart(partId: string, customerId: string, notes?: string) {
+    const part = await this.prisma.workOrderPart.findUnique({
+      where: { id: partId },
+      include: { workOrder: true },
+    });
+
+    if (!part) {
+      throw new Error('Part not found');
+    }
+
+    // Verify customer owns this work order
+    if (part.workOrder.customerId !== customerId) {
+      throw new Error('Unauthorized: This part does not belong to your work order');
+    }
+
+    // Update part approval
+    await this.prisma.workOrderPart.update({
+      where: { id: partId },
+      data: {
+        customerApproved: true,
+        customerRejected: false,
+        approvedAt: new Date(),
+        customerNotes: notes,
+      },
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(part.workOrderId);
+
+    return { message: 'Part approved successfully' };
+  }
+
+  // Reject a part
+  async rejectPart(partId: string, customerId: string, reason?: string) {
+    const part = await this.prisma.workOrderPart.findUnique({
+      where: { id: partId },
+      include: { workOrder: true },
+    });
+
+    if (!part) {
+      throw new Error('Part not found');
+    }
+
+    // Verify customer owns this work order
+    if (part.workOrder.customerId !== customerId) {
+      throw new Error('Unauthorized: This part does not belong to your work order');
+    }
+
+    // Update part rejection
+    await this.prisma.workOrderPart.update({
+      where: { id: partId },
+      data: {
+        customerApproved: false,
+        customerRejected: true,
+        rejectedAt: new Date(),
+        customerNotes: reason,
+      },
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(part.workOrderId);
+
+    return { message: 'Part rejected' };
+  }
+
+  // Get pending items (services and parts) awaiting customer approval
+  async getPendingApprovals(workOrderId: string, customerId: string) {
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+    });
+
+    if (!workOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Verify customer owns this work order
+    if (workOrder.customerId !== customerId) {
+      throw new Error('Unauthorized: This work order does not belong to you');
+    }
+
+    const [services, parts] = await Promise.all([
+      this.prisma.workOrderService.findMany({
+        where: {
+          workOrderId,
+          customerApproved: false,
+          customerRejected: false,
+          status: ServiceStatus.ESTIMATED,
+        },
+        include: {
+          cannedService: true,
+          laborItems: {
+            include: {
+              laborCatalog: true,
+            },
+          },
+        },
+      }),
+      this.prisma.workOrderPart.findMany({
+        where: {
+          workOrderId,
+          customerApproved: false,
+          customerRejected: false,
+        },
+        include: {
+          part: true,
+        },
+      }),
+    ]);
+
+    return {
+      services,
+      parts,
+      totalPending: services.length + parts.length,
+    };
+  }
+
   // Helper method to find ServiceAdvisor by Supabase user ID
   async findServiceAdvisorBySupabaseUserId(supabaseUserId: string) {
     const serviceAdvisor = await this.prisma.serviceAdvisor.findFirst({

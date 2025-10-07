@@ -393,4 +393,12 @@ export interface IWorkOrderService {
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
+  
+  // Customer approval methods
+  approveService(serviceId: string, customerId: string, notes?: string): Promise<any>;
+  rejectService(serviceId: string, customerId: string, reason?: string): Promise<any>;
+  approvePart(partId: string, customerId: string, notes?: string): Promise<any>;
+  rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
+  getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
+  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
 }

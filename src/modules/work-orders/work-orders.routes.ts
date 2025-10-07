@@ -50,6 +50,13 @@ router.get('/:workOrderId/inspections', workOrderController.getWorkOrderInspecti
 router.post('/:workOrderId/qc', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderQC.bind(workOrderController));
 router.get('/:workOrderId/qc', workOrderController.getWorkOrderQC.bind(workOrderController));
 
+// Customer Approval Routes (authenticated customers only)
+router.post('/services/:serviceId/approve', authenticateSupabaseToken, workOrderController.approveService.bind(workOrderController));
+router.post('/services/:serviceId/reject', authenticateSupabaseToken, workOrderController.rejectService.bind(workOrderController));
+router.post('/parts/:partId/approve', authenticateSupabaseToken, workOrderController.approvePart.bind(workOrderController));
+router.post('/parts/:partId/reject', authenticateSupabaseToken, workOrderController.rejectPart.bind(workOrderController));
+router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrderController.getPendingApprovals.bind(workOrderController));
+
 // Work Order Statistics Routes
 router.get('/statistics/overview', authenticateSupabaseToken, requireManager, workOrderController.getWorkOrderStatistics.bind(workOrderController));
 
