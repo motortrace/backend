@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { CustomerService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerFilters } from './customers.types';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerFilters, ICustomerService } from './customers.types';
 
 export class CustomerController {
-  private customerService = new CustomerService();
+  constructor(private readonly customerService: ICustomerService) {}
 
   // Get all customers with optional filtering
   async getCustomers(req: Request, res: Response) {

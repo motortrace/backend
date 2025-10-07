@@ -1,17 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { IAuthSupabaseService } from './authSupabase.types';
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+export class AuthSupabaseService implements IAuthSupabaseService {
+  private readonly supabase: SupabaseClient;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY in environment variables');
-}
+  constructor() {
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY in environment variables');
+    }
 
-export const authSupabaseService = {
-  async signUp(email: string, password: string, role?: string) {
-    const { data, error } = await supabase.auth.signUp({ 
+    this.supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+
+  async signUp(email: string, password: string, role?: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.signUp({ 
       email, 
       password,
       options: {
@@ -22,10 +27,10 @@ export const authSupabaseService = {
     });
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
 
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  async signIn(email: string, password: string): Promise<{ user: any; session: any }> {
+    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
     
     // Return both user and session data
@@ -33,31 +38,30 @@ export const authSupabaseService = {
       user: data.user,
       session: data.session
     };
-  },
+  }
 
-  async getUser(token: string) {
-    const { data, error } = await supabase.auth.getUser(token);
+  async getUser(token: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.getUser(token);
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
 
-  async signOut() {
-    const { error } = await supabase.auth.signOut();
+  async signOut(): Promise<boolean> {
+    const { error } = await this.supabase.auth.signOut();
     if (error) throw new Error(error.message);
     return true;
-  },
+  }
 
-  // New method to validate and refresh tokens
-  async validateToken(token: string) {
+  async validateToken(token: string): Promise<any> {
     try {
-      const { data, error } = await supabase.auth.getUser(token);
+      const { data, error } = await this.supabase.auth.getUser(token);
       if (error) throw new Error(error.message);
       return data.user;
     } catch (error: any) {
       // Try to refresh the token if it's expired
       if (error.message?.includes('JWT')) {
         try {
-          const { data, error: refreshError } = await supabase.auth.refreshSession();
+          const { data, error: refreshError } = await this.supabase.auth.refreshSession();
           if (refreshError) throw new Error(refreshError.message);
           return data.user;
         } catch (refreshErr: any) {
@@ -66,34 +70,30 @@ export const authSupabaseService = {
       }
       throw error;
     }
-  },
+  }
 
-  // Method to get session info (useful for debugging)
-  async getSession() {
-    const { data, error } = await supabase.auth.getSession();
+  async getSession(): Promise<any> {
+    const { data, error } = await this.supabase.auth.getSession();
     if (error) throw new Error(error.message);
     return data.session;
-  },
+  }
 
-  // Method to get current access token
-  async getAccessToken() {
-    const { data, error } = await supabase.auth.getSession();
+  async getAccessToken(): Promise<string | undefined> {
+    const { data, error } = await this.supabase.auth.getSession();
     if (error) throw new Error(error.message);
     return data.session?.access_token;
-  },
+  }
 
-  // Method to update user role
-  async updateUserRole(userId: string, role: string) {
-    const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+  async updateUserRole(userId: string, role: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.admin.updateUserById(userId, {
       user_metadata: { role }
     });
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
 
-  // Google sign-in method
-  async googleSignIn(idToken: string, role: string = 'customer') {
-    const { data, error } = await supabase.auth.signInWithIdToken({
+  async googleSignIn(idToken: string, role: string = 'customer'): Promise<{ user: any; session: any }> {
+    const { data, error } = await this.supabase.auth.signInWithIdToken({
       provider: 'google',
       token: idToken
     });
@@ -113,28 +113,26 @@ export const authSupabaseService = {
       user: data.user,
       session: data.session
     };
-  },
+  }
 
-  async deleteUser(userId: string) {
-    const { data, error } = await supabase.auth.admin.deleteUser(userId);
+  async deleteUser(userId: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.admin.deleteUser(userId);
     if (error) throw new Error(error.message);
     return data;
-  },
+  }
 
-  // Method to delete user data from custom tables (requires appropriate RLS policies)
-  async deleteUserData(userId: string, tableName: string) {
-    const { data, error } = await supabase
+  async deleteUserData(userId: string, tableName: string): Promise<any> {
+    const { data, error } = await this.supabase
       .from(tableName)
       .delete()
-      .eq('user_id', userId); // Assuming your table has a user_id column
+      .eq('user_id', userId);
     
     if (error) throw new Error(error.message);
     return data;
-  },
+  }
 
-  // Method to soft delete user (mark as deleted instead of removing)
-  async softDeleteUser(userId: string, tableName: string = 'profiles') {
-    const { data, error } = await supabase
+  async softDeleteUser(userId: string, tableName: string = 'profiles'): Promise<any> {
+    const { data, error } = await this.supabase
       .from(tableName)
       .update({ 
         is_deleted: true, 
@@ -144,10 +142,9 @@ export const authSupabaseService = {
     
     if (error) throw new Error(error.message);
     return data;
-  },
+  }
 
-  // Method to completely remove user (auth + all related data)
-  async completeUserDeletion(userId: string, relatedTables: string[] = []) {
+  async completeUserDeletion(userId: string, relatedTables: string[] = []): Promise<{ success: boolean; message: string }> {
     try {
       // Delete from related tables first
       for (const table of relatedTables) {
@@ -161,30 +158,29 @@ export const authSupabaseService = {
     } catch (error: any) {
       throw new Error(`Failed to delete user: ${error.message}`);
     }
-  },
+  }
 
-  // Password reset methods
-  async resetPassword(email: string) {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+  async resetPassword(email: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password`,
     });
     
     if (error) throw new Error(error.message);
     return data;
-  },
+  }
 
-  async updatePassword(token: string, newPassword: string) {
-    const { data, error } = await supabase.auth.updateUser({
+  async updatePassword(token: string, newPassword: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.updateUser({
       password: newPassword
     });
     
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
 
-  async changePassword(currentPassword: string, newPassword: string) {
+  async changePassword(currentPassword: string, newPassword: string): Promise<any> {
     // First verify current password by attempting to sign in
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
       email: '', // We'll need to get this from the current user
       password: currentPassword
     });
@@ -192,18 +188,20 @@ export const authSupabaseService = {
     if (signInError) throw new Error('Current password is incorrect');
     
     // Update password
-    const { data, error } = await supabase.auth.updateUser({
+    const { data, error } = await this.supabase.auth.updateUser({
       password: newPassword
     });
     
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
 
-  async verifyResetToken(token: string) {
-    const { data, error } = await supabase.auth.getUser(token);
+  async verifyResetToken(token: string): Promise<any> {
+    const { data, error } = await this.supabase.auth.getUser(token);
     if (error) throw new Error(error.message);
     return data.user;
-  },
+  }
+}
 
-};
+// Export singleton instance for backward compatibility
+export const authSupabaseService = new AuthSupabaseService();

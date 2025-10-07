@@ -1,25 +1,35 @@
 import { Router } from 'express';
 import { authenticateSupabaseToken, requireAdmin, requireManager } from '../auth/supabase/authSupabase.middleware';
-import { getUsers, getUserById, createUser, updateUser, deleteUser } from './users.controller';
+import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
+
+// Dependency Injection - Create instances
+const usersService = new UsersService(prisma);
+const usersController = new UsersController(usersService);
 
 // All routes require authentication
 router.use(authenticateSupabaseToken);
 
+// ✅ ADMIN ONLY: Create staff user (Service Advisor, Technician, Manager, etc.)
+// Staff users bypass onboarding - they're created complete and ready to use
+router.post('/staff', requireAdmin, usersController.createStaffUser.bind(usersController));
+
 // Get all users (admin and manager only)
-router.get('/', requireManager, getUsers);
+router.get('/', requireManager, usersController.getUsers.bind(usersController));
 
 // Get user by ID (admin and manager only)
-router.get('/:id', requireManager, getUserById);
+router.get('/:id', requireManager, usersController.getUserById.bind(usersController));
 
-// Create new user (admin only)
-router.post('/', requireAdmin, createUser);
+// Create new user profile (admin only) - for manual profile creation
+router.post('/', requireAdmin, usersController.createUser.bind(usersController));
 
 // Update user (admin only)
-router.put('/:id', requireAdmin, updateUser);
+router.put('/:id', requireAdmin, usersController.updateUser.bind(usersController));
 
 // Delete user (admin only)
-router.delete('/:id', requireAdmin, deleteUser);
+router.delete('/:id', requireAdmin, usersController.deleteUser.bind(usersController));
 
 export default router;

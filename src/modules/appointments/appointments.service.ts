@@ -1,4 +1,4 @@
-import { PrismaClient, AppointmentStatus, AppointmentPriority, DayOfWeek } from '@prisma/client';
+import { AppointmentStatus, AppointmentPriority, DayOfWeek } from '@prisma/client';
 import {
   CreateAppointmentRequest,
   UpdateAppointmentRequest,
@@ -11,11 +11,13 @@ import {
   TimeBlockAvailability,
   DailyCapacityRequest,
   DailyCapacity,
+  IAppointmentsService,
 } from './appointments.types';
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+export class AppointmentService implements IAppointmentsService {
+  constructor(private readonly prisma: PrismaClient) {}
 
-export class AppointmentService {
   // Create a new appointment with ShopMonkey-style booking logic
   async createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices> {
     const { cannedServiceIds, serviceNotes = [], ...appointmentData } = data;
@@ -26,7 +28,7 @@ export class AppointmentService {
     const requestedAt = new Date(appointmentData.requestedAt);
 
     // Validate that all canned services exist and are available
-    const cannedServices = await prisma.cannedService.findMany({
+    const cannedServices = await this.prisma.cannedService.findMany({
       where: {
         id: { in: cannedServiceIds },
         isAvailable: true,
@@ -41,7 +43,7 @@ export class AppointmentService {
     const appointmentDate = new Date(startTime);
     appointmentDate.setHours(0, 0, 0, 0);
     
-    const dailyBookings = await prisma.appointment.count({
+    const dailyBookings = await this.prisma.appointment.count({
       where: {
         startTime: {
           gte: appointmentDate,
@@ -52,7 +54,7 @@ export class AppointmentService {
     });
 
     // Get shop capacity settings
-    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+    const capacitySettings = await this.prisma.shopCapacitySettings.findFirst({
       where: { id: 'default' },
     });
 
@@ -69,7 +71,7 @@ export class AppointmentService {
     const timeBlockStart = this.getTimeBlockStart(startTime, capacitySettings.timeBlockIntervalMinutes);
     const timeBlockEnd = new Date(timeBlockStart.getTime() + capacitySettings.timeBlockIntervalMinutes * 60 * 1000);
 
-    const timeBlockBookings = await prisma.appointment.count({
+    const timeBlockBookings = await this.prisma.appointment.count({
       where: {
         startTime: {
           gte: timeBlockStart,
@@ -84,7 +86,7 @@ export class AppointmentService {
     }
 
     // Create appointment with services (ShopMonkey: duration ignored during booking)
-    const appointment = await prisma.appointment.create({
+    const appointment = await this.prisma.appointment.create({
       data: {
         customerId: appointmentData.customerId,
         vehicleId: appointmentData.vehicleId,
@@ -138,7 +140,7 @@ export class AppointmentService {
     const { date, serviceIds } = request;
 
     // Get shop capacity settings
-    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+    const capacitySettings = await this.prisma.shopCapacitySettings.findFirst({
       where: { id: 'default' },
     });
 
@@ -148,7 +150,7 @@ export class AppointmentService {
 
     // Get shop operating hours for the day
     const dayOfWeek = this.getDayOfWeek(date);
-    const operatingHours = await prisma.shopOperatingHours.findUnique({
+    const operatingHours = await this.prisma.shopOperatingHours.findUnique({
       where: { dayOfWeek },
     });
 
@@ -172,7 +174,7 @@ export class AppointmentService {
 
       if (slotEndTime <= endTime) {
         // Check existing appointments in this time block
-        const existingAppointments = await prisma.appointment.count({
+        const existingAppointments = await this.prisma.appointment.count({
           where: {
             startTime: {
               gte: currentTime,
@@ -206,7 +208,7 @@ export class AppointmentService {
     const { date, timeBlock } = request;
 
     // Get shop capacity settings
-    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+    const capacitySettings = await this.prisma.shopCapacitySettings.findFirst({
       where: { id: 'default' },
     });
 
@@ -226,7 +228,7 @@ export class AppointmentService {
     const timeBlockEnd = new Date(timeBlockStart.getTime() + capacitySettings.timeBlockIntervalMinutes * 60 * 1000);
 
     // Count existing bookings in this time block
-    const currentBookings = await prisma.appointment.count({
+    const currentBookings = await this.prisma.appointment.count({
       where: {
         startTime: {
           gte: timeBlockStart,
@@ -258,7 +260,7 @@ export class AppointmentService {
     const { date } = request;
 
     // Get shop capacity settings
-    const capacitySettings = await prisma.shopCapacitySettings.findFirst({
+    const capacitySettings = await this.prisma.shopCapacitySettings.findFirst({
       where: { id: 'default' },
     });
 
@@ -272,7 +274,7 @@ export class AppointmentService {
     
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    const totalBookings = await prisma.appointment.count({
+    const totalBookings = await this.prisma.appointment.count({
       where: {
         startTime: {
           gte: dayStart,
@@ -286,7 +288,7 @@ export class AppointmentService {
 
     // Get all time blocks for the day
     const dayOfWeek = this.getDayOfWeek(date);
-    const operatingHours = await prisma.shopOperatingHours.findUnique({
+    const operatingHours = await this.prisma.shopOperatingHours.findUnique({
       where: { dayOfWeek },
     });
 
@@ -304,7 +306,7 @@ export class AppointmentService {
         const timeBlockEnd = new Date(currentTime.getTime() + intervalMinutes * 60 * 1000);
         
         if (timeBlockEnd <= endTime) {
-          const timeBlockBookings = await prisma.appointment.count({
+          const timeBlockBookings = await this.prisma.appointment.count({
             where: {
               startTime: {
                 gte: currentTime,
@@ -354,7 +356,7 @@ export class AppointmentService {
       if (filters?.endDate) where.startTime.lte = filters.endDate;
     }
 
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where,
       include: {
         cannedServices: {
@@ -390,7 +392,7 @@ export class AppointmentService {
 
   // Get appointment by ID
   async getAppointmentById(id: string): Promise<AppointmentWithServices | null> {
-    const appointment = await prisma.appointment.findUnique({
+    const appointment = await this.prisma.appointment.findUnique({
       where: { id },
       include: {
         cannedServices: {
@@ -425,7 +427,7 @@ export class AppointmentService {
 
   // Update appointment
   async updateAppointment(id: string, data: UpdateAppointmentRequest): Promise<AppointmentWithServices> {
-    const appointment = await prisma.appointment.update({
+    const appointment = await this.prisma.appointment.update({
       where: { id },
       data,
       include: {
@@ -461,14 +463,14 @@ export class AppointmentService {
 
   // Delete appointment
   async deleteAppointment(id: string): Promise<void> {
-    await prisma.appointment.delete({
+    await this.prisma.appointment.delete({
       where: { id },
     });
   }
 
   // Get unassigned appointments
   async getUnassignedAppointments(): Promise<AppointmentWithServices[]> {
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where: {
         assignedToId: null,
         status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
@@ -507,7 +509,7 @@ export class AppointmentService {
 
   // Get confirmed appointments without active work orders
   async getConfirmedAppointmentsWithoutWorkOrders(): Promise<AppointmentWithServices[]> {
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where: {
         status: AppointmentStatus.CONFIRMED,
         // Exclude appointments that have active work orders
@@ -550,7 +552,7 @@ export class AppointmentService {
 
   // Assign appointment to service advisor
   async assignAppointment(appointmentId: string, assignedToId: string): Promise<AppointmentWithServices> {
-    const appointment = await prisma.appointment.update({
+    const appointment = await this.prisma.appointment.update({
       where: { id: appointmentId },
       data: { assignedToId },
       include: {
@@ -588,7 +590,7 @@ export class AppointmentService {
 
   // Shop Settings Management
   async updateOperatingHours(data: ShopOperatingHoursRequest) {
-    return await prisma.shopOperatingHours.upsert({
+    return await this.prisma.shopOperatingHours.upsert({
       where: { dayOfWeek: data.dayOfWeek },
       update: data,
       create: data,
@@ -596,13 +598,13 @@ export class AppointmentService {
   }
 
   async getOperatingHours() {
-    return await prisma.shopOperatingHours.findMany({
+    return await this.prisma.shopOperatingHours.findMany({
       orderBy: { dayOfWeek: 'asc' },
     });
   }
 
   async updateCapacitySettings(data: ShopCapacitySettingsRequest) {
-    return await prisma.shopCapacitySettings.upsert({
+    return await this.prisma.shopCapacitySettings.upsert({
       where: { id: 'default' },
       update: data,
       create: { id: 'default', ...data },
@@ -610,7 +612,7 @@ export class AppointmentService {
   }
 
   async getCapacitySettings() {
-    return await prisma.shopCapacitySettings.findFirst({
+    return await this.prisma.shopCapacitySettings.findFirst({
       where: { id: 'default' },
     });
   }
@@ -693,7 +695,7 @@ export class AppointmentService {
   // New helper method: Get suggested alternative time blocks
   private async getSuggestedTimeBlocks(date: Date, requestedTimeBlock: string, capacitySettings: any): Promise<string[]> {
     const dayOfWeek = this.getDayOfWeek(date);
-    const operatingHours = await prisma.shopOperatingHours.findUnique({
+    const operatingHours = await this.prisma.shopOperatingHours.findUnique({
       where: { dayOfWeek },
     });
 
@@ -715,7 +717,7 @@ export class AppointmentService {
       const timeBlockEnd = new Date(currentTime.getTime() + intervalMinutes * 60 * 1000);
       
       if (timeBlockEnd <= endTime) {
-        const timeBlockBookings = await prisma.appointment.count({
+        const timeBlockBookings = await this.prisma.appointment.count({
           where: {
             startTime: {
               gte: currentTime,

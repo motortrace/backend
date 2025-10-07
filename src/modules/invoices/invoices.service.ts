@@ -1,15 +1,20 @@
-import { PrismaClient, InvoiceStatus, LineItemType, Prisma } from '@prisma/client';
+import { InvoiceStatus, LineItemType, Prisma, PrismaClient } from '@prisma/client';
 import {
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
   InvoiceWithDetails,
   InvoiceFilters,
   InvoiceStatistics,
+  IInvoicesService,
 } from './invoices.types';
+import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/custom-errors';
+import { PDFInvoice } from '@h1dd3nsn1p3r/pdf-invoice';
+import * as path from 'path';
+import * as fs from 'fs';
 
-const prisma = new PrismaClient();
+export class InvoicesService implements IInvoicesService {
+  constructor(private readonly prisma: PrismaClient) {}
 
-export class InvoicesService {
   // Generate unique invoice number
   private async generateInvoiceNumber(): Promise<string> {
     const today = new Date();
@@ -20,7 +25,7 @@ export class InvoicesService {
     const startOfMonth = new Date(year, today.getMonth(), 1);
     const endOfMonth = new Date(year, today.getMonth() + 1, 0);
     
-    const invoiceCount = await prisma.invoice.count({
+    const invoiceCount = await this.prisma.invoice.count({
       where: {
         createdAt: {
           gte: startOfMonth,
@@ -36,7 +41,7 @@ export class InvoicesService {
   // Create detailed invoice with line items
   async createInvoice(data: CreateInvoiceRequest): Promise<InvoiceWithDetails> {
     // Get work order with all related data
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
       include: {
         customer: {
@@ -94,16 +99,16 @@ export class InvoicesService {
     });
 
     if (!workOrder) {
-      throw new Error('Work order not found');
+      throw new NotFoundError('WorkOrder', data.workOrderId);
     }
 
     // Check if invoice already exists
-    const existingInvoice = await prisma.invoice.findFirst({
+    const existingInvoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
     if (existingInvoice) {
-      throw new Error('Invoice already exists for this work order');
+      throw new ConflictError('Invoice already exists for this work order');
     }
 
     // Calculate totals
@@ -119,7 +124,7 @@ export class InvoicesService {
     const totalAmount = subtotal + taxAmount - discountAmount;
 
     // Create invoice
-    const invoice = await prisma.invoice.create({
+    const invoice = await this.prisma.invoice.create({
       data: {
         invoiceNumber: await this.generateInvoiceNumber(),
         workOrderId: data.workOrderId,
@@ -138,7 +143,7 @@ export class InvoicesService {
 
     // Create line items for services
     for (const service of workOrder.services) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.SERVICE,
@@ -152,9 +157,11 @@ export class InvoicesService {
       });
     }
 
-    // Create line items for labor
-    for (const labor of workOrder.laborItems) {
-      await prisma.invoiceLineItem.create({
+    // Create line items ONLY for standalone labor (not part of a canned service)
+    // Labor items that belong to a service (have cannedServiceId) are already included in the service price
+    const standaloneLabor = workOrder.laborItems.filter(labor => !labor.cannedServiceId);
+    for (const labor of standaloneLabor) {
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.LABOR,
@@ -170,7 +177,7 @@ export class InvoicesService {
 
     // Create line items for parts
     for (const part of workOrder.partsUsed) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.PART,
@@ -186,7 +193,7 @@ export class InvoicesService {
 
     // Add tax line item if applicable
     if (taxAmount > 0) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.TAX,
@@ -200,7 +207,7 @@ export class InvoicesService {
 
     // Add discount line item if applicable
     if (discountAmount > 0) {
-      await prisma.invoiceLineItem.create({
+      await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.DISCOUNT,
@@ -218,7 +225,7 @@ export class InvoicesService {
 
   // Get invoice by ID with all details
   async getInvoiceById(invoiceId: string): Promise<InvoiceWithDetails> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
         workOrder: {
@@ -252,7 +259,7 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
     return {
@@ -312,7 +319,7 @@ export class InvoicesService {
     }
 
     const [invoices, total] = await Promise.all([
-      prisma.invoice.findMany({
+      this.prisma.invoice.findMany({
         where,
         include: {
           workOrder: {
@@ -347,7 +354,7 @@ export class InvoicesService {
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.invoice.count({ where }),
+      this.prisma.invoice.count({ where }),
     ]);
 
     return {
@@ -391,7 +398,7 @@ export class InvoicesService {
 
   // Get invoices for a work order
   async getInvoicesByWorkOrder(workOrderId: string): Promise<InvoiceWithDetails[]> {
-    const invoices = await prisma.invoice.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where: { workOrderId },
       include: {
         workOrder: {
@@ -461,15 +468,15 @@ export class InvoicesService {
 
   // Update invoice
   async updateInvoice(invoiceId: string, data: UpdateInvoiceRequest): Promise<InvoiceWithDetails> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
-    const updatedInvoice = await prisma.invoice.update({
+    const updatedInvoice = await this.prisma.invoice.update({
       where: { id: invoiceId },
       data: {
         ...data,
@@ -481,19 +488,19 @@ export class InvoicesService {
 
   // Delete invoice
   async deleteInvoice(invoiceId: string): Promise<void> {
-    const invoice = await prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new NotFoundError('Invoice', invoiceId);
     }
 
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new Error('Cannot delete a paid invoice');
+      throw new BadRequestError('Cannot delete a paid invoice');
     }
 
-    await prisma.invoice.delete({
+    await this.prisma.invoice.delete({
       where: { id: invoiceId },
     });
   }
@@ -508,12 +515,12 @@ export class InvoicesService {
       overdueInvoices,
       totalRevenue,
     ] = await Promise.all([
-      prisma.invoice.count(),
-      prisma.invoice.count({ where: { status: InvoiceStatus.DRAFT } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.SENT } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.CANCELLED } }),
-      prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
-      prisma.invoice.aggregate({
+      this.prisma.invoice.count(),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.DRAFT } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.SENT } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.CANCELLED } }),
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
+      this.prisma.invoice.aggregate({
         _sum: { totalAmount: true },
         where: { 
           status: { in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE] }
@@ -533,5 +540,127 @@ export class InvoicesService {
       totalRevenue: Number(totalRevenue._sum.totalAmount || 0),
       averageInvoiceAmount,
     };
+  }
+
+  // Generate PDF invoice
+  async generateInvoicePDF(invoiceId: string): Promise<string> {
+    // Get invoice with all details
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        workOrder: {
+          include: {
+            customer: true,
+            vehicle: true,
+          },
+        },
+        lineItems: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundError('Invoice', invoiceId);
+    }
+
+    // Create temporary directory if it doesn't exist
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Generate file path
+    const fileName = `invoice-${invoice.invoiceNumber}-${Date.now()}.pdf`;
+    const tempFilePath = path.join(tempDir, fileName);
+
+    // Transform data to PDF invoice format
+    const payload = {
+      company: {
+        name: "MotorTrace Auto Service",
+        address: "123 Service Center Drive\nCity, State 12345",
+        phone: "Tel: (555) 123-4567",
+        email: "Email: service@motortrace.com",
+        website: "Web: https://www.motortrace.com",
+        taxId: "Tax ID: 12-3456789",
+      },
+      customer: {
+        name: invoice.workOrder.customer.name,
+        email: invoice.workOrder.customer.email || undefined,
+        phone: invoice.workOrder.customer.phone || undefined,
+      },
+      invoice: {
+        number: invoice.invoiceNumber,
+        date: invoice.createdAt.toLocaleDateString('en-US'),
+        dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'),
+        status: this.getInvoiceStatusLabel(invoice.status),
+        locale: "en-US",
+        currency: "USD",
+        path: tempFilePath,
+      },
+      items: invoice.lineItems.map(item => ({
+        name: item.description,
+        quantity: item.quantity,
+        price: Number(item.unitPrice),
+        tax: 0, // Tax is already calculated separately
+      })),
+      note: {
+        text: invoice.notes || "Thank you for your business!",
+        italic: true,
+      },
+    };
+
+    // Generate PDF
+    const pdfInvoice = new PDFInvoice(payload);
+    const generatedPath = await pdfInvoice.create();
+
+    // Wait a bit to ensure file is fully written
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Verify the file exists and has content
+    if (!fs.existsSync(generatedPath)) {
+      throw new Error('PDF file was not generated');
+    }
+
+    const stats = fs.statSync(generatedPath);
+    if (stats.size === 0) {
+      throw new Error('Generated PDF is empty');
+    }
+
+    console.log(`PDF generated at: ${generatedPath}, size: ${stats.size} bytes`);
+
+    // Read the generated PDF file
+    const pdfBuffer = fs.readFileSync(generatedPath);
+
+    // Upload to Supabase Storage
+    const { StorageService } = require('../storage/storage.service');
+    const uploadResult = await StorageService.uploadInvoicePDF(
+      pdfBuffer,
+      fileName,
+      invoiceId
+    );
+
+    // Delete the temporary file
+    fs.unlinkSync(generatedPath);
+
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Failed to upload PDF to storage');
+    }
+
+    return uploadResult.url!;
+  }
+
+  // Helper to get readable invoice status
+  private getInvoiceStatusLabel(status: InvoiceStatus): string {
+    const statusMap: Record<InvoiceStatus, string> = {
+      [InvoiceStatus.DRAFT]: 'Draft',
+      [InvoiceStatus.SENT]: 'Sent',
+      [InvoiceStatus.PAID]: 'Paid',
+      [InvoiceStatus.OVERDUE]: 'Overdue',
+      [InvoiceStatus.CANCELLED]: 'Cancelled',
+    };
+    return statusMap[status] || 'Draft';
   }
 }

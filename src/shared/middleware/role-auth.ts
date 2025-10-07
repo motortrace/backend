@@ -11,23 +11,25 @@ import {
 } from '../utils/role-checker';
 
 export const requireRole = (requiredRoles: AuthUserRole[]) => {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const supabaseUserId = req.user?.id;
+      const userRole = req.user?.role;
       
-      if (!supabaseUserId) {
+      if (!req.user?.id) {
         return res.status(401).json({
           success: false,
           error: 'Authentication required'
         });
       }
 
-      const hasRequiredRole = await hasRole(supabaseUserId, requiredRoles);
-      
-      if (!hasRequiredRole) {
+      // ✅ OPTIMIZED: Read role from JWT token (req.user.role) instead of querying database
+      // Role is already validated by JWT signature and available in token claims
+      if (!userRole || !requiredRoles.includes(userRole)) {
         return res.status(403).json({
           success: false,
-          error: 'Insufficient permissions'
+          error: 'Insufficient permissions',
+          required: requiredRoles,
+          current: userRole
         });
       }
 
@@ -42,20 +44,20 @@ export const requireRole = (requiredRoles: AuthUserRole[]) => {
   };
 };
 
-export const requireServiceAdvisor = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireServiceAdvisor = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const supabaseUserId = req.user?.id;
+    const userRole = req.user?.role;
+    const allowedRoles: AuthUserRole[] = ['service_advisor', 'manager', 'admin'];
     
-    if (!supabaseUserId) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required'
       });
     }
 
-    const isAdvisor = await isServiceAdvisor(supabaseUserId);
-    
-    if (!isAdvisor) {
+    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Service advisor access required'
@@ -72,20 +74,20 @@ export const requireServiceAdvisor = async (req: AuthenticatedRequest, res: Resp
   }
 };
 
-export const requireTechnician = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireTechnician = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const supabaseUserId = req.user?.id;
+    const userRole = req.user?.role;
+    const allowedRoles: AuthUserRole[] = ['technician', 'manager', 'admin'];
     
-    if (!supabaseUserId) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required'
       });
     }
 
-    const isTech = await isTechnician(supabaseUserId);
-    
-    if (!isTech) {
+    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Technician access required'
@@ -102,20 +104,20 @@ export const requireTechnician = async (req: AuthenticatedRequest, res: Response
   }
 };
 
-export const requireInventoryManager = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireInventoryManager = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const supabaseUserId = req.user?.id;
+    const userRole = req.user?.role;
+    const allowedRoles: AuthUserRole[] = ['inventory_manager', 'manager', 'admin'];
     
-    if (!supabaseUserId) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required'
       });
     }
 
-    const isInventoryMgr = await isInventoryManager(supabaseUserId);
-    
-    if (!isInventoryMgr) {
+    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Inventory manager access required'
@@ -132,20 +134,20 @@ export const requireInventoryManager = async (req: AuthenticatedRequest, res: Re
   }
 };
 
-export const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const supabaseUserId = req.user?.id;
+    const userRole = req.user?.role;
+    const allowedRoles: AuthUserRole[] = ['admin'];
     
-    if (!supabaseUserId) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required'
       });
     }
 
-    const isAdminUser = await isAdmin(supabaseUserId);
-    
-    if (!isAdminUser) {
+    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Admin access required'
@@ -162,20 +164,20 @@ export const requireAdmin = async (req: AuthenticatedRequest, res: Response, nex
   }
 };
 
-export const requireManager = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireManager = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const supabaseUserId = req.user?.id;
+    const userRole = req.user?.role;
+    const allowedRoles: AuthUserRole[] = ['manager', 'admin'];
     
-    if (!supabaseUserId) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         error: 'Authentication required'
       });
     }
 
-    const isManagerUser = await isManager(supabaseUserId);
-    
-    if (!isManagerUser) {
+    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Manager access required'

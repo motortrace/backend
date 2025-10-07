@@ -1,14 +1,13 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateTechnicianDto, UpdateTechnicianDto, TechnicianFilters, TechnicianResponse, TechnicianStats, WorkOrderResponse } from './technicians.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 export class TechnicianService {
+  constructor(private readonly prisma: PrismaClient) {}
   // Create a new technician
   async createTechnician(data: CreateTechnicianDto): Promise<TechnicianResponse> {
     try {
       // Check if user profile exists and has TECHNICIAN role
-      const userProfile = await prisma.userProfile.findUnique({
+      const userProfile = await this.prisma.userProfile.findUnique({
         where: { id: data.userProfileId },
         select: { id: true, role: true }
       });
@@ -23,7 +22,7 @@ export class TechnicianService {
 
       // Check if employee ID is unique (if provided)
       if (data.employeeId) {
-        const existingTechnician = await prisma.technician.findUnique({
+        const existingTechnician = await this.prisma.technician.findUnique({
           where: { employeeId: data.employeeId }
         });
 
@@ -32,7 +31,7 @@ export class TechnicianService {
         }
       }
 
-      const technician = await prisma.technician.create({
+      const technician = await this.prisma.technician.create({
         data: {
           userProfileId: data.userProfileId,
           employeeId: data.employeeId,
@@ -96,7 +95,7 @@ export class TechnicianService {
         }
       }
 
-      const technicians = await prisma.technician.findMany({
+      const technicians = await this.prisma.technician.findMany({
         where,
         include: {
           userProfile: {
@@ -131,7 +130,7 @@ export class TechnicianService {
   // Get technician by ID
   async getTechnicianById(id: string): Promise<TechnicianResponse | null> {
     try {
-      const technician = await prisma.technician.findUnique({
+      const technician = await this.prisma.technician.findUnique({
         where: { id },
         include: {
           userProfile: {
@@ -167,7 +166,7 @@ export class TechnicianService {
   // Get technician by employee ID
   async getTechnicianByEmployeeId(employeeId: string): Promise<TechnicianResponse | null> {
     try {
-      const technician = await prisma.technician.findUnique({
+      const technician = await this.prisma.technician.findUnique({
         where: { employeeId },
         include: {
           userProfile: {
@@ -205,7 +204,7 @@ export class TechnicianService {
     try {
       // Check if employee ID is unique (if provided and different)
       if (data.employeeId) {
-        const existingTechnician = await prisma.technician.findFirst({
+        const existingTechnician = await this.prisma.technician.findFirst({
           where: {
             employeeId: data.employeeId,
             id: { not: id }
@@ -217,7 +216,7 @@ export class TechnicianService {
         }
       }
 
-      const technician = await prisma.technician.update({
+      const technician = await this.prisma.technician.update({
         where: { id },
         data: {
           employeeId: data.employeeId,
@@ -258,7 +257,7 @@ export class TechnicianService {
   async deleteTechnician(id: string): Promise<void> {
     try {
       // Check if technician has any inspections, labor items, or QC checks
-      const technician = await prisma.technician.findUnique({
+      const technician = await this.prisma.technician.findUnique({
         where: { id },
         include: {
           _count: {
@@ -292,7 +291,7 @@ export class TechnicianService {
         throw new Error('Cannot delete technician with existing part installations');
       }
 
-      await prisma.technician.delete({
+      await this.prisma.technician.delete({
         where: { id },
       });
     } catch (error: any) {
@@ -312,13 +311,13 @@ export class TechnicianService {
         activeTechnicians,
         recentHires,
       ] = await Promise.all([
-        prisma.technician.count(),
-        prisma.technician.groupBy({
+        this.prisma.technician.count(),
+        this.prisma.technician.groupBy({
           by: ['specialization'],
           _count: { specialization: true },
           where: { specialization: { not: null } },
         }),
-        prisma.technician.count({
+        this.prisma.technician.count({
           where: {
             OR: [
               { inspections: { some: {} } },
@@ -327,7 +326,7 @@ export class TechnicianService {
             ],
           },
         }),
-        prisma.technician.findMany({
+        this.prisma.technician.findMany({
           take: 5,
           orderBy: { createdAt: 'desc' },
           include: {
@@ -361,7 +360,7 @@ export class TechnicianService {
   // Search technicians
   async searchTechnicians(query: string): Promise<TechnicianResponse[]> {
     try {
-      const technicians = await prisma.technician.findMany({
+      const technicians = await this.prisma.technician.findMany({
         where: {
           OR: [
             { employeeId: { contains: query, mode: 'insensitive' } },
@@ -403,7 +402,7 @@ export class TechnicianService {
   async getWorkOrdersByTechnician(technicianId: string, filters?: { status?: string; limit?: number; offset?: number }): Promise<WorkOrderResponse[]> {
     try {
       // First verify the technician exists
-      const technician = await prisma.technician.findUnique({
+      const technician = await this.prisma.technician.findUnique({
         where: { id: technicianId }
       });
 
@@ -412,7 +411,7 @@ export class TechnicianService {
       }
 
       // Get work orders through labor items
-      const laborItems = await prisma.workOrderLabor.findMany({
+      const laborItems = await this.prisma.workOrderLabor.findMany({
         where: { technicianId },
         include: {
           workOrder: {
@@ -557,3 +556,4 @@ export class TechnicianService {
     };
   }
 }
+

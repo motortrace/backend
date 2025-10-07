@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { VehiclesController } from './vehicles.controller';
+import { VehiclesService } from './vehicles.service';
 import {
   validateRequest,
   createVehicleSchema,
@@ -9,9 +10,11 @@ import {
   vehicleFiltersSchema,
 } from './vehicles.validation';
 import { authenticateSupabaseToken } from '../auth/supabase/authSupabase.middleware';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const vehiclesController = new VehiclesController();
+const vehiclesService = new VehiclesService(prisma);
+const vehiclesController = new VehiclesController(vehiclesService);
 
 // Create + list
 router.post(

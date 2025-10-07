@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ServiceAdvisorController } from './service-advisors.controller';
+import { ServiceAdvisorService } from './service-advisors.service';
 import {
   validateRequest,
   createServiceAdvisorSchema,
@@ -7,9 +8,11 @@ import {
   serviceAdvisorIdSchema,
   serviceAdvisorFiltersSchema,
 } from './service-advisors.validation';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const serviceAdvisorController = new ServiceAdvisorController();
+const serviceAdvisorService = new ServiceAdvisorService(prisma);
+const serviceAdvisorController = new ServiceAdvisorController(serviceAdvisorService);
 
 // Get all service advisors with optional filtering
 router.get(

@@ -1,5 +1,6 @@
 import { PaymentService } from './payments.service';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import prisma from '../../infrastructure/database/prisma';
 
 // This is a demonstration file showing how to use the payment module
 // In a real application, you would use a proper testing framework like Jest
@@ -8,7 +9,7 @@ export class PaymentModuleDemo {
   private paymentService: PaymentService;
 
   constructor() {
-    this.paymentService = new PaymentService();
+    this.paymentService = new PaymentService(prisma);
   }
 
   // Demo: Create a manual cash payment

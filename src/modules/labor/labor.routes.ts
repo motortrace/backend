@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { LaborController } from './labor.controller';
+import { LaborService } from './labor.service';
+import prisma from '../../infrastructure/database/prisma';
 import { 
   authenticateSupabaseToken, 
   requireTechnician, 
@@ -17,7 +19,10 @@ import {
 } from './labor.validation';
 
 const router = Router();
-const laborController = new LaborController();
+
+// Dependency Injection
+const laborService = new LaborService(prisma);
+const laborController = new LaborController(laborService);
 
 // Simple Labor Creation Route (following appointments pattern)
 router.post('/', authenticateSupabaseToken, requireTechnician, laborController.createLabor.bind(laborController));

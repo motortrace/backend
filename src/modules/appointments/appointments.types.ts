@@ -118,4 +118,23 @@ export interface AppointmentWithServices {
     supabaseUserId: string;
     profileImage?: string | null;
   };
-} 
+}
+
+// Service Interface (for Dependency Injection)
+export interface IAppointmentsService {
+  createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices>;
+  getAppointments(filters: any): Promise<AppointmentWithServices[]>;
+  getAppointmentById(id: string): Promise<AppointmentWithServices | null>;
+  updateAppointment(id: string, data: UpdateAppointmentRequest): Promise<AppointmentWithServices>;
+  deleteAppointment(id: string): Promise<void>;
+  assignAppointment(id: string, advisorId: string): Promise<AppointmentWithServices>;
+  getAvailableSlots(request: AppointmentSlotRequest): Promise<AvailableSlot[]>;
+  checkTimeBlockAvailability(request: TimeBlockAvailabilityRequest): Promise<TimeBlockAvailability>;
+  checkDailyCapacity(request: DailyCapacityRequest): Promise<DailyCapacity>;
+  getUnassignedAppointments(): Promise<any>;
+  getConfirmedAppointmentsWithoutWorkOrders(): Promise<any>;
+  updateOperatingHours(data: ShopOperatingHoursRequest): Promise<any>;
+  getOperatingHours(): Promise<any>;
+  updateCapacitySettings(data: ShopCapacitySettingsRequest): Promise<any>;
+  getCapacitySettings(): Promise<any>;
+}

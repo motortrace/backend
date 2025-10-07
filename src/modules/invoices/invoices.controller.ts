@@ -1,164 +1,131 @@
 import { Request, Response } from 'express';
-import { InvoicesService } from './invoices.service';
 import {
   CreateInvoiceRequest,
   UpdateInvoiceRequest,
   InvoiceFilters,
+  IInvoicesService,
 } from './invoices.types';
+import { asyncHandler } from '../../shared/middleware/async-handler';
 
 export class InvoicesController {
-  private invoicesService = new InvoicesService();
+  constructor(private readonly invoicesService: IInvoicesService) {}
 
   // Create invoice
-  async createInvoice(req: Request, res: Response) {
-    try {
-      const invoiceData: CreateInvoiceRequest = req.body;
-      const invoice = await this.invoicesService.createInvoice(invoiceData);
+  createInvoice = asyncHandler(async (req: Request, res: Response) => {
+    const invoiceData: CreateInvoiceRequest = req.body;
+    const invoice = await this.invoicesService.createInvoice(invoiceData);
 
-      res.status(201).json({
-        success: true,
-        data: invoice,
-        message: 'Invoice created successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.status(201).json({
+      success: true,
+      data: invoice,
+      message: 'Invoice created successfully',
+    });
+  });
 
   // Get invoice by ID
-  async getInvoiceById(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const invoice = await this.invoicesService.getInvoiceById(id);
+  getInvoiceById = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const invoice = await this.invoicesService.getInvoiceById(id);
 
-      res.json({
-        success: true,
-        data: invoice,
-      });
-    } catch (error: any) {
-      res.status(404).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      data: invoice,
+    });
+  });
 
   // Get invoices with filters
-  async getInvoices(req: Request, res: Response) {
-    try {
-      const { 
-        workOrderId, 
-        status, 
-        startDate, 
-        endDate, 
-        page = 1, 
-        limit = 10 
-      } = req.query;
+  getInvoices = asyncHandler(async (req: Request, res: Response) => {
+    const { 
+      workOrderId, 
+      status, 
+      startDate, 
+      endDate, 
+      page = 1, 
+      limit = 10 
+    } = req.query;
 
-      const filters: InvoiceFilters = {};
-      
-      if (workOrderId) filters.workOrderId = workOrderId as string;
-      if (status) filters.status = status as any;
-      if (startDate) filters.startDate = new Date(startDate as string);
-      if (endDate) filters.endDate = new Date(endDate as string);
+    const filters: InvoiceFilters = {};
+    
+    if (workOrderId) filters.workOrderId = workOrderId as string;
+    if (status) filters.status = status as any;
+    if (startDate) filters.startDate = new Date(startDate as string);
+    if (endDate) filters.endDate = new Date(endDate as string);
 
-      const result = await this.invoicesService.getInvoices(
-        filters, 
-        Number(page), 
-        Number(limit)
-      );
+    const result = await this.invoicesService.getInvoices(
+      filters, 
+      Number(page), 
+      Number(limit)
+    );
 
-      res.json({
-        success: true,
-        data: result.invoices,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total: result.total,
-          pages: Math.ceil(result.total / Number(limit)),
-        },
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      data: result.invoices,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: result.total,
+        pages: Math.ceil(result.total / Number(limit)),
+      },
+    });
+  });
 
   // Get invoices for a work order
-  async getInvoicesByWorkOrder(req: Request, res: Response) {
-    try {
-      const { workOrderId } = req.params;
-      const invoices = await this.invoicesService.getInvoicesByWorkOrder(workOrderId);
+  getInvoicesByWorkOrder = asyncHandler(async (req: Request, res: Response) => {
+    const { workOrderId } = req.params;
+    const invoices = await this.invoicesService.getInvoicesByWorkOrder(workOrderId);
 
-      res.json({
-        success: true,
-        data: invoices,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      data: invoices,
+    });
+  });
 
   // Update invoice
-  async updateInvoice(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const updateData: UpdateInvoiceRequest = req.body;
-      const invoice = await this.invoicesService.updateInvoice(id, updateData);
+  updateInvoice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const updateData: UpdateInvoiceRequest = req.body;
+    const invoice = await this.invoicesService.updateInvoice(id, updateData);
 
-      res.json({
-        success: true,
-        data: invoice,
-        message: 'Invoice updated successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      data: invoice,
+      message: 'Invoice updated successfully',
+    });
+  });
 
   // Delete invoice
-  async deleteInvoice(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      await this.invoicesService.deleteInvoice(id);
+  deleteInvoice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await this.invoicesService.deleteInvoice(id);
 
-      res.json({
-        success: true,
-        message: 'Invoice deleted successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      message: 'Invoice deleted successfully',
+    });
+  });
 
   // Get invoice statistics
-  async getInvoiceStatistics(req: Request, res: Response) {
-    try {
-      const statistics = await this.invoicesService.getInvoiceStatistics();
+  getInvoiceStatistics = asyncHandler(async (req: Request, res: Response) => {
+    const statistics = await this.invoicesService.getInvoiceStatistics();
 
-      res.json({
-        success: true,
-        data: statistics,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+    res.json({
+      success: true,
+      data: statistics,
+    });
+  });
+
+  // Generate PDF invoice
+  generateInvoicePDF = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const pdfUrl = await this.invoicesService.generateInvoicePDF(id);
+
+    // Return the PDF URL
+    res.status(200).json({
+      success: true,
+      message: 'Invoice PDF generated successfully',
+      data: {
+        url: pdfUrl
+      }
+    });
+  });
 }

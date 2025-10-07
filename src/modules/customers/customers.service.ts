@@ -1,12 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import { Customer, CreateCustomerDto, UpdateCustomerDto, CustomerFilters } from './customers.types';
+import { Customer, CreateCustomerDto, UpdateCustomerDto, CustomerFilters, ICustomerService } from './customers.types';
 
-const prisma = new PrismaClient();
-
-export class CustomerService {
+export class CustomerService implements ICustomerService {
+  constructor(private readonly prisma: PrismaClient) {}
   async createCustomer(customerData: CreateCustomerDto): Promise<Customer> {
     try {
-      const customer = await prisma.customer.create({
+      const customer = await this.prisma.customer.create({
         data: customerData,
         include: {
           userProfile: {
@@ -53,7 +52,7 @@ export class CustomerService {
 
   async getCustomerById(id: string): Promise<Customer | null> {
     try {
-      const customer = await prisma.customer.findUnique({
+      const customer = await this.prisma.customer.findUnique({
         where: { id },
         include: {
           userProfile: {
@@ -100,7 +99,7 @@ export class CustomerService {
 
   async getCustomerByUserProfileId(userProfileId: string): Promise<Customer | null> {
     try {
-      const customer = await prisma.customer.findUnique({
+      const customer = await this.prisma.customer.findUnique({
         where: { userProfileId },
         include: {
           userProfile: {
@@ -199,7 +198,7 @@ export class CustomerService {
         }
       }
 
-      const customers = await prisma.customer.findMany({
+      const customers = await this.prisma.customer.findMany({
         where,
         include: {
           userProfile: {
@@ -249,7 +248,7 @@ export class CustomerService {
 
   async updateCustomer(id: string, customerData: UpdateCustomerDto): Promise<Customer> {
     try {
-      const customer = await prisma.customer.update({
+      const customer = await this.prisma.customer.update({
         where: { id },
         data: customerData,
         include: {
@@ -297,7 +296,7 @@ export class CustomerService {
 
   async deleteCustomer(id: string): Promise<void> {
     try {
-      await prisma.customer.delete({
+      await this.prisma.customer.delete({
         where: { id },
       });
     } catch (error: any) {
@@ -307,7 +306,7 @@ export class CustomerService {
 
   async getCustomerVehicles(customerId: string) {
     try {
-      const vehicles = await prisma.vehicle.findMany({
+      const vehicles = await this.prisma.vehicle.findMany({
         where: { customerId },
         orderBy: { createdAt: 'desc' },
       });
@@ -320,7 +319,7 @@ export class CustomerService {
 
   async getCustomerWorkOrders(customerId: string) {
     try {
-      const workOrders = await prisma.workOrder.findMany({
+      const workOrders = await this.prisma.workOrder.findMany({
         where: { customerId },
         orderBy: { createdAt: 'desc' },
       });
@@ -333,7 +332,7 @@ export class CustomerService {
 
   async getCustomerAppointments(customerId: string) {
     try {
-      const appointments = await prisma.appointment.findMany({
+      const appointments = await this.prisma.appointment.findMany({
         where: { customerId },
         orderBy: { requestedAt: 'asc' },
       });

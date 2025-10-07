@@ -3,7 +3,7 @@ import { ServiceAdvisorService } from './service-advisors.service';
 import { CreateServiceAdvisorDto, UpdateServiceAdvisorDto, ServiceAdvisorFilters } from './service-advisors.types';
 
 export class ServiceAdvisorController {
-  private serviceAdvisorService = new ServiceAdvisorService();
+  constructor(private readonly serviceAdvisorService: ServiceAdvisorService) {}
 
   // Get all service advisors with optional filtering
   async getServiceAdvisors(req: Request, res: Response) {
@@ -268,3 +268,4 @@ export class ServiceAdvisorController {
     }
   }
 }
+

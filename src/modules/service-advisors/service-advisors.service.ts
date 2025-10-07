@@ -1,14 +1,13 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateServiceAdvisorDto, UpdateServiceAdvisorDto, ServiceAdvisorFilters, ServiceAdvisorResponse, ServiceAdvisorStats, WorkOrderResponse } from './service-advisors.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 export class ServiceAdvisorService {
+  constructor(private readonly prisma: PrismaClient) {}
   // Create a new service advisor
   async createServiceAdvisor(data: CreateServiceAdvisorDto): Promise<ServiceAdvisorResponse> {
     try {
       // Check if user profile exists and has SERVICE_ADVISOR role
-      const userProfile = await prisma.userProfile.findUnique({
+      const userProfile = await this.prisma.userProfile.findUnique({
         where: { id: data.userProfileId },
         select: { id: true, role: true }
       });
@@ -23,7 +22,7 @@ export class ServiceAdvisorService {
 
       // Check if employee ID is unique (if provided)
       if (data.employeeId) {
-        const existingAdvisor = await prisma.serviceAdvisor.findUnique({
+        const existingAdvisor = await this.prisma.serviceAdvisor.findUnique({
           where: { employeeId: data.employeeId }
         });
 
@@ -32,7 +31,7 @@ export class ServiceAdvisorService {
         }
       }
 
-      const serviceAdvisor = await prisma.serviceAdvisor.create({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.create({
         data: {
           userProfileId: data.userProfileId,
           employeeId: data.employeeId,
@@ -95,7 +94,7 @@ export class ServiceAdvisorService {
         }
       }
 
-      const serviceAdvisors = await prisma.serviceAdvisor.findMany({
+      const serviceAdvisors = await this.prisma.serviceAdvisor.findMany({
         where,
         include: {
           userProfile: {
@@ -129,7 +128,7 @@ export class ServiceAdvisorService {
   // Get service advisor by ID
   async getServiceAdvisorById(id: string): Promise<ServiceAdvisorResponse | null> {
     try {
-      const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id },
         include: {
           userProfile: {
@@ -164,7 +163,7 @@ export class ServiceAdvisorService {
   // Get service advisor by employee ID
   async getServiceAdvisorByEmployeeId(employeeId: string): Promise<ServiceAdvisorResponse | null> {
     try {
-      const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
         where: { employeeId },
         include: {
           userProfile: {
@@ -201,7 +200,7 @@ export class ServiceAdvisorService {
     try {
       // Check if employee ID is unique (if provided and different)
       if (data.employeeId) {
-        const existingAdvisor = await prisma.serviceAdvisor.findFirst({
+        const existingAdvisor = await this.prisma.serviceAdvisor.findFirst({
           where: {
             employeeId: data.employeeId,
             id: { not: id }
@@ -213,7 +212,7 @@ export class ServiceAdvisorService {
         }
       }
 
-      const serviceAdvisor = await prisma.serviceAdvisor.update({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.update({
         where: { id },
         data: {
           employeeId: data.employeeId,
@@ -252,7 +251,7 @@ export class ServiceAdvisorService {
   async deleteServiceAdvisor(id: string): Promise<void> {
     try {
       // Check if service advisor has any work orders or appointments
-      const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id },
         include: {
           _count: {
@@ -276,7 +275,7 @@ export class ServiceAdvisorService {
         throw new Error('Cannot delete service advisor with existing appointments');
       }
 
-      await prisma.serviceAdvisor.delete({
+      await this.prisma.serviceAdvisor.delete({
         where: { id },
       });
     } catch (error: any) {
@@ -296,13 +295,13 @@ export class ServiceAdvisorService {
         activeServiceAdvisors,
         recentHires,
       ] = await Promise.all([
-        prisma.serviceAdvisor.count(),
-        prisma.serviceAdvisor.groupBy({
+        this.prisma.serviceAdvisor.count(),
+        this.prisma.serviceAdvisor.groupBy({
           by: ['department'],
           _count: { department: true },
           where: { department: { not: null } },
         }),
-        prisma.serviceAdvisor.count({
+        this.prisma.serviceAdvisor.count({
           where: {
             OR: [
               { advisorWorkOrders: { some: {} } },
@@ -310,7 +309,7 @@ export class ServiceAdvisorService {
             ],
           },
         }),
-        prisma.serviceAdvisor.findMany({
+        this.prisma.serviceAdvisor.findMany({
           take: 5,
           orderBy: { createdAt: 'desc' },
           include: {
@@ -344,7 +343,7 @@ export class ServiceAdvisorService {
   // Search service advisors
   async searchServiceAdvisors(query: string): Promise<ServiceAdvisorResponse[]> {
     try {
-      const serviceAdvisors = await prisma.serviceAdvisor.findMany({
+      const serviceAdvisors = await this.prisma.serviceAdvisor.findMany({
         where: {
           OR: [
             { employeeId: { contains: query, mode: 'insensitive' } },
@@ -385,7 +384,7 @@ export class ServiceAdvisorService {
   async getWorkOrdersByServiceAdvisor(serviceAdvisorId: string, filters?: { status?: string; limit?: number; offset?: number }): Promise<WorkOrderResponse[]> {
     try {
       // First verify the service advisor exists
-      const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id: serviceAdvisorId }
       });
 
@@ -402,7 +401,7 @@ export class ServiceAdvisorService {
         where.status = filters.status;
       }
 
-      const workOrders = await prisma.workOrder.findMany({
+      const workOrders = await this.prisma.workOrder.findMany({
         where,
         include: {
           customer: {
@@ -530,3 +529,4 @@ export class ServiceAdvisorService {
     };
   }
 }
+

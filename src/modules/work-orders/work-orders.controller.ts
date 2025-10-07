@@ -1,15 +1,27 @@
 import { Request, Response } from 'express';
-import { WorkOrderService } from './work-orders.service';
+import multer from 'multer';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
   WorkOrderFilters,
   CreateWorkOrderServiceRequest,
   CreatePaymentRequest,
+  IWorkOrderService,
 } from './work-orders.types';
 
+// Configure multer for work order attachments
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
+
 export class WorkOrderController {
-  private workOrderService = new WorkOrderService();
+  // Multer middleware for attachment uploads
+  public uploadAttachmentMiddleware = upload.single('file');
+
+  constructor(private readonly workOrderService: IWorkOrderService) {}
 
   // Work Order Management
   async createWorkOrder(req: any, res: Response) {
@@ -378,21 +390,55 @@ export class WorkOrderController {
   }
 
   // Work Order Attachments
-  async uploadWorkOrderAttachment(req: Request, res: Response) {
+  async uploadWorkOrderAttachment(req: any, res: Response) {
     try {
       const { workOrderId } = req.params;
-      const { fileUrl, fileName, fileType, fileSize, description, category } = req.body;
-      const { uploadedById } = req.body;
+      const { description, category } = req.body;
+      
+      if (!req.file) {
+        res.status(400).json({ 
+          success: false,
+          error: 'No file provided' 
+        });
+        return;
+      }
 
+      // Import StorageService dynamically
+      const { StorageService } = await import('../storage/storage.service');
+      
+      // Upload file to storage
+      const uploadResult = await StorageService.uploadWorkOrderAttachment(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        workOrderId
+      );
+
+      if (!uploadResult.success) {
+        res.status(400).json({ 
+          success: false,
+          error: uploadResult.error || 'Failed to upload file' 
+        });
+        return;
+      }
+
+      // Get UserProfile ID from Supabase user ID
+      let uploadedById: string | undefined;
+      if (req.user?.id) {
+        const userProfile = await this.workOrderService.getUserProfileBySupabaseId(req.user.id);
+        uploadedById = userProfile?.id;
+      }
+
+      // Save attachment record to database
       const attachment = await this.workOrderService.uploadWorkOrderAttachment(
         workOrderId,
         {
-          fileUrl,
-          fileName,
-          fileType,
-          fileSize,
-          description,
-          category,
+          fileUrl: uploadResult.url!,
+          fileName: req.file.originalname,
+          fileType: req.file.mimetype,
+          fileSize: req.file.size,
+          description: description || '',
+          category: category ? category.toUpperCase() : 'OTHER',
           uploadedById,
         }
       );
@@ -403,6 +449,7 @@ export class WorkOrderController {
         message: 'Work order attachment uploaded successfully',
       });
     } catch (error: any) {
+      console.error('❌ Work order attachment upload error:', error);
       res.status(400).json({
         success: false,
         error: error.message,

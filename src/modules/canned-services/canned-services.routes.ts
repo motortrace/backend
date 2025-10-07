@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import { CannedServiceController } from './canned-services.controller';
+import { CannedServiceService } from './canned-services.service';
 import { validateRequest } from './canned-services.types';
 import {
   createCannedServiceSchema,
   updateCannedServiceSchema,
   cannedServiceFiltersSchema,
 } from './canned-services.types';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const cannedServiceController = new CannedServiceController();
+const cannedServiceService = new CannedServiceService(prisma);
+const cannedServiceController = new CannedServiceController(cannedServiceService);
 
 // Create a new canned service
 router.post(

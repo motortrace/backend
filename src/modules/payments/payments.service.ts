@@ -1,4 +1,4 @@
-import { PrismaClient, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import {
   CreateManualPaymentRequest,
   CreateOnlinePaymentRequest,
@@ -14,14 +14,14 @@ import {
   PaymentGatewayResponse,
   PaymentWebhookData,
 } from './payments.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 export class PaymentService {
+  constructor(private readonly prisma: PrismaClient) {}
   // Create payment intent for online credit card payments (Stripe sandbox)
   async createPaymentIntent(data: CreateOnlinePaymentRequest): Promise<PaymentIntentResponse> {
     // Verify work order exists and get estimate amount
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
       include: {
         customer: true,
@@ -58,7 +58,7 @@ export class PaymentService {
   // Create manual payment (cash, check, etc.) with image upload
   async createManualPayment(data: CreateManualPaymentRequest): Promise<PaymentResponse> {
     // Verify work order exists
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
     });
 
@@ -67,7 +67,7 @@ export class PaymentService {
     }
 
     // Verify service advisor exists
-    const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
       where: { id: data.processedById },
     });
 
@@ -76,7 +76,7 @@ export class PaymentService {
     }
 
     // Create payment record with image
-    const payment = await prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         workOrderId: data.workOrderId,
         method: data.method,
@@ -117,7 +117,7 @@ export class PaymentService {
   // Process online payment (credit card) - sandbox mode
   async processOnlinePayment(data: CreateOnlinePaymentRequest): Promise<PaymentResponse> {
     // Verify work order exists
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: data.workOrderId },
     });
 
@@ -133,7 +133,7 @@ export class PaymentService {
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Create payment record
-    const payment = await prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         workOrderId: data.workOrderId,
         method: PaymentMethod.CREDIT_CARD,
@@ -211,7 +211,7 @@ export class PaymentService {
 
   // Update payment record
   async updatePayment(paymentId: string, data: UpdatePaymentRequest): Promise<PaymentResponse> {
-    const payment = await prisma.payment.findUnique({
+    const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
     });
 
@@ -219,7 +219,7 @@ export class PaymentService {
       throw new Error('Payment not found');
     }
 
-    const updatedPayment = await prisma.payment.update({
+    const updatedPayment = await this.prisma.payment.update({
       where: { id: paymentId },
       data: {
         status: data.status,
@@ -258,7 +258,7 @@ export class PaymentService {
 
   // Create refund
   async createRefund(data: CreateRefundRequest): Promise<PaymentResponse> {
-    const payment = await prisma.payment.findUnique({
+    const payment = await this.prisma.payment.findUnique({
       where: { id: data.paymentId },
     });
 
@@ -271,7 +271,7 @@ export class PaymentService {
     }
 
     // Verify service advisor exists
-    const serviceAdvisor = await prisma.serviceAdvisor.findUnique({
+    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
       where: { id: data.processedById },
     });
 
@@ -279,7 +279,7 @@ export class PaymentService {
       throw new Error('Service advisor not found');
     }
 
-    const updatedPayment = await prisma.payment.update({
+    const updatedPayment = await this.prisma.payment.update({
       where: { id: data.paymentId },
       data: {
         refundAmount: data.amount,
@@ -310,7 +310,7 @@ export class PaymentService {
 
   // Get payment by ID
   async getPayment(paymentId: string): Promise<PaymentResponse> {
-    const payment = await prisma.payment.findUnique({
+    const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
         processedBy: {
@@ -354,7 +354,7 @@ export class PaymentService {
       if (filters.endDate) where.paidAt.lte = filters.endDate;
     }
 
-    const payments = await prisma.payment.findMany({
+    const payments = await this.prisma.payment.findMany({
       where,
       include: {
         processedBy: {
@@ -378,7 +378,7 @@ export class PaymentService {
 
   // Get work order payment summary
   async getWorkOrderPaymentSummary(workOrderId: string): Promise<WorkOrderPaymentSummary> {
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
         payments: {
@@ -443,7 +443,7 @@ export class PaymentService {
       }
     }
 
-    const payments = await prisma.payment.findMany({ where });
+    const payments = await this.prisma.payment.findMany({ where });
 
     const totalPayments = payments.length;
     const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
@@ -493,7 +493,7 @@ export class PaymentService {
 
   // Private helper methods
   private async updateWorkOrderPaymentStatus(workOrderId: string): Promise<void> {
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: { payments: true },
     });
@@ -516,7 +516,7 @@ export class PaymentService {
       paymentStatus = PaymentStatus.PENDING;
     }
 
-    await prisma.workOrder.update({
+    await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: { paymentStatus },
     });
@@ -567,7 +567,7 @@ export class PaymentService {
 
   private async handlePaymentRefund(data: any): Promise<PaymentGatewayResponse> {
     // Find payment by transaction ID
-    const payment = await prisma.payment.findFirst({
+    const payment = await this.prisma.payment.findFirst({
       where: { reference: data.id },
     });
 
@@ -581,7 +581,7 @@ export class PaymentService {
       };
     }
 
-    const updatedPayment = await prisma.payment.update({
+    const updatedPayment = await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         refundAmount: data.amount_refunded / 100,
@@ -608,7 +608,7 @@ export class PaymentService {
     transactionId: string;
     status: PaymentStatus;
   }): Promise<PaymentResponse> {
-    const payment = await prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         workOrderId: data.workOrderId,
         method: data.method,
@@ -665,3 +665,5 @@ export class PaymentService {
     };
   }
 }
+
+

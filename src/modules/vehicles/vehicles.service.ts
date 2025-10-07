@@ -1,13 +1,12 @@
-import { PrismaClient } from '@prisma/client';
 import { CreateVehicleRequest, UpdateVehicleRequest, VehicleResponse, VehicleFilters, VehicleStatistics } from './vehicles.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 export class VehiclesService {
+  constructor(private readonly prisma: PrismaClient) {}
   // Create a new vehicle
   async createVehicle(data: CreateVehicleRequest): Promise<VehicleResponse> {
     // Check if customer exists
-    const customer = await prisma.customer.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id: data.customerId },
     });
     if (!customer) {
@@ -16,7 +15,7 @@ export class VehiclesService {
 
     // Check if VIN is unique (if provided)
     if (data.vin) {
-      const existingVehicle = await prisma.vehicle.findUnique({
+      const existingVehicle = await this.prisma.vehicle.findUnique({
         where: { vin: data.vin },
       });
       if (existingVehicle) {
@@ -24,7 +23,7 @@ export class VehiclesService {
       }
     }
 
-    const vehicle = await prisma.vehicle.create({
+    const vehicle = await this.prisma.vehicle.create({
       data: {
         customerId: data.customerId,
         make: data.make,
@@ -49,7 +48,7 @@ export class VehiclesService {
 
   // Get vehicle by ID
   async getVehicleById(id: string): Promise<VehicleResponse> {
-    const vehicle = await prisma.vehicle.findUnique({
+    const vehicle = await this.prisma.vehicle.findUnique({
       where: { id },
       include: {
         customer: {
@@ -90,7 +89,7 @@ export class VehiclesService {
       ];
     }
 
-    const vehicles = await prisma.vehicle.findMany({
+    const vehicles = await this.prisma.vehicle.findMany({
       where,
       include: {
         customer: {
@@ -110,7 +109,7 @@ export class VehiclesService {
   // Update vehicle
   async updateVehicle(id: string, data: UpdateVehicleRequest): Promise<VehicleResponse> {
     // Check if vehicle exists
-    const existingVehicle = await prisma.vehicle.findUnique({
+    const existingVehicle = await this.prisma.vehicle.findUnique({
       where: { id },
     });
     if (!existingVehicle) {
@@ -119,7 +118,7 @@ export class VehiclesService {
 
     // Check if VIN is unique (if being updated)
     if (data.vin && data.vin !== existingVehicle.vin) {
-      const duplicateVin = await prisma.vehicle.findUnique({
+      const duplicateVin = await this.prisma.vehicle.findUnique({
         where: { vin: data.vin },
       });
       if (duplicateVin) {
@@ -127,7 +126,7 @@ export class VehiclesService {
       }
     }
 
-    const vehicle = await prisma.vehicle.update({
+    const vehicle = await this.prisma.vehicle.update({
       where: { id },
       data,
       include: {
@@ -147,7 +146,7 @@ export class VehiclesService {
   // Delete vehicle
   async deleteVehicle(id: string): Promise<void> {
     // Check if vehicle exists
-    const vehicle = await prisma.vehicle.findUnique({
+    const vehicle = await this.prisma.vehicle.findUnique({
       where: { id },
     });
     if (!vehicle) {
@@ -155,21 +154,21 @@ export class VehiclesService {
     }
 
     // Check if vehicle has associated work orders
-    const workOrders = await prisma.workOrder.findMany({
+    const workOrders = await this.prisma.workOrder.findMany({
       where: { vehicleId: id },
     });
     if (workOrders.length > 0) {
       throw new Error('Cannot delete vehicle with associated work orders');
     }
 
-    await prisma.vehicle.delete({
+    await this.prisma.vehicle.delete({
       where: { id },
     });
   }
 
   // Get vehicles by customer
   async getVehiclesByCustomer(customerId: string): Promise<VehicleResponse[]> {
-    const vehicles = await prisma.vehicle.findMany({
+    const vehicles = await this.prisma.vehicle.findMany({
       where: { customerId },
       include: {
         customer: {
@@ -189,20 +188,20 @@ export class VehiclesService {
   // Get vehicle statistics
   async getVehicleStatistics(): Promise<VehicleStatistics> {
     const [totalVehicles, vehiclesByMake, vehiclesByYear, recentAdditions] = await Promise.all([
-      prisma.vehicle.count(),
-      prisma.vehicle.groupBy({
+      this.prisma.vehicle.count(),
+      this.prisma.vehicle.groupBy({
         by: ['make'],
         _count: { make: true },
         orderBy: { _count: { make: 'desc' } },
         take: 10,
       }),
-      prisma.vehicle.groupBy({
+      this.prisma.vehicle.groupBy({
         by: ['year'],
         _count: { year: true },
         orderBy: { year: 'desc' },
         take: 10,
       }),
-      prisma.vehicle.findMany({
+      this.prisma.vehicle.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -233,7 +232,7 @@ export class VehiclesService {
 
   // Search vehicles
   async searchVehicles(query: string): Promise<VehicleResponse[]> {
-    const vehicles = await prisma.vehicle.findMany({
+    const vehicles = await this.prisma.vehicle.findMany({
       where: {
         OR: [
           { make: { contains: query, mode: 'insensitive' } },

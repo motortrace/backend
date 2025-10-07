@@ -1,19 +1,19 @@
-import { PrismaClient, CannedService } from '@prisma/client';
+import { CannedService } from '@prisma/client';
 import {
   CreateCannedServiceRequest,
   UpdateCannedServiceRequest,
   CannedServiceFilters,
   CannedServiceDetails,
 } from './canned-services.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 export class CannedServiceService {
+  constructor(private readonly prisma: PrismaClient) {}
 
   // Create a new canned service
   async createCannedService(data: CreateCannedServiceRequest): Promise<CannedService> {
     // Check if code already exists
-    const existingService = await prisma.cannedService.findUnique({
+    const existingService = await this.prisma.cannedService.findUnique({
       where: { code: data.code },
     });
 
@@ -21,7 +21,7 @@ export class CannedServiceService {
       throw new Error(`Canned service with code '${data.code}' already exists`);
     }
 
-    const cannedService = await prisma.cannedService.create({
+    const cannedService = await this.prisma.cannedService.create({
       data: {
         code: data.code,
         name: data.name,
@@ -41,7 +41,7 @@ export class CannedServiceService {
     laborOperations: Array<{ laborCatalogId: string; sequence: number; notes?: string }>
   ): Promise<any> {
     // Check if code already exists
-    const existingService = await prisma.cannedService.findUnique({
+    const existingService = await this.prisma.cannedService.findUnique({
       where: { code: data.code },
     });
 
@@ -51,7 +51,7 @@ export class CannedServiceService {
 
     // Verify all labor catalog IDs exist
     const laborCatalogIds = laborOperations.map(op => op.laborCatalogId);
-    const laborCatalogs = await prisma.laborCatalog.findMany({
+    const laborCatalogs = await this.prisma.laborCatalog.findMany({
       where: {
         id: { in: laborCatalogIds },
         isActive: true
@@ -66,7 +66,7 @@ export class CannedServiceService {
     }
 
     // Create the canned service with labor operations
-    const cannedService = await prisma.cannedService.create({
+    const cannedService = await this.prisma.cannedService.create({
       data: {
         code: data.code,
         name: data.name,
@@ -116,7 +116,7 @@ export class CannedServiceService {
   //     ];
   //   }
 
-  //   const cannedServices = await prisma.cannedService.findMany({
+  //   const cannedServices = await this.prisma.cannedService.findMany({
   //     where,
   //     orderBy: [
   //       { isAvailable: 'desc' },
@@ -129,7 +129,7 @@ export class CannedServiceService {
 
   // // Get canned service by ID
   // async getCannedServiceById(id: string): Promise<CannedService | null> {
-  //   const cannedService = await prisma.cannedService.findUnique({
+  //   const cannedService = await this.prisma.cannedService.findUnique({
   //     where: { id },
   //   });
 
@@ -138,7 +138,7 @@ export class CannedServiceService {
 
   // // Get canned service by code
   // async getCannedServiceByCode(code: string): Promise<CannedService | null> {
-  //   const cannedService = await prisma.cannedService.findUnique({
+  //   const cannedService = await this.prisma.cannedService.findUnique({
   //     where: { code },
   //   });
 
@@ -169,7 +169,7 @@ export class CannedServiceService {
       ];
     }
 
-    const cannedServices = await prisma.cannedService.findMany({
+    const cannedServices = await this.prisma.cannedService.findMany({
       where,
       include: {
         laborOperations: {
@@ -207,7 +207,7 @@ export class CannedServiceService {
 
   // Simak's method to get a canned service by ID
   // async getCannedServiceById(id: string): Promise<CannedService | null> {
-  //   const cannedService = await prisma.cannedService.findUnique({
+  //   const cannedService = await this.prisma.cannedService.findUnique({
   //     where: { id },
   //   });
 
@@ -219,7 +219,7 @@ export class CannedServiceService {
 
   // Jabir's updated method to get a canned service by ID
   async getCannedServiceById(id: string): Promise<any> {
-    const cannedService = await prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findUnique({
       where: { id },
       include: {
         laborOperations: {
@@ -254,7 +254,7 @@ export class CannedServiceService {
 
   // Simak's method to get a canned service by code
   // async getCannedServiceByCode(code: string): Promise<CannedService | null> {
-  //   const cannedService = await prisma.cannedService.findUnique({
+  //   const cannedService = await this.prisma.cannedService.findUnique({
   //     where: { code },
   //   });
 
@@ -264,7 +264,7 @@ export class CannedServiceService {
 
   // Jabir's updated method to get a canned service by code
   async getCannedServiceByCode(code: string): Promise<any> {
-    const cannedService = await prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findUnique({
       where: { code },
       include: {
         laborOperations: {
@@ -297,7 +297,7 @@ export class CannedServiceService {
 
   // Get canned service with detailed information including labor and parts
   async getCannedServiceDetails(id: string): Promise<CannedServiceDetails | null> {
-    const cannedService = await prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findUnique({
       where: { id },
       include: {
         laborOperations: {
@@ -391,7 +391,7 @@ export class CannedServiceService {
   // async updateCannedService(id: string, data: UpdateCannedServiceRequest): Promise<CannedService> {
   //   // Check if code is being updated and if it already exists
   //   if (data.code) {
-  //     const existingService = await prisma.cannedService.findFirst({
+  //     const existingService = await this.prisma.cannedService.findFirst({
   //       where: {
   //         code: data.code,
   //         id: { not: id },
@@ -403,7 +403,7 @@ export class CannedServiceService {
   //     }
   //   }
 
-  //   const cannedService = await prisma.cannedService.update({
+  //   const cannedService = await this.prisma.cannedService.update({
   //     where: { id },
   //     data,
   //   });
@@ -415,7 +415,7 @@ export class CannedServiceService {
   async updateCannedService(id: string, data: UpdateCannedServiceRequest): Promise<any> {
     // Check if code is being updated and if it already exists
     if (data.code) {
-      const existingService = await prisma.cannedService.findFirst({
+      const existingService = await this.prisma.cannedService.findFirst({
         where: {
           code: data.code,
           id: { not: id },
@@ -450,7 +450,7 @@ export class CannedServiceService {
     // Handle labor operations if provided
     if (laborOperations !== undefined) {
       // First, delete existing labor operations
-      await prisma.cannedServiceLabor.deleteMany({
+      await this.prisma.cannedServiceLabor.deleteMany({
         where: { cannedServiceId: id }
       });
 
@@ -458,7 +458,7 @@ export class CannedServiceService {
       if (laborOperations.length > 0) {
         // Validate labor catalog IDs
         const laborCatalogIds = laborOperations.map(op => op.laborCatalogId);
-        const laborCatalogs = await prisma.laborCatalog.findMany({
+        const laborCatalogs = await this.prisma.laborCatalog.findMany({
           where: {
             id: { in: laborCatalogIds },
             isActive: true
@@ -473,7 +473,7 @@ export class CannedServiceService {
         }
 
         // Create new labor operations
-        await prisma.cannedServiceLabor.createMany({
+        await this.prisma.cannedServiceLabor.createMany({
           data: laborOperations.map(op => ({
             cannedServiceId: id,
             laborCatalogId: op.laborCatalogId,
@@ -487,7 +487,7 @@ export class CannedServiceService {
     // Only update if there are actual fields to update (excluding laborOperations)
     let cannedService;
     if (Object.keys(prismaData).length > 0) {
-      cannedService = await prisma.cannedService.update({
+      cannedService = await this.prisma.cannedService.update({
         where: { id },
         data: prismaData,
         include: {
@@ -509,7 +509,7 @@ export class CannedServiceService {
       });
     } else {
       // If only laborOperations were updated, fetch the updated service
-      cannedService = await prisma.cannedService.findUnique({
+      cannedService = await this.prisma.cannedService.findUnique({
         where: { id },
         include: {
           laborOperations: {
@@ -536,7 +536,7 @@ export class CannedServiceService {
   // Delete canned service
   async deleteCannedService(id: string): Promise<void> {
     // Check if the service is being used in any work orders
-    const workOrderServices = await prisma.workOrderService.findFirst({
+    const workOrderServices = await this.prisma.workOrderService.findFirst({
       where: { cannedServiceId: id },
     });
 
@@ -545,7 +545,7 @@ export class CannedServiceService {
     }
 
     // Check if the service is being used in any appointments
-    const appointmentServices = await prisma.appointmentCannedService.findFirst({
+    const appointmentServices = await this.prisma.appointmentCannedService.findFirst({
       where: { cannedServiceId: id },
     });
 
@@ -553,7 +553,7 @@ export class CannedServiceService {
       throw new Error('Cannot delete canned service that is being used in appointments');
     }
 
-    await prisma.cannedService.delete({
+    await this.prisma.cannedService.delete({
       where: { id },
     });
   }
@@ -565,7 +565,7 @@ export class CannedServiceService {
 
   // Toggle availability of a canned service
   async toggleAvailability(id: string): Promise<CannedService> {
-    const currentService = await prisma.cannedService.findUnique({
+    const currentService = await this.prisma.cannedService.findUnique({
       where: { id },
     });
 
@@ -573,7 +573,7 @@ export class CannedServiceService {
       throw new Error('Canned service not found');
     }
 
-    const updatedService = await prisma.cannedService.update({
+    const updatedService = await this.prisma.cannedService.update({
       where: { id },
       data: { isAvailable: !currentService.isAvailable },
     });
@@ -606,7 +606,7 @@ export class CannedServiceService {
 
     const multiplier = 1 + (percentageIncrease / 100);
 
-    const result = await prisma.cannedService.updateMany({
+    const result = await this.prisma.cannedService.updateMany({
       data: {
         price: {
           multiply: multiplier,
@@ -617,3 +617,4 @@ export class CannedServiceService {
     return result.count;
   }
 }
+

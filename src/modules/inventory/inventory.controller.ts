@@ -10,14 +10,13 @@ import {
   UpdateInventoryCategoryRequest,
 } from './inventory.types';
 
-const inventoryService = new InventoryService();
-
 export class InventoryController {
+  constructor(private readonly inventoryService: InventoryService) {}
   // InventoryCategory Methods
   async createInventoryCategory(req: Request, res: Response) {
     try {
       const data: CreateInventoryCategoryRequest = req.body;
-      const category = await inventoryService.createInventoryCategory(data);
+      const category = await this.inventoryService.createInventoryCategory(data);
       
       res.status(201).json({
         success: true,
@@ -35,7 +34,7 @@ export class InventoryController {
   async getInventoryCategory(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const category = await inventoryService.getInventoryCategory(id);
+      const category = await this.inventoryService.getInventoryCategory(id);
       
       if (!category) {
         return res.status(404).json({
@@ -58,7 +57,7 @@ export class InventoryController {
 
   async getInventoryCategories(req: Request, res: Response) {
     try {
-      const categories = await inventoryService.getInventoryCategories();
+      const categories = await this.inventoryService.getInventoryCategories();
       
       res.status(200).json({
         success: true,
@@ -77,7 +76,7 @@ export class InventoryController {
       const { id } = req.params;
       const data: UpdateInventoryCategoryRequest = req.body;
       
-      const category = await inventoryService.updateInventoryCategory(id, data);
+      const category = await this.inventoryService.updateInventoryCategory(id, data);
       
       res.status(200).json({
         success: true,
@@ -96,7 +95,7 @@ export class InventoryController {
     try {
       const { id } = req.params;
       
-      await inventoryService.deleteInventoryCategory(id);
+      await this.inventoryService.deleteInventoryCategory(id);
       
       res.status(200).json({
         success: true,
@@ -113,7 +112,7 @@ export class InventoryController {
   async createInventoryItem(req: Request, res: Response) {
     try {
       const data: CreateInventoryItemRequest = req.body;
-      const item = await inventoryService.createInventoryItem(data);
+      const item = await this.inventoryService.createInventoryItem(data);
       
       res.status(201).json({
         success: true,
@@ -131,7 +130,7 @@ export class InventoryController {
   async getInventoryItem(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const item = await inventoryService.getInventoryItem(id);
+      const item = await this.inventoryService.getInventoryItem(id);
       
       if (!item) {
         return res.status(404).json({
@@ -158,7 +157,7 @@ export class InventoryController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       
-      const result = await inventoryService.getInventoryItems(filter, page, limit);
+      const result = await this.inventoryService.getInventoryItems(filter, page, limit);
       
       res.status(200).json({
         success: true,
@@ -183,7 +182,7 @@ export class InventoryController {
       const { id } = req.params;
       const data: UpdateInventoryItemRequest = req.body;
       
-      const item = await inventoryService.updateInventoryItem(id, data);
+      const item = await this.inventoryService.updateInventoryItem(id, data);
       
       res.status(200).json({
         success: true,
@@ -201,7 +200,7 @@ export class InventoryController {
   async deleteInventoryItem(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await inventoryService.deleteInventoryItem(id);
+      await this.inventoryService.deleteInventoryItem(id);
       
       res.status(200).json({
         success: true,
@@ -218,7 +217,7 @@ export class InventoryController {
   async adjustInventory(req: Request, res: Response) {
     try {
       const data: InventoryAdjustmentRequest = req.body;
-      const item = await inventoryService.adjustInventory(data);
+      const item = await this.inventoryService.adjustInventory(data);
       
       res.status(200).json({
         success: true,
@@ -236,7 +235,7 @@ export class InventoryController {
   async transferInventory(req: Request, res: Response) {
     try {
       const data: InventoryTransferRequest = req.body;
-      await inventoryService.transferInventory(data);
+      await this.inventoryService.transferInventory(data);
       
       res.status(200).json({
         success: true,
@@ -252,7 +251,7 @@ export class InventoryController {
 
   async getInventorySummary(req: Request, res: Response) {
     try {
-      const summary = await inventoryService.getInventorySummary();
+      const summary = await this.inventoryService.getInventorySummary();
       
       res.status(200).json({
         success: true,
@@ -268,7 +267,7 @@ export class InventoryController {
 
   async getLowStockItems(req: Request, res: Response) {
     try {
-      const items = await inventoryService.getLowStockItems();
+      const items = await this.inventoryService.getLowStockItems();
       
       res.status(200).json({
         success: true,
@@ -284,7 +283,7 @@ export class InventoryController {
 
   async getOutOfStockItems(req: Request, res: Response) {
     try {
-      const items = await inventoryService.getOutOfStockItems();
+      const items = await this.inventoryService.getOutOfStockItems();
       
       res.status(200).json({
         success: true,
@@ -300,7 +299,7 @@ export class InventoryController {
 
   async getInventoryReport(req: Request, res: Response) {
     try {
-      const report = await inventoryService.getInventoryReport();
+      const report = await this.inventoryService.getInventoryReport();
       
       res.status(200).json({
         success: true,
@@ -316,7 +315,7 @@ export class InventoryController {
 
   async getReorderSuggestions(req: Request, res: Response) {
     try {
-      const suggestions = await inventoryService.getReorderSuggestions();
+      const suggestions = await this.inventoryService.getReorderSuggestions();
       
       res.status(200).json({
         success: true,
@@ -339,7 +338,7 @@ export class InventoryController {
         endDate: endDate ? new Date(endDate as string) : undefined,
       };
       
-      const parts = await inventoryService.getWorkOrderParts(filter);
+      const parts = await this.inventoryService.getWorkOrderParts(filter);
       
       res.status(200).json({
         success: true,
@@ -356,7 +355,7 @@ export class InventoryController {
   async bulkUpdateInventory(req: Request, res: Response) {
     try {
       const { items } = req.body;
-      const updatedItems = await inventoryService.bulkUpdateInventory(items);
+      const updatedItems = await this.inventoryService.bulkUpdateInventory(items);
       
       res.status(200).json({
         success: true,
@@ -373,7 +372,7 @@ export class InventoryController {
 
   async getCategories(req: Request, res: Response) {
     try {
-      const categories = await inventoryService.getCategories();
+      const categories = await this.inventoryService.getCategories();
       
       res.status(200).json({
         success: true,
@@ -389,7 +388,7 @@ export class InventoryController {
 
   async getManufacturers(req: Request, res: Response) {
     try {
-      const manufacturers = await inventoryService.getManufacturers();
+      const manufacturers = await this.inventoryService.getManufacturers();
       
       res.status(200).json({
         success: true,
@@ -405,7 +404,7 @@ export class InventoryController {
 
   async getSuppliers(req: Request, res: Response) {
     try {
-      const suppliers = await inventoryService.getSuppliers();
+      const suppliers = await this.inventoryService.getSuppliers();
       
       res.status(200).json({
         success: true,
@@ -421,7 +420,7 @@ export class InventoryController {
 
   async getLocations(req: Request, res: Response) {
     try {
-      const locations = await inventoryService.getLocations();
+      const locations = await this.inventoryService.getLocations();
       
       res.status(200).json({
         success: true,
@@ -435,3 +434,5 @@ export class InventoryController {
     }
   }
 }
+
+

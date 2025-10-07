@@ -19,19 +19,23 @@ const upload = multer({
   },
 });
 
-/**
- * Upload profile image endpoint
- */
-export const uploadProfileImage = [
-  upload.single('profileImage'),
-  async (req: AuthenticatedRequest, res: Response) => {
+export class StorageController {
+  // Multer middleware for profile image uploads
+  public uploadProfileImageMiddleware = upload.single('profileImage');
+  
+  // Multer middleware for car image uploads
+  public uploadCarImageMiddleware = upload.single('carImage');
+
+  async uploadProfileImage(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       if (!req.user) {
-        return res.status(401).json({ error: 'User not authenticated' });
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
       }
 
       if (!req.file) {
-        return res.status(400).json({ error: 'No image file provided' });
+        res.status(400).json({ error: 'No image file provided' });
+        return;
       }
 
       console.log('📤 Uploading profile image for user:', req.user.id);
@@ -45,9 +49,10 @@ export const uploadProfileImage = [
       );
 
       if (!result.success) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: result.error || 'Failed to upload image' 
         });
+        return;
       }
 
       console.log('✅ Profile image uploaded successfully:', result.url);
@@ -71,21 +76,17 @@ export const uploadProfileImage = [
       });
     }
   }
-];
 
-/**
- * Upload car image endpoint
- */
-export const uploadCarImage = [
-  upload.single('carImage'),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async uploadCarImage(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       if (!req.user) {
-        return res.status(401).json({ error: 'User not authenticated' });
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
       }
 
       if (!req.file) {
-        return res.status(400).json({ error: 'No image file provided' });
+        res.status(400).json({ error: 'No image file provided' });
+        return;
       }
 
       console.log('📤 Uploading car image for user:', req.user.id);
@@ -98,7 +99,8 @@ export const uploadCarImage = [
       );
 
       if (!result.success) {
-        return res.status(400).json({ error: result.error || 'Failed to upload image' });
+        res.status(400).json({ error: result.error || 'Failed to upload image' });
+        return;
       }
 
       res.json({
@@ -112,90 +114,84 @@ export const uploadCarImage = [
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   }
-];
 
-/**
- * Delete profile image endpoint
- */
-export async function deleteProfileImage(req: AuthenticatedRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+  async deleteProfileImage(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
 
-    const { imageUrl } = req.body;
+      const { imageUrl } = req.body;
 
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'Image URL is required' });
-    }
+      if (!imageUrl) {
+        res.status(400).json({ error: 'Image URL is required' });
+        return;
+      }
 
-    console.log('🗑️ Deleting profile image:', imageUrl);
+      console.log('🗑️ Deleting profile image:', imageUrl);
 
-    const result = await StorageService.deleteProfileImage(imageUrl);
+      const result = await StorageService.deleteProfileImage(imageUrl);
 
-    if (!result.success) {
-      return res.status(400).json({ 
-        error: result.error || 'Failed to delete image' 
+      if (!result.success) {
+        res.status(400).json({ 
+          error: result.error || 'Failed to delete image' 
+        });
+        return;
+      }
+
+      console.log('✅ Profile image deleted successfully');
+
+      res.json({
+        success: true,
+        message: 'Profile image deleted successfully'
+      });
+
+    } catch (error: any) {
+      console.error('❌ Profile image delete error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error.message 
       });
     }
-
-    console.log('✅ Profile image deleted successfully');
-
-    res.json({
-      success: true,
-      message: 'Profile image deleted successfully'
-    });
-
-  } catch (error: any) {
-    console.error('❌ Profile image delete error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
   }
-}
 
-/**
- * Get upload configuration for frontend
- */
-export async function getUploadConfig(req: Request, res: Response) {
-  try {
-    res.json({
-      success: true,
-      data: {
-        maxFileSize: 5 * 1024 * 1024, // 5MB
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-        allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp']
-      },
-      message: 'Upload configuration retrieved successfully'
-    });
-  } catch (error: any) {
-    console.error('❌ Upload config error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
+  async getUploadConfig(req: Request, res: Response): Promise<void> {
+    try {
+      res.json({
+        success: true,
+        data: {
+          maxFileSize: 5 * 1024 * 1024, // 5MB
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+          allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp']
+        },
+        message: 'Upload configuration retrieved successfully'
+      });
+    } catch (error: any) {
+      console.error('❌ Upload config error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error.message 
+      });
+    }
   }
-}
 
-/**
- * Initialize storage bucket (for manual testing/debugging)
- */
-export async function initializeStorage(req: Request, res: Response) {
-  try {
-    console.log('🔄 Manually initializing storage...');
-    
-    await StorageService.initializeStorage();
-    
-    res.json({
-      success: true,
-      message: 'Storage bucket initialized successfully'
-    });
-  } catch (error: any) {
-    console.error('❌ Storage initialization error:', error);
-    res.status(500).json({ 
-      error: 'Failed to initialize storage',
-      message: error.message 
-    });
+  async initializeStorage(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('🔄 Manually initializing storage...');
+      
+      await StorageService.initializeStorage();
+      
+      res.json({
+        success: true,
+        message: 'Storage bucket initialized successfully'
+      });
+    } catch (error: any) {
+      console.error('❌ Storage initialization error:', error);
+      res.status(500).json({ 
+        error: 'Failed to initialize storage',
+        message: error.message 
+      });
+    }
   }
 }

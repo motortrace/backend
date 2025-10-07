@@ -1,4 +1,4 @@
-import { PrismaClient, WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, Prisma } from '@prisma/client';
+import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, Prisma } from '@prisma/client';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
@@ -8,8 +8,7 @@ import {
   CreatePaymentRequest,
   WorkOrderStatistics,
 } from './work-orders.types';
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
 // Type alias for work order with all includes
 type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
@@ -24,11 +23,21 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     estimates: { include: { createdBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } }; approvedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    attachments: { include: { uploadedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
+    attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
   };
 }>;
 
 export class WorkOrderService {
+  constructor(private readonly prisma: PrismaClient) {}
+  
+  // Get UserProfile by Supabase ID
+  async getUserProfileBySupabaseId(supabaseUserId: string) {
+    return await this.prisma.userProfile.findUnique({
+      where: { supabaseUserId },
+      select: { id: true, name: true }
+    });
+  }
+
   // Generate unique work order number
   private async generateWorkOrderNumber(): Promise<string> {
     const today = new Date();
@@ -42,7 +51,7 @@ export class WorkOrderService {
     const endOfDay = new Date(today);
     endOfDay.setHours(23, 59, 59, 999);
     
-    const todayCount = await prisma.workOrder.count({
+    const todayCount = await this.prisma.workOrder.count({
       where: {
         createdAt: {
           gte: startOfDay,
@@ -63,7 +72,7 @@ export class WorkOrderService {
     const workOrderNumber = await this.generateWorkOrderNumber();
 
     // Validate customer and vehicle exist
-    const customer = await prisma.customer.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id: workOrderData.customerId },
     });
 
@@ -71,7 +80,7 @@ export class WorkOrderService {
       throw new Error('Customer not found');
     }
 
-    const vehicle = await prisma.vehicle.findUnique({
+    const vehicle = await this.prisma.vehicle.findUnique({
       where: { id: workOrderData.vehicleId },
     });
 
@@ -81,7 +90,7 @@ export class WorkOrderService {
 
     // Validate appointment if provided
     if (workOrderData.appointmentId) {
-      const appointment = await prisma.appointment.findUnique({
+      const appointment = await this.prisma.appointment.findUnique({
         where: { id: workOrderData.appointmentId },
       });
 
@@ -92,7 +101,7 @@ export class WorkOrderService {
 
     // Validate service advisor if provided
     if (workOrderData.advisorId) {
-      const advisor = await prisma.serviceAdvisor.findUnique({
+      const advisor = await this.prisma.serviceAdvisor.findUnique({
         where: { id: workOrderData.advisorId },
       });
 
@@ -104,7 +113,7 @@ export class WorkOrderService {
 
 
     // Create work order with services
-    const workOrder = await prisma.workOrder.create({
+    const workOrder = await this.prisma.workOrder.create({
       data: {
         workOrderNumber,
         customerId: workOrderData.customerId,
@@ -296,17 +305,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -335,7 +334,7 @@ export class WorkOrderService {
       if (filters.endDate) where.createdAt.lte = filters.endDate;
     }
 
-    const workOrders = await prisma.workOrder.findMany({
+    const workOrders = await this.prisma.workOrder.findMany({
       where,
       include: {
         customer: {
@@ -499,17 +498,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -615,11 +604,11 @@ export class WorkOrderService {
     // Transform technician names in attachments
     if (transformed.attachments) {
       transformed.attachments = transformed.attachments.map((attachment: any) => {
-        if (attachment.uploadedBy && attachment.uploadedBy.userProfile && attachment.uploadedBy.userProfile.name) {
-          const nameParts = attachment.uploadedBy.userProfile.name.split(' ');
-          attachment.uploadedBy.userProfile.firstName = nameParts[0] || '';
-          attachment.uploadedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
-          delete attachment.uploadedBy.userProfile.name;
+        if (attachment.uploadedBy && attachment.uploadedBy.name) {
+          const nameParts = attachment.uploadedBy.name.split(' ');
+          attachment.uploadedBy.firstName = nameParts[0] || '';
+          attachment.uploadedBy.lastName = nameParts.slice(1).join(' ') || '';
+          delete attachment.uploadedBy.name;
         }
         return attachment;
       });
@@ -630,7 +619,7 @@ export class WorkOrderService {
 
   // Get work order by ID
   async getWorkOrderById(id: string): Promise<WorkOrderWithDetails | null> {
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id },
       include: {
         customer: {
@@ -793,17 +782,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -822,7 +801,7 @@ export class WorkOrderService {
     if (data.closedAt) updateData.closedAt = new Date(data.closedAt);
     if (data.finalizedAt) updateData.finalizedAt = new Date(data.finalizedAt);
 
-    const workOrder = await prisma.workOrder.update({
+    const workOrder = await this.prisma.workOrder.update({
       where: { id },
       data: updateData,
       include: {
@@ -986,17 +965,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1008,7 +977,7 @@ export class WorkOrderService {
   // Soft delete work order (change status to CANCELLED instead of deleting)
   async deleteWorkOrder(id: string): Promise<WorkOrderWithDetails> {
     // First check if work order exists
-    const existingWorkOrder = await prisma.workOrder.findUnique({
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
       where: { id },
     });
 
@@ -1022,7 +991,7 @@ export class WorkOrderService {
     }
 
     // Soft delete by changing status to CANCELLED and updating workflow step
-    const cancelledWorkOrder = await prisma.workOrder.update({
+    const cancelledWorkOrder = await this.prisma.workOrder.update({
       where: { id },
       data: {
         status: WorkOrderStatus.CANCELLED,
@@ -1193,17 +1162,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1215,7 +1174,7 @@ export class WorkOrderService {
   // Restore cancelled work order (change status back from CANCELLED)
   async restoreWorkOrder(id: string): Promise<WorkOrderWithDetails> {
     // First check if work order exists
-    const existingWorkOrder = await prisma.workOrder.findUnique({
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
       where: { id },
     });
 
@@ -1229,7 +1188,7 @@ export class WorkOrderService {
     }
 
     // Restore by changing status back to PENDING and updating workflow step
-    const restoredWorkOrder = await prisma.workOrder.update({
+    const restoredWorkOrder = await this.prisma.workOrder.update({
       where: { id },
       data: {
         status: WorkOrderStatus.PENDING,
@@ -1400,17 +1359,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1421,7 +1370,7 @@ export class WorkOrderService {
 
   // Get cancelled work orders (soft deleted)
   async getCancelledWorkOrders(): Promise<WorkOrderWithDetails[]> {
-    const cancelledWorkOrders = await prisma.workOrder.findMany({
+    const cancelledWorkOrders = await this.prisma.workOrder.findMany({
       where: { 
         status: WorkOrderStatus.CANCELLED 
       },
@@ -1586,17 +1535,7 @@ export class WorkOrderService {
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            uploadedBy: { select: { id: true, name: true } },
           },
         },
       },
@@ -1615,7 +1554,7 @@ export class WorkOrderService {
   // Create work order service
   async createWorkOrderService(data: CreateWorkOrderServiceRequest) {
     // Validate the canned service exists
-    const cannedService = await prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findUnique({
       where: { id: data.cannedServiceId },
       include: {
         laborOperations: {
@@ -1631,7 +1570,7 @@ export class WorkOrderService {
     }
 
     // Create the work order service
-    const service = await prisma.workOrderService.create({
+    const service = await this.prisma.workOrderService.create({
       data: {
         ...data,
         quantity: data.quantity || 1,
@@ -1656,7 +1595,7 @@ export class WorkOrderService {
     if (cannedService.laborOperations.length > 0) {
       const laborEntries = await Promise.all(
         cannedService.laborOperations.map(async (laborOp) => {
-          return await prisma.workOrderLabor.create({
+          return await this.prisma.workOrderLabor.create({
             data: {
               workOrderId: data.workOrderId,
               laborCatalogId: laborOp.laborCatalogId,
@@ -1709,7 +1648,7 @@ export class WorkOrderService {
 
   // Get work order services
   async getWorkOrderServices(workOrderId: string) {
-    const services = await prisma.workOrderService.findMany({
+    const services = await this.prisma.workOrderService.findMany({
       where: { workOrderId },
       include: {
         cannedService: {
@@ -1733,7 +1672,7 @@ export class WorkOrderService {
 
   // Create payment
   async createPayment(data: CreatePaymentRequest) {
-    const payment = await prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         ...data,
         status: PaymentStatus.PAID,
@@ -1762,7 +1701,7 @@ export class WorkOrderService {
 
   // Get work order payments
   async getWorkOrderPayments(workOrderId: string) {
-    const payments = await prisma.payment.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: { workOrderId },
       include: {
         processedBy: {
@@ -1804,7 +1743,7 @@ export class WorkOrderService {
       updateData.closedAt = new Date();
     }
 
-    const workOrder = await prisma.workOrder.update({
+    const workOrder = await this.prisma.workOrder.update({
       where: { id },
       data: updateData,
     });
@@ -1814,7 +1753,7 @@ export class WorkOrderService {
 
   // Assign service advisor to work order
   async assignServiceAdvisor(id: string, advisorId: string) {
-    const workOrder = await prisma.workOrder.update({
+    const workOrder = await this.prisma.workOrder.update({
       where: { id },
       data: { advisorId },
     });
@@ -1824,7 +1763,7 @@ export class WorkOrderService {
 
   // Assign technician to specific labor item
   async assignTechnicianToLabor(laborId: string, technicianId: string) {
-    const laborItem = await prisma.workOrderLabor.update({
+    const laborItem = await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: { technicianId },
       include: {
@@ -1856,7 +1795,7 @@ export class WorkOrderService {
   // Update work order labor item
   async updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest) {
     // Get the current labor item to check if it has a cannedServiceId
-    const currentLabor = await prisma.workOrderLabor.findUnique({
+    const currentLabor = await this.prisma.workOrderLabor.findUnique({
       where: { id: laborId },
       select: { 
         id: true,
@@ -1871,7 +1810,7 @@ export class WorkOrderService {
     }
 
     // Update the labor item
-    const updatedLabor = await prisma.workOrderLabor.update({
+    const updatedLabor = await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         ...data,
@@ -1921,7 +1860,7 @@ export class WorkOrderService {
   // Helper method to update WorkOrderService subtotal based on associated labor items
   private async updateWorkOrderServiceSubtotal(workOrderId: string, cannedServiceId: string) {
     // Get all labor items for this canned service
-    const laborItems = await prisma.workOrderLabor.findMany({
+    const laborItems = await this.prisma.workOrderLabor.findMany({
       where: {
         workOrderId: workOrderId,
         cannedServiceId: cannedServiceId,
@@ -1935,7 +1874,7 @@ export class WorkOrderService {
     const totalLaborSubtotal = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
 
     // Update the WorkOrderService subtotal
-    await prisma.workOrderService.updateMany({
+    await this.prisma.workOrderService.updateMany({
       where: {
         workOrderId: workOrderId,
         cannedServiceId: cannedServiceId,
@@ -1952,15 +1891,15 @@ export class WorkOrderService {
   // Helper method to update work order totals
   private async updateWorkOrderTotals(workOrderId: string) {
     const [laborItems, partItems, serviceItems] = await Promise.all([
-      prisma.workOrderLabor.findMany({
+      this.prisma.workOrderLabor.findMany({
         where: { workOrderId },
         select: { subtotal: true },
       }),
-      prisma.workOrderPart.findMany({
+      this.prisma.workOrderPart.findMany({
         where: { workOrderId },
         select: { subtotal: true },
       }),
-      prisma.workOrderService.findMany({
+      this.prisma.workOrderService.findMany({
         where: { workOrderId },
         select: { subtotal: true },
       }),
@@ -1971,7 +1910,7 @@ export class WorkOrderService {
     const subtotalServices = serviceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
 
     // Get existing tax and discount amounts
-    const existingWorkOrder = await prisma.workOrder.findUnique({
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       select: { taxAmount: true, discountAmount: true },
     });
@@ -1980,7 +1919,7 @@ export class WorkOrderService {
     const discountAmount = Number(existingWorkOrder?.discountAmount || 0);
     const totalAmount = subtotalLabor + subtotalParts + subtotalServices + taxAmount - discountAmount;
 
-    await prisma.workOrder.update({
+    await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
         subtotalLabor,
@@ -1993,7 +1932,7 @@ export class WorkOrderService {
   // Reset WorkOrderLabor subtotal to original hourlyRate from laborCatalog
   async resetWorkOrderLaborSubtotal(laborId: string) {
     // Get the current labor item with its labor catalog
-    const currentLabor = await prisma.workOrderLabor.findUnique({
+    const currentLabor = await this.prisma.workOrderLabor.findUnique({
       where: { id: laborId },
       include: {
         laborCatalog: {
@@ -2023,7 +1962,7 @@ export class WorkOrderService {
     const originalSubtotal = Number(currentLabor.laborCatalog.hourlyRate);
 
     // Update the labor item
-    const updatedLabor = await prisma.workOrderLabor.update({
+    const updatedLabor = await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         subtotal: originalSubtotal,
@@ -2090,16 +2029,16 @@ export class WorkOrderService {
       topTechnicians,
       topServices,
     ] = await Promise.all([
-      prisma.workOrder.count({ where }),
-      prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.PENDING } }),
-      prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.IN_PROGRESS } }),
-      prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.COMPLETED } }),
-      prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.CANCELLED } }),
-      prisma.workOrder.aggregate({
+      this.prisma.workOrder.count({ where }),
+      this.prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.PENDING } }),
+      this.prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.IN_PROGRESS } }),
+      this.prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.COMPLETED } }),
+      this.prisma.workOrder.count({ where: { ...where, status: WorkOrderStatus.CANCELLED } }),
+      this.prisma.workOrder.aggregate({
         where: { ...where, status: WorkOrderStatus.COMPLETED },
         _sum: { totalAmount: true },
       }),
-      prisma.workOrderLabor.groupBy({
+      this.prisma.workOrderLabor.groupBy({
         by: ['technicianId'],
         where: { workOrder: where },
         _sum: { hours: true },
@@ -2107,7 +2046,7 @@ export class WorkOrderService {
         orderBy: { _count: { workOrderId: 'desc' } },
         take: 5,
       }),
-      prisma.workOrderService.groupBy({
+      this.prisma.workOrderService.groupBy({
         by: ['cannedServiceId'],
         where: { workOrder: where },
         _sum: { subtotal: true },
@@ -2119,7 +2058,7 @@ export class WorkOrderService {
 
     // Get technician names
     const technicianIds = topTechnicians.map(t => t.technicianId).filter(Boolean) as string[];
-    const technicians = await prisma.technician.findMany({
+    const technicians = await this.prisma.technician.findMany({
       where: { id: { in: technicianIds } },
       select: {
         id: true,
@@ -2133,7 +2072,7 @@ export class WorkOrderService {
 
     // Get service names
     const serviceIds = topServices.map(s => s.cannedServiceId);
-    const services = await prisma.cannedService.findMany({
+    const services = await this.prisma.cannedService.findMany({
       where: { id: { in: serviceIds } },
       select: {
         id: true,
@@ -2220,7 +2159,7 @@ export class WorkOrderService {
       if (filters.endDate) where.createdAt.lte = filters.endDate;
     }
 
-    const workOrders = await prisma.workOrder.findMany({
+    const workOrders = await this.prisma.workOrder.findMany({
       where,
       include: {
         customer: {
@@ -2272,24 +2211,10 @@ export class WorkOrderService {
     category: AttachmentCategory;
     uploadedById?: string;
   }) {
-    const attachment = await prisma.workOrderAttachment.create({
+    const attachment = await this.prisma.workOrderAttachment.create({
       data: {
         workOrderId,
         ...data,
-      },
-      include: {
-        uploadedBy: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -2304,19 +2229,13 @@ export class WorkOrderService {
       where.category = category;
     }
 
-    const attachments = await prisma.workOrderAttachment.findMany({
+    const attachments = await this.prisma.workOrderAttachment.findMany({
       where,
       include: {
         uploadedBy: {
           select: {
             id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            name: true,
           },
         },
       },
@@ -2330,7 +2249,7 @@ export class WorkOrderService {
 
   // Create work order inspection
   async createWorkOrderInspection(workOrderId: string, inspectorId: string, notes?: string) {
-    const inspection = await prisma.workOrderInspection.create({
+    const inspection = await this.prisma.workOrderInspection.create({
       data: {
         workOrderId,
         inspectorId,
@@ -2357,7 +2276,7 @@ export class WorkOrderService {
 
   // Get work order inspections
   async getWorkOrderInspections(workOrderId: string) {
-    const inspections = await prisma.workOrderInspection.findMany({
+    const inspections = await this.prisma.workOrderInspection.findMany({
       where: { workOrderId },
       include: {
         inspector: {
@@ -2392,7 +2311,7 @@ export class WorkOrderService {
     reworkRequired?: boolean;
     reworkNotes?: string;
   }) {
-    const qc = await prisma.workOrderQC.create({
+    const qc = await this.prisma.workOrderQC.create({
       data: {
         workOrderId,
         ...data,
@@ -2418,7 +2337,7 @@ export class WorkOrderService {
 
   // Get work order QC
   async getWorkOrderQC(workOrderId: string) {
-    const qc = await prisma.workOrderQC.findMany({
+    const qc = await this.prisma.workOrderQC.findMany({
       where: { workOrderId },
       include: {
         inspector: {
@@ -2445,7 +2364,7 @@ export class WorkOrderService {
   // Generate estimate from existing labor and parts
   async generateEstimateFromLaborAndParts(workOrderId: string, createdById: string) {
     // Get the work order with all labor and parts
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
         laborItems: {
@@ -2488,7 +2407,7 @@ export class WorkOrderService {
 
 
     // Create the estimate
-    const estimate = await prisma.workOrderEstimate.create({
+    const estimate = await this.prisma.workOrderEstimate.create({
       data: {
         workOrderId,
         version: 1,
@@ -2535,7 +2454,7 @@ export class WorkOrderService {
     });
 
     // Update work order status to APPROVAL and update totals
-    await prisma.workOrder.update({
+    await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
         status: 'IN_PROGRESS' as WorkOrderStatus,
@@ -2565,7 +2484,7 @@ export class WorkOrderService {
 
   // Helper method to find ServiceAdvisor by Supabase user ID
   async findServiceAdvisorBySupabaseUserId(supabaseUserId: string) {
-    const serviceAdvisor = await prisma.serviceAdvisor.findFirst({
+    const serviceAdvisor = await this.prisma.serviceAdvisor.findFirst({
       where: {
         userProfile: {
           supabaseUserId: supabaseUserId
@@ -2578,7 +2497,7 @@ export class WorkOrderService {
 
   // Helper method to update work order payment status
   private async updateWorkOrderPaymentStatus(workOrderId: string) {
-    const workOrder = await prisma.workOrder.findUnique({
+    const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
         payments: true,
@@ -2599,9 +2518,11 @@ export class WorkOrderService {
       paymentStatus = PaymentStatus.PENDING;
     }
 
-    await prisma.workOrder.update({
+    await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: { paymentStatus },
     });
   }
 }
+
+

@@ -11,11 +11,7 @@ import {
 } from './labor.types';
 
 export class LaborController {
-  private laborService: LaborService;
-
-  constructor() {
-    this.laborService = new LaborService();
-  }
+  constructor(private readonly laborService: LaborService) {}
 
   // Simple Labor Creation (following appointments pattern)
   async createLabor(req: any, res: Response) {

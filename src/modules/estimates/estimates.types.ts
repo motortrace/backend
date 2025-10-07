@@ -220,3 +220,25 @@ export interface EstimateStatistics {
   averageEstimateAmount: number;
   totalEstimatedValue: number;
 }
+
+// Service Interface (for Dependency Injection)
+export interface IEstimatesService {
+  createEstimate(data: CreateEstimateRequest): Promise<EstimateWithDetails>;
+  getEstimateById(id: string): Promise<EstimateWithDetails>;
+  getEstimates(filters: EstimateFilters, page: number, limit: number): Promise<{ estimates: EstimateWithDetails[]; total: number }>;
+  updateEstimate(id: string, data: UpdateEstimateRequest): Promise<EstimateWithDetails>;
+  deleteEstimate(id: string): Promise<void>;
+  createEstimateLabor(data: CreateEstimateLaborRequest): Promise<any>;
+  updateEstimateLabor(id: string, data: UpdateEstimateLaborRequest): Promise<any>;
+  deleteEstimateLabor(id: string): Promise<void>;
+  createEstimatePart(data: CreateEstimatePartRequest): Promise<any>;
+  updateEstimatePart(id: string, data: UpdateEstimatePartRequest): Promise<any>;
+  deleteEstimatePart(id: string): Promise<void>;
+  createEstimateApproval(data: CreateEstimateApprovalRequest): Promise<any>;
+  updateEstimateApproval(id: string, data: UpdateEstimateApprovalRequest): Promise<any>;
+  getEstimateStatistics(): Promise<EstimateStatistics>;
+  approveEstimate(estimateId: string, approvedById: string): Promise<void>;
+  addCannedServiceToEstimate(estimateId: string, cannedServiceId: string): Promise<EstimateWithDetails>;
+  toggleEstimateVisibility(estimateId: string, isVisible: boolean): Promise<EstimateWithDetails>;
+  getCustomerVisibleEstimates(workOrderId: string): Promise<EstimateWithDetails[]>;
+}

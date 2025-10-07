@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TechnicianController } from './technicians.controller';
+import { TechnicianService } from './technicians.service';
 import {
   validateRequest,
   createTechnicianSchema,
@@ -7,9 +8,11 @@ import {
   technicianIdSchema,
   technicianFiltersSchema,
 } from './technicians.validation';
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const technicianController = new TechnicianController();
+const technicianService = new TechnicianService(prisma);
+const technicianController = new TechnicianController(technicianService);
 
 // Get all technicians with optional filtering
 router.get(

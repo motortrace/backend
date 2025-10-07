@@ -365,3 +365,34 @@ export interface WorkOrderStatistics {
     totalRevenue: number;
   }[];
 }
+
+// Service Interface (for Dependency Injection)
+export interface IWorkOrderService {
+  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  createWorkOrder(data: CreateWorkOrderRequest): Promise<any>;
+  getWorkOrders(filters: WorkOrderFilters): Promise<any[]>;
+  getWorkOrderById(id: string): Promise<any>;
+  updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<any>;
+  deleteWorkOrder(id: string): Promise<any>;
+  restoreWorkOrder(id: string): Promise<any>;
+  getCancelledWorkOrders(): Promise<any[]>;
+  createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
+  getWorkOrderServices(workOrderId: string): Promise<any>;
+  createPayment(data: CreatePaymentRequest): Promise<any>;
+  getWorkOrderPayments(workOrderId: string): Promise<any>;
+  updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
+  assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
+  assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
+  updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest): Promise<any>;
+  resetWorkOrderLaborSubtotal(laborId: string): Promise<any>;
+  getWorkOrderStatistics(filters: { startDate?: Date; endDate?: Date }): Promise<WorkOrderStatistics>;
+  searchWorkOrders(query: string, filters: WorkOrderFilters): Promise<any>;
+  uploadWorkOrderAttachment(workOrderId: string, data: any): Promise<any>;
+  getWorkOrderAttachments(workOrderId: string, category?: string): Promise<any>;
+  createWorkOrderInspection(workOrderId: string, inspectorId: string, notes?: string): Promise<any>;
+  getWorkOrderInspections(workOrderId: string): Promise<any>;
+  createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
+  getWorkOrderQC(workOrderId: string): Promise<any>;
+  findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
+  generateEstimateFromLaborAndParts(workOrderId: string, serviceAdvisorId: string): Promise<any>;
+}

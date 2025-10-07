@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { EstimatesController } from './estimates.controller';
+import { EstimatesService } from './estimates.service';
 import {
   createEstimateSchema,
   updateEstimateSchema,
@@ -17,10 +18,13 @@ import {
   estimateApprovalIdSchema,
   validateRequest,
 } from './estimates.validation';
-
+import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
-const estimatesController = new EstimatesController();
+
+// Dependency Injection
+const estimatesService = new EstimatesService(prisma);
+const estimatesController = new EstimatesController(estimatesService);
 
 // Estimate routes
 router.post(

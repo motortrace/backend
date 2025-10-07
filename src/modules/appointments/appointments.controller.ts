@@ -1,15 +1,15 @@
 import { Request, Response } from 'express';
-import { AppointmentService } from './appointments.service';
 import {
   CreateAppointmentRequest,
   UpdateAppointmentRequest,
   AppointmentSlotRequest,
   TimeBlockAvailabilityRequest,
   DailyCapacityRequest,
+  IAppointmentsService,
 } from './appointments.types';
 
 export class AppointmentController {
-  private appointmentService = new AppointmentService();
+  constructor(private readonly appointmentService: IAppointmentsService) {}
 
   // Appointment Management
   async createAppointment(req: any, res: Response) {
