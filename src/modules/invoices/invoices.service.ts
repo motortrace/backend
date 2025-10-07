@@ -191,13 +191,14 @@ export class InvoicesService implements IInvoicesService {
       });
     }
 
-    // Add tax line item if applicable
+    // Add tax line item for record-keeping (18% VAT on subtotal - Sri Lankan standard)
+    // This is calculated as: subtotal * 0.18
     if (taxAmount > 0) {
       await this.prisma.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
           type: LineItemType.TAX,
-          description: 'Tax',
+          description: 'VAT (18%)',
           quantity: 1,
           unitPrice: taxAmount,
           subtotal: taxAmount,
@@ -217,6 +218,24 @@ export class InvoicesService implements IInvoicesService {
           subtotal: -discountAmount,
         },
       });
+    }
+
+    // Automatically generate PDF and store in Supabase Storage
+    let pdfUrl: string | null = null;
+    try {
+      pdfUrl = await this.generateInvoicePDF(invoice.id);
+      console.log(`✅ Invoice PDF generated automatically: ${pdfUrl}`);
+      
+      // Update the invoice record with the PDF URL
+      await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { pdfUrl }
+      });
+      console.log(`✅ Invoice PDF URL saved to database`);
+    } catch (pdfError) {
+      console.error('⚠️ Failed to generate PDF during invoice creation:', pdfError);
+      // Don't fail invoice creation if PDF generation fails
+      // PDF can be regenerated later via GET endpoint
     }
 
     // Return the complete invoice with line items
@@ -576,39 +595,102 @@ export class InvoicesService implements IInvoicesService {
     const fileName = `invoice-${invoice.invoiceNumber}-${Date.now()}.pdf`;
     const tempFilePath = path.join(tempDir, fileName);
 
-    // Transform data to PDF invoice format
-    const payload = {
+    // Separate line items by type (exclude TAX and DISCOUNT as they're handled separately)
+    const serviceItems = invoice.lineItems.filter(item => item.type === 'SERVICE');
+    const laborItems = invoice.lineItems.filter(item => item.type === 'LABOR');
+    const partItems = invoice.lineItems.filter(item => item.type === 'PART');
+    const taxItem = invoice.lineItems.find(item => item.type === 'TAX');
+    const discountItem = invoice.lineItems.find(item => item.type === 'DISCOUNT');
+
+    // Map line items - USE SUBTOTAL AS PRICE (that's what we actually charge)
+    // The library displays 'price' field, so we pass subtotal there
+    const allItems = [
+      ...serviceItems.map(item => {
+        return {
+          name: item.description,
+          quantity: Number(item.quantity),
+          price: Number(item.subtotal) / Number(item.quantity), // Price per unit after discount
+        };
+      }),
+      ...laborItems.map(item => {
+        return {
+          name: item.description,
+          quantity: Number(item.quantity),
+          price: Number(item.subtotal) / Number(item.quantity),
+        };
+      }),
+      ...partItems.map(item => {
+        return {
+          name: item.description,
+          quantity: Number(item.quantity),
+          price: Number(item.subtotal) / Number(item.quantity),
+        };
+      }),
+    ];
+
+    // Format dates for Sri Lanka
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
+      });
+    };
+
+    // Build vehicle header for top of invoice
+    let vehicleHeader = `Work Order: ${invoice.workOrder.workOrderNumber}\n`;
+    vehicleHeader += `Vehicle: ${invoice.workOrder.vehicle.year} ${invoice.workOrder.vehicle.make} ${invoice.workOrder.vehicle.model}\n`;
+    if (invoice.workOrder.vehicle.licensePlate) {
+      vehicleHeader += `License Plate: ${invoice.workOrder.vehicle.licensePlate}\n`;
+    }
+    if (invoice.workOrder.vehicle.vin) {
+      vehicleHeader += `VIN: ${invoice.workOrder.vehicle.vin}\n`;
+    }
+    if (invoice.workOrder.odometerReading) {
+      vehicleHeader += `Odometer: ${invoice.workOrder.odometerReading.toLocaleString()} km`;
+    }
+
+    // Build detailed notes for footer
+    let detailedNotes = invoice.notes || "Thank you for your business!";
+    if (invoice.terms) {
+      detailedNotes += `\n\nTerms: ${invoice.terms}`;
+    }
+
+    // Transform data to PDF invoice format - USE INVOICE TABLE VALUES DIRECTLY
+    const payload: any = {
       company: {
         name: "MotorTrace Auto Service",
-        address: "123 Service Center Drive\nCity, State 12345",
-        phone: "Tel: (555) 123-4567",
-        email: "Email: service@motortrace.com",
-        website: "Web: https://www.motortrace.com",
-        taxId: "Tax ID: 12-3456789",
+        address: `${vehicleHeader}\n\n` + "No. 123, Service Center Road\nColombo 00500\nSri Lanka",
+        phone: "Tel: +94 11 234 5678",
+        email: "Email: service@motortrace.lk",
+        website: "Web: https://www.motortrace.lk",
+        taxId: "VAT Reg No: 123456789-7000",
       },
       customer: {
         name: invoice.workOrder.customer.name,
         email: invoice.workOrder.customer.email || undefined,
         phone: invoice.workOrder.customer.phone || undefined,
+        address: undefined,
       },
       invoice: {
         number: invoice.invoiceNumber,
-        date: invoice.createdAt.toLocaleDateString('en-US'),
-        dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'),
+        date: formatDate(invoice.createdAt),
+        dueDate: invoice.dueDate ? formatDate(invoice.dueDate) : formatDate(new Date()),
         status: this.getInvoiceStatusLabel(invoice.status),
-        locale: "en-US",
-        currency: "USD",
+        locale: "en-LK",
+        currency: "LKR",
         path: tempFilePath,
       },
-      items: invoice.lineItems.map(item => ({
-        name: item.description,
-        quantity: item.quantity,
-        price: Number(item.unitPrice),
-        tax: 0, // Tax is already calculated separately
-      })),
+      items: allItems,
+      // USE EXACT VALUES FROM INVOICE TABLE
+      subtotal: Number(invoice.subtotal),
+      tax: Number(invoice.taxAmount),
+      taxLabel: "VAT (18%)",
+      discount: Number(invoice.discountAmount || 0),
+      total: Number(invoice.totalAmount),
       note: {
-        text: invoice.notes || "Thank you for your business!",
-        italic: true,
+        text: detailedNotes,
+        italic: false,
       },
     };
 
