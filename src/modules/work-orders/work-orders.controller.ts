@@ -27,21 +27,20 @@ export class WorkOrderController {
   async createWorkOrder(req: any, res: Response) {
     try {
       const workOrderData: CreateWorkOrderRequest = req.body;
-
-      const workOrder = await this.workOrderService.createWorkOrder(workOrderData);
-
+      const workOrderId = await this.workOrderService.createWorkOrder(workOrderData);
       res.status(201).json({
         success: true,
-        data: workOrder,
+        workOrderId,
         message: 'Work order created successfully',
       });
     } catch (error: any) {
       res.status(400).json({
         success: false,
-        error: error.message,
+        message: error.message || 'Something went wrong',
       });
     }
   }
+
 
   async getWorkOrders(req: Request, res: Response) {
     try {
@@ -135,40 +134,40 @@ export class WorkOrderController {
     }
   }
 
-  async restoreWorkOrder(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
+  // async restoreWorkOrder(req: Request, res: Response) {
+  //   try {
+  //     const { id } = req.params;
+  //     const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
 
-      res.json({
-        success: true,
-        data: restoredWorkOrder,
-        message: 'Work order restored successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: restoredWorkOrder,
+  //       message: 'Work order restored successfully',
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
-  async getCancelledWorkOrders(req: Request, res: Response) {
-    try {
-      const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
+  // async getCancelledWorkOrders(req: Request, res: Response) {
+  //   try {
+  //     const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
 
-      res.json({
-        success: true,
-        data: cancelledWorkOrders,
-        message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: cancelledWorkOrders,
+  //       message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
   // Work Order Services
   async createWorkOrderService(req: Request, res: Response) {
@@ -568,12 +567,15 @@ export class WorkOrderController {
     }
   }
 
-  // Generate estimate from labor and parts
-  async generateEstimateFromLaborAndParts(req: Request, res: Response) {
-    try {
-      const { workOrderId } = req.params;
-      const supabaseUserId = (req as any).user?.id; // Get Supabase user ID from auth middleware
+  // Customer Approval Endpoints
 
+  async approveService(req: any, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      const { notes } = req.body;
+      
+      // Get customer ID from authenticated user
+      const supabaseUserId = req.user?.id;
       if (!supabaseUserId) {
         return res.status(401).json({
           success: false,
@@ -581,22 +583,322 @@ export class WorkOrderController {
         });
       }
 
-      // Find the ServiceAdvisor ID that corresponds to this Supabase user
-      const serviceAdvisor = await this.workOrderService.findServiceAdvisorBySupabaseUserId(supabaseUserId);
-      
-      if (!serviceAdvisor) {
-        return res.status(403).json({
+      // Find UserProfile then Customer by Supabase user ID
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
           success: false,
-          error: 'Service advisor not found for this user'
+          error: 'User profile not found'
         });
       }
 
-      const result = await this.workOrderService.generateEstimateFromLaborAndParts(workOrderId, serviceAdvisor.id);
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.approveService(serviceId, customer.id, notes);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async rejectService(req: any, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      const { reason } = req.body;
+      
+      // Get customer ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find customer by Supabase user ID
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.rejectService(serviceId, customer.id, reason);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async approvePart(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { notes } = req.body;
+      
+      // Get customer ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find customer by Supabase user ID
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.approvePart(partId, customer.id, notes);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async rejectPart(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { reason } = req.body;
+      
+      // Get customer ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find customer by Supabase user ID
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.rejectPart(partId, customer.id, reason);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getPendingApprovals(req: any, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      
+      // Get customer ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find customer by Supabase user ID
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Customer profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.getPendingApprovals(workOrderId, customer.id);
 
       res.json({
         success: true,
         data: result,
-        message: 'Estimate generated successfully and work order status updated to APPROVAL',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Part Installation Endpoints
+
+  async assignTechnicianToPart(req: Request, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { technicianId } = req.body;
+
+      const part = await this.workOrderService.assignTechnicianToPart(partId, technicianId);
+
+      res.json({
+        success: true,
+        data: part,
+        message: 'Technician assigned to part successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async startPartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.startPartInstallation(partId, technician.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async completePartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { notes, warrantyInfo } = req.body;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.completePartInstallation(partId, technician.id, { notes, warrantyInfo });
+
+      res.json({
+        success: true,
+        message: result.message,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -606,3 +908,4 @@ export class WorkOrderController {
     }
   }
 }
+

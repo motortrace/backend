@@ -199,8 +199,8 @@ export interface WorkOrderWithDetails {
       id: string;
       code: string;
       name: string;
-      estimatedHours: number;
-      hourlyRate: number;
+      estimatedMinutes: number;
+      skillLevel?: string;
     };
     technician?: {
       id: string;
@@ -317,7 +317,7 @@ export interface WorkOrderWithDetails {
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;
   cannedServiceId: string;
-  description?: string;
+  description: string;  // Required field
   quantity?: number;
   unitPrice?: number;
   notes?: string;
@@ -374,8 +374,7 @@ export interface IWorkOrderService {
   getWorkOrderById(id: string): Promise<any>;
   updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<any>;
   deleteWorkOrder(id: string): Promise<any>;
-  restoreWorkOrder(id: string): Promise<any>;
-  getCancelledWorkOrders(): Promise<any[]>;
+  // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
@@ -394,5 +393,18 @@ export interface IWorkOrderService {
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
-  generateEstimateFromLaborAndParts(workOrderId: string, serviceAdvisorId: string): Promise<any>;
+  
+  // Customer approval methods
+  approveService(serviceId: string, customerId: string, notes?: string): Promise<any>;
+  rejectService(serviceId: string, customerId: string, reason?: string): Promise<any>;
+  approvePart(partId: string, customerId: string, notes?: string): Promise<any>;
+  rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
+  getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
+  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  
+  // Part installation methods
+  assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
+  startPartInstallation(partId: string, technicianId: string): Promise<any>;
+  completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }): Promise<any>;
+  findTechnicianBySupabaseUserId(supabaseUserId: string): Promise<any>;
 }

@@ -110,7 +110,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -144,7 +144,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -179,7 +179,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -232,7 +232,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -366,7 +366,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -529,4 +529,5 @@ export class ServiceAdvisorService {
     };
   }
 }
+
 
