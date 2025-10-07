@@ -92,33 +92,95 @@ export class AuthSupabaseController {
       // Get the full user data from Supabase
       const supabaseUser = await this.authService.getUser(req.headers.authorization?.replace('Bearer ', '') || '');
 
-      // Load profile from Prisma
+      // Load profile from Prisma with all role-specific data
       const userProfile = await this.prisma.userProfile.findUnique({
         where: { supabaseUserId: req.user.id },
-        select: {
-          name: true,
-          phone: true,
-          profileImage: true,
-          isRegistrationComplete: true
+        include: {
+          customer: true,
+          serviceAdvisor: true,
+          technician: true,
+          inventoryManager: true,
+          manager: true,
+          admin: true
         }
       });
 
-      // For now, we'll return Supabase user data plus Prisma profile data
+      if (!userProfile) {
+        res.status(404).json({ 
+          error: 'User profile not found',
+          message: 'No user profile exists for this Supabase user' 
+        });
+        return;
+      }
+
+      // Build role-specific data object
+      let roleData: any = null;
+      if (userProfile.customer) {
+        roleData = {
+          type: 'customer',
+          customerId: userProfile.customer.id,
+          ...userProfile.customer
+        };
+      } else if (userProfile.serviceAdvisor) {
+        roleData = {
+          type: 'service_advisor',
+          serviceAdvisorId: userProfile.serviceAdvisor.id,
+          employeeId: userProfile.serviceAdvisor.employeeId,
+          department: userProfile.serviceAdvisor.department
+        };
+      } else if (userProfile.technician) {
+        roleData = {
+          type: 'technician',
+          technicianId: userProfile.technician.id,
+          employeeId: userProfile.technician.employeeId,
+          specialization: userProfile.technician.specialization,
+          certifications: userProfile.technician.certifications
+        };
+      } else if (userProfile.inventoryManager) {
+        roleData = {
+          type: 'inventory_manager',
+          inventoryManagerId: userProfile.inventoryManager.id,
+          employeeId: userProfile.inventoryManager.employeeId,
+          department: userProfile.inventoryManager.department
+        };
+      } else if (userProfile.manager) {
+        roleData = {
+          type: 'manager',
+          managerId: userProfile.manager.id,
+          employeeId: userProfile.manager.employeeId,
+          department: userProfile.manager.department
+        };
+      } else if (userProfile.admin) {
+        roleData = {
+          type: 'admin',
+          adminId: userProfile.admin.id,
+          employeeId: userProfile.admin.employeeId
+        };
+      }
+
+      // Return comprehensive user data
       console.log('🔍 Supabase user:', supabaseUser);
       res.json({
-        user: {
-          id: req.user.id,
+        success: true,
+        data: {
+          // Supabase auth data
+          supabaseUserId: req.user.id,
           email: req.user.email,
-          role: req.user.role,
-          // Additional Supabase user data
           emailConfirmed: supabaseUser?.email_confirmed_at ? true : false,
-          createdAt: supabaseUser?.created_at,
           lastSignIn: supabaseUser?.last_sign_in_at,
-          // Prisma profile data
-          fullName: userProfile?.name || undefined,
-          phone: userProfile?.phone || undefined,
-          profileImage: userProfile?.profileImage || undefined,
-          isRegistrationComplete: userProfile?.isRegistrationComplete ?? false
+          
+          // UserProfile data
+          userProfileId: userProfile.id,
+          name: userProfile.name,
+          phone: userProfile.phone,
+          profileImage: userProfile.profileImage,
+          role: userProfile.role,
+          isRegistrationComplete: userProfile.isRegistrationComplete,
+          createdAt: userProfile.createdAt,
+          updatedAt: userProfile.updatedAt,
+          
+          // Role-specific data
+          roleDetails: roleData
         },
         message: 'User profile retrieved successfully'
       });
