@@ -408,18 +408,7 @@ export class LaborService {
       throw new Error(`Work order labor with ID '${id}' not found`);
     }
 
-    if (data.serviceId) {
-      const service = await this.prisma.workOrderService.findFirst({
-        where: {
-          id: data.serviceId,
-          workOrderId: existingLabor.workOrderId,
-        },
-      });
-
-      if (!service) {
-        throw new Error(`Service with ID '${data.serviceId}' not found in this work order`);
-      }
-    }
+    // Note: serviceId cannot be updated - it's a required foreign key
 
     if (data.laborCatalogId) {
       const laborCatalog = await this.prisma.laborCatalog.findUnique({
@@ -441,9 +430,21 @@ export class LaborService {
       }
     }
 
+    // Build update data object with only the fields that can be updated
+    const updateData: any = {};
+    if (data.laborCatalogId !== undefined) updateData.laborCatalogId = data.laborCatalogId;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.estimatedMinutes !== undefined) updateData.estimatedMinutes = data.estimatedMinutes;
+    if (data.actualMinutes !== undefined) updateData.actualMinutes = data.actualMinutes;
+    if (data.technicianId !== undefined) updateData.technicianId = data.technicianId;
+    if (data.startTime !== undefined) updateData.startTime = data.startTime;
+    if (data.endTime !== undefined) updateData.endTime = data.endTime;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+
     return await this.prisma.workOrderLabor.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         workOrder: {
           select: {

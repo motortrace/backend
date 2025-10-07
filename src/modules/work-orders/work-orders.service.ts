@@ -19,10 +19,9 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     serviceAdvisor: { select: { id: true; employeeId: true; department: true; userProfile: { select: { id: true; name: true; phone: true } } } };
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
     inspections: { include: { inspector: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedHours: true; hourlyRate: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
+    laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedMinutes: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    estimates: { include: { createdBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } }; approvedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
     attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
   };
 }>;
@@ -305,32 +304,6 @@ export class WorkOrderService {
             },
           },
         },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
         attachments: {
           include: {
             uploadedBy: { select: { id: true, name: true } },
@@ -414,25 +387,6 @@ export class WorkOrderService {
           delete payment.processedBy.userProfile.name;
         }
         return payment;
-      });
-    }
-
-    // Transform technician names in estimates
-    if (transformed.estimates) {
-      transformed.estimates = transformed.estimates.map((estimate: any) => {
-        if (estimate.createdBy && estimate.createdBy.userProfile && estimate.createdBy.userProfile.name) {
-          const nameParts = estimate.createdBy.userProfile.name.split(' ');
-          estimate.createdBy.userProfile.firstName = nameParts[0] || '';
-          estimate.createdBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
-          delete estimate.createdBy.userProfile.name;
-        }
-        if (estimate.approvedBy && estimate.approvedBy.userProfile && estimate.approvedBy.userProfile.name) {
-          const nameParts = estimate.approvedBy.userProfile.name.split(' ');
-          estimate.approvedBy.userProfile.firstName = nameParts[0] || '';
-          estimate.approvedBy.userProfile.lastName = nameParts.slice(1).join(' ') || '';
-          delete estimate.approvedBy.userProfile.name;
-        }
-        return estimate;
       });
     }
 
@@ -576,32 +530,6 @@ export class WorkOrderService {
         payments: {
           include: {
             processedBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        estimates: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                userProfile: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            approvedBy: {
               select: {
                 id: true,
                 userProfile: {
@@ -1686,125 +1614,6 @@ export class WorkOrderService {
     return qc;
   }
 
-  // Generate estimate from existing labor and parts
-  async generateEstimateFromLaborAndParts(workOrderId: string, createdById: string) {
-    // Get the work order with all labor and parts
-    const workOrder = await this.prisma.workOrder.findUnique({
-      where: { id: workOrderId },
-      include: {
-        laborItems: {
-          include: {
-            laborCatalog: true,
-            technician: {
-              include: {
-                userProfile: true
-              }
-            }
-          }
-        },
-        partsUsed: {
-          include: {
-            part: true,
-            installedBy: {
-              include: {
-                userProfile: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!workOrder) {
-      throw new Error('Work order not found');
-    }
-
-    // NOTE: In new architecture, labor doesn't have subtotals - only parts are billable here
-    // Services (which may include labor operations) have their own pricing
-    const partsTotal = workOrder.partsUsed.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    
-    const subtotal = partsTotal;
-    const taxAmount = subtotal * 0.1; // 10% tax - you can make this configurable
-    const totalAmount = subtotal + taxAmount;
-
-
-
-
-
-    // Create the estimate
-    const estimate = await this.prisma.workOrderEstimate.create({
-      data: {
-        workOrderId,
-        version: 1,
-        description: `Estimate generated from parts for ${workOrder.workOrderNumber}`,
-        totalAmount,
-        laborAmount: 0,  // Labor is tracked separately, not billed directly
-        partsAmount: partsTotal,
-        taxAmount,
-        discountAmount: 0,
-        notes: 'Estimate automatically generated from recorded parts (labor tracked in services)',
-        createdById,
-        approved: true, // Auto-approve since it's based on actual work
-        approvedAt: new Date(),
-        approvedById: createdById,
-
-      },
-      include: {
-        estimateLaborItems: true,
-        estimatePartItems: true,
-        createdBy: {
-          select: {
-            id: true,
-            employeeId: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        approvedBy: {
-          select: {
-            id: true,
-            userProfile: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Update work order status to APPROVAL and update totals
-    await this.prisma.workOrder.update({
-      where: { id: workOrderId },
-      data: {
-        status: 'IN_PROGRESS' as WorkOrderStatus,
-        workflowStep: 'APPROVAL' as WorkflowStep,
-        estimatedTotal: totalAmount,
-        subtotalParts: partsTotal,
-        totalAmount: totalAmount,
-        taxAmount: taxAmount,
-        estimateApproved: true
-      }
-    });
-
-    return {
-      estimate,
-      workOrderUpdate: {
-        status: 'IN_PROGRESS',
-        workflowStep: 'APPROVAL',
-        estimatedTotal: totalAmount,
-        subtotalParts: partsTotal,
-        totalAmount: totalAmount,
-        taxAmount: taxAmount
-      }
-    };
-  }
-
   // Helper method to find ServiceAdvisor by Supabase user ID
   async findServiceAdvisorBySupabaseUserId(supabaseUserId: string) {
     const serviceAdvisor = await this.prisma.serviceAdvisor.findFirst({
@@ -1847,5 +1656,6 @@ export class WorkOrderService {
     });
   }
 }
+
 
 

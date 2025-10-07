@@ -566,42 +566,4 @@ export class WorkOrderController {
       });
     }
   }
-
-  // Generate estimate from labor and parts
-  async generateEstimateFromLaborAndParts(req: Request, res: Response) {
-    try {
-      const { workOrderId } = req.params;
-      const supabaseUserId = (req as any).user?.id; // Get Supabase user ID from auth middleware
-
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find the ServiceAdvisor ID that corresponds to this Supabase user
-      const serviceAdvisor = await this.workOrderService.findServiceAdvisorBySupabaseUserId(supabaseUserId);
-      
-      if (!serviceAdvisor) {
-        return res.status(403).json({
-          success: false,
-          error: 'Service advisor not found for this user'
-        });
-      }
-
-      const result = await this.workOrderService.generateEstimateFromLaborAndParts(workOrderId, serviceAdvisor.id);
-
-      res.json({
-        success: true,
-        data: result,
-        message: 'Estimate generated successfully and work order status updated to APPROVAL',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
 }

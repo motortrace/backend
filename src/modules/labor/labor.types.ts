@@ -46,7 +46,7 @@ export interface CreateWorkOrderLaborRequest {
 }
 
 export interface UpdateWorkOrderLaborRequest {
-  serviceId?: string;
+  // Note: serviceId cannot be updated - it's a required foreign key set at creation
   laborCatalogId?: string;
   description?: string;
   estimatedMinutes?: number;

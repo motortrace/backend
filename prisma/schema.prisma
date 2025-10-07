@@ -44,7 +44,6 @@ model ServiceAdvisor {
   // Relations
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
-  createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
   approvals      WorkOrderApproval[] @relation("Approvals")
   processedPayments Payment[] @relation("ProcessedPayments")
 }
@@ -112,7 +111,6 @@ model Customer {
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
   appointments  Appointment[]
-  approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
 }
 
 model Vehicle {
@@ -202,7 +200,6 @@ model WorkOrder {
   qcChecks        WorkOrderQC[]
   attachments     WorkOrderAttachment[]
   payments        Payment[]
-  estimates       WorkOrderEstimate[]
   services        WorkOrderService[]
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
@@ -276,7 +273,6 @@ model LaborCatalog {
 
   // Relations
   cannedServices CannedServiceLabor[] // Services that use this labor operation
-  estimateLaborItems EstimateLabor[]
   laborItems WorkOrderLabor[]
 }
 
@@ -335,7 +331,6 @@ model InventoryItem {
   categoryId   String
   
   // Relations
-  estimatePartItems EstimatePart[]
   workOrderParts WorkOrderPart[]
 }
 
@@ -561,59 +556,7 @@ model WorkOrderInspectionAttachment {
   uploadedAt   DateTime   @default(now())
 }
 
-// Estimates & Approvals
-// SIMPLIFIED: No more EstimateLabor/EstimatePart tables
-// Estimate tracking happens directly on WorkOrderService and WorkOrderPart
-model WorkOrderEstimate {
-  id           String    @id @default(cuid())
-  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id])
-  workOrderId  String
-  version      Int       @default(1) // Track estimate versions
-  description  String?   // Brief description of what this estimate covers
-  
-  // Calculated totals (from WorkOrderService/Part with matching estimateId)
-  totalAmount  Decimal   @db.Decimal(10,2)
-  taxAmount    Decimal?  @db.Decimal(10,2) @default(0)
-  discountAmount Decimal? @db.Decimal(10,2) @default(0)
-  
-  notes        String?   // Additional notes about the estimate
-  
-  // Status tracking
-  status       EstimateStatus @default(DRAFT)
-  sentAt       DateTime? // When sent to customer
-  
-  // Approval
-  approved     Boolean   @default(false)
-  approvedAt   DateTime?
-  approvedBy   Customer? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
-  approvedById String?
-  
-  // Rejection
-  rejectedAt   DateTime?
-  rejectionReason String?
-  
-  // Creator
-  createdBy    ServiceAdvisor? @relation("CreatedEstimates", fields: [createdById], references: [id])
-  createdById  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  approvals    WorkOrderApproval[]
-  
-  @@index([workOrderId, version])
-  @@index([status])
-}
-
-enum EstimateStatus {
-  DRAFT           // Being prepared
-  SENT            // Sent to customer
-  APPROVED        // Customer approved
-  REJECTED        // Customer rejected
-  EXPIRED         // Valid until date passed
-  SUPERSEDED      // Newer version created
-}
-
-// Labor & Parts Usage - Populated from estimates when approved
+// Labor & Parts Usage
 model WorkOrderLabor {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
@@ -659,10 +602,6 @@ model WorkOrderPart {
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
   
-  // Estimate tracking - links this part to an estimate
-  estimateId       String?       // Which estimate included this part
-  estimateVersion  Int?          // Track version history
-  
   // Customer approval status
   customerApproved Boolean       @default(false)
   customerRejected Boolean       @default(false)
@@ -684,7 +623,6 @@ model WorkOrderPart {
   updatedAt        DateTime      @updatedAt
   
   @@index([workOrderId])
-  @@index([estimateId])
   @@index([customerApproved])
 }
 
@@ -693,8 +631,6 @@ model WorkOrderApproval {
   id           String       @id @default(cuid())
   workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  estimate     WorkOrderEstimate? @relation(fields: [estimateId], references: [id])
-  estimateId   String?
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
@@ -851,10 +787,6 @@ model WorkOrderService {
   unitPrice        Decimal       @db.Decimal(10,2)  // Price per service instance
   subtotal         Decimal       @db.Decimal(10,2)  // unitPrice × quantity
   
-  // Estimate tracking - links this service to an estimate
-  estimateId       String?       // Which estimate included this service
-  estimateVersion  Int?          // Track version history
-  
   // Customer approval status
   customerApproved Boolean       @default(false)
   customerRejected Boolean       @default(false)
@@ -873,7 +805,6 @@ model WorkOrderService {
   laborItems       WorkOrderLabor[]
   
   @@index([workOrderId])
-  @@index([estimateId])
   @@index([customerApproved])
   @@index([status])
 }

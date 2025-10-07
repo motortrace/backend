@@ -393,5 +393,4 @@ export interface IWorkOrderService {
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
-  generateEstimateFromLaborAndParts(workOrderId: string, serviceAdvisorId: string): Promise<any>;
 }
