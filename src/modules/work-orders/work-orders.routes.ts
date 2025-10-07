@@ -57,6 +57,11 @@ router.post('/parts/:partId/approve', authenticateSupabaseToken, workOrderContro
 router.post('/parts/:partId/reject', authenticateSupabaseToken, workOrderController.rejectPart.bind(workOrderController));
 router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrderController.getPendingApprovals.bind(workOrderController));
 
+// Part Installation Routes (technician workflows)
+router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
+router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));
+router.put('/parts/:partId/complete', authenticateSupabaseToken, requireTechnician, workOrderController.completePartInstallation.bind(workOrderController));
+
 // Work Order Statistics Routes
 router.get('/statistics/overview', authenticateSupabaseToken, requireManager, workOrderController.getWorkOrderStatistics.bind(workOrderController));
 

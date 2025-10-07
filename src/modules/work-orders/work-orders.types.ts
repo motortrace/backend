@@ -401,4 +401,10 @@ export interface IWorkOrderService {
   rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
   getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
   getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  
+  // Part installation methods
+  assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
+  startPartInstallation(partId: string, technicianId: string): Promise<any>;
+  completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }): Promise<any>;
+  findTechnicianBySupabaseUserId(supabaseUserId: string): Promise<any>;
 }

@@ -633,7 +633,19 @@ export class WorkOrderController {
       }
 
       // Find customer by Supabase user ID
-      const customer = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (!customer) {
         return res.status(404).json({
           success: false,
@@ -670,7 +682,19 @@ export class WorkOrderController {
       }
 
       // Find customer by Supabase user ID
-      const customer = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (!customer) {
         return res.status(404).json({
           success: false,
@@ -707,7 +731,19 @@ export class WorkOrderController {
       }
 
       // Find customer by Supabase user ID
-      const customer = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (!customer) {
         return res.status(404).json({
           success: false,
@@ -743,7 +779,19 @@ export class WorkOrderController {
       }
 
       // Find customer by Supabase user ID
-      const customer = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Get Customer record linked to this UserProfile
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (!customer) {
         return res.status(404).json({
           success: false,
@@ -764,4 +812,100 @@ export class WorkOrderController {
       });
     }
   }
+
+  // Part Installation Endpoints
+
+  async assignTechnicianToPart(req: Request, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { technicianId } = req.body;
+
+      const part = await this.workOrderService.assignTechnicianToPart(partId, technicianId);
+
+      res.json({
+        success: true,
+        data: part,
+        message: 'Technician assigned to part successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async startPartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.startPartInstallation(partId, technician.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async completePartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { notes, warrantyInfo } = req.body;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.completePartInstallation(partId, technician.id, { notes, warrantyInfo });
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
+

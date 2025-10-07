@@ -1801,6 +1801,102 @@ export class WorkOrderService {
     };
   }
 
+  // Part Installation Management
+
+  // Assign technician to a part
+  async assignTechnicianToPart(partId: string, technicianId: string) {
+    const part = await this.prisma.workOrderPart.findUnique({
+      where: { id: partId },
+      include: { workOrder: true },
+    });
+
+    if (!part) {
+      throw new Error('Part not found');
+    }
+
+    // Update part with technician assignment
+    const updatedPart = await this.prisma.workOrderPart.update({
+      where: { id: partId },
+      data: { installedById: technicianId },
+      include: {
+        installedBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+          },
+        },
+      },
+    });
+
+    return updatedPart;
+  }
+
+  // Start part installation (technician marks work started)
+  async startPartInstallation(partId: string, technicianId: string) {
+    const part = await this.prisma.workOrderPart.findUnique({
+      where: { id: partId },
+    });
+
+    if (!part) {
+      throw new Error('Part not found');
+    }
+
+    // Verify technician is assigned to this part
+    if (part.installedById !== technicianId) {
+      throw new Error('Unauthorized: You are not assigned to install this part');
+    }
+
+    // Update part to mark installation started
+    await this.prisma.workOrderPart.update({
+      where: { id: partId },
+      data: {
+        // You could add a status field if needed, for now just confirm assignment
+      },
+    });
+
+    return { message: 'Part installation started' };
+  }
+
+  // Complete part installation
+  async completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }) {
+    const part = await this.prisma.workOrderPart.findUnique({
+      where: { id: partId },
+    });
+
+    if (!part) {
+      throw new Error('Part not found');
+    }
+
+    // Verify technician is assigned to this part
+    if (part.installedById !== technicianId) {
+      throw new Error('Unauthorized: You are not assigned to install this part');
+    }
+
+    // Update part to mark installation complete
+    await this.prisma.workOrderPart.update({
+      where: { id: partId },
+      data: {
+        installedAt: new Date(),
+        notes: data.notes,
+        warrantyInfo: data.warrantyInfo,
+      },
+    });
+
+    return { message: 'Part installation completed successfully' };
+  }
+
   // Helper method to find ServiceAdvisor by Supabase user ID
   async findServiceAdvisorBySupabaseUserId(supabaseUserId: string) {
     const serviceAdvisor = await this.prisma.serviceAdvisor.findFirst({
@@ -1812,6 +1908,19 @@ export class WorkOrderService {
     });
 
     return serviceAdvisor;
+  }
+
+  // Helper method to find Technician by Supabase user ID
+  async findTechnicianBySupabaseUserId(supabaseUserId: string) {
+    const technician = await this.prisma.technician.findFirst({
+      where: {
+        userProfile: {
+          supabaseUserId: supabaseUserId
+        }
+      }
+    });
+
+    return technician;
   }
 
   // Helper method to update work order payment status
