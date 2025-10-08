@@ -37,7 +37,7 @@ npx ts-node scripts/migrate-labor-pricing.ts
 npx prisma db push
 ```
 
-## 🔧 TODO: Code Updates Required
+##  TODO: Code Updates Required
 
 ### 1. **labor.service.ts** - Major updates needed
    -  Line 44: `createLabor()` - Change `subtotal = hours * rate` → `price * quantity`

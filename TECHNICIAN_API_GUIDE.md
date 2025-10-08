@@ -1,6 +1,6 @@
 # Technician API Endpoints Guide
 
-## 🔧 Complete Guide for Technician Workflow
+##  Complete Guide for Technician Workflow
 
 This guide covers all endpoints technicians need to view, accept, and complete their work.
 

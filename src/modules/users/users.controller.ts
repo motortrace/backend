@@ -174,7 +174,7 @@ export class UsersController {
         return;
       }
 
-      console.log('🔧 Creating staff user:', { email, role, name });
+      console.log(' Creating staff user:', { email, role, name });
 
       // 1. Create user in Supabase Auth
       const { data: authData, error: authError } = await this.supabaseAdmin.auth.admin.createUser({

@@ -1,6 +1,6 @@
 # Parts Workflow & System Design
 
-## 📦 Endpoint to Check All Parts in System
+##  Endpoint to Check All Parts in System
 
 ```bash
 GET http://localhost:3000/inventory
@@ -183,7 +183,7 @@ Customer never saw or approved these parts
 
 ---
 
-## 🔧 Implementation Recommendations
+##  Implementation Recommendations
 
 ### 1. **Remove Direct WorkOrderPart Creation**
 - Remove endpoints that allow technicians to add parts directly

@@ -420,9 +420,9 @@ export class StorageService {
    */
   static async initializeStorage(): Promise<void> {
     try {
-      console.log('🔧 Initializing storage...');
-      console.log('🔧 Supabase URL:', process.env.SUPABASE_URL || 'Not set');
-      console.log('🔧 Supabase Key:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
+      console.log(' Initializing storage...');
+      console.log(' Supabase URL:', process.env.SUPABASE_URL || 'Not set');
+      console.log(' Supabase Key:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
 
       // Check if Supabase is configured
       if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
@@ -443,7 +443,7 @@ export class StorageService {
         return;
       }
 
-      console.log('📦 Available buckets:', buckets?.map(b => b.name) || []);
+      console.log(' Available buckets:', buckets?.map(b => b.name) || []);
 
       const profileBucketExists = buckets?.some(bucket => bucket.name === this.PROFILE_IMAGES_BUCKET);
       const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
@@ -452,7 +452,7 @@ export class StorageService {
       const invoicesBucketExists = buckets?.some(bucket => bucket.name === this.INVOICES_BUCKET);
 
       if (!profileBucketExists) {
-        console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
         
         // Create bucket using service client
         const { error: createError } = await serviceClient.storage.createBucket(
@@ -476,7 +476,7 @@ export class StorageService {
       }
 
       if (!carBucketExists) {
-        console.log(`📦 Creating bucket: ${this.CAR_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.CAR_IMAGES_BUCKET}`);
         const { error: createCarError } = await serviceClient.storage.createBucket(
           this.CAR_IMAGES_BUCKET,
           {
@@ -495,7 +495,7 @@ export class StorageService {
       }
 
       if (!templateBucketExists) {
-        console.log(`📦 Creating bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
         const { error: createTemplateError } = await serviceClient.storage.createBucket(
           this.TEMPLATE_IMAGES_BUCKET,
           {
@@ -514,7 +514,7 @@ export class StorageService {
       }
 
       if (!workOrderAttachmentsBucketExists) {
-        console.log(`📦 Creating bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        console.log(` Creating bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
         const { error: createAttachmentsError } = await serviceClient.storage.createBucket(
           this.WORK_ORDER_ATTACHMENTS_BUCKET,
           {
@@ -533,7 +533,7 @@ export class StorageService {
       }
 
       if (!invoicesBucketExists) {
-        console.log(`📦 Creating bucket: ${this.INVOICES_BUCKET}`);
+        console.log(` Creating bucket: ${this.INVOICES_BUCKET}`);
         const { error: createInvoicesError } = await serviceClient.storage.createBucket(
           this.INVOICES_BUCKET,
           {
