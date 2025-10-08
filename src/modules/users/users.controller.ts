@@ -228,7 +228,7 @@ export class UsersController {
 
         console.log(' Role-specific record created:', roleSpecificRecord);
       } catch (roleError: any) {
-        console.warn('⚠️ Failed to create role-specific record:', roleError.message);
+        console.warn(' Failed to create role-specific record:', roleError.message);
       }
 
       res.status(201).json({

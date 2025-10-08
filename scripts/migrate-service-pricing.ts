@@ -105,7 +105,7 @@ async function migrateToServicePricing() {
       
       // If still no price, set a default or skip
       if (unitPrice === 0) {
-        console.log(`  ⚠️  Service ${service.id} has no price, setting to 0...`);
+        console.log(`    Service ${service.id} has no price, setting to 0...`);
       }
       
       const subtotal = unitPrice * service.quantity;

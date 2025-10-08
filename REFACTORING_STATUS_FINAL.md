@@ -27,7 +27,7 @@ We've successfully migrated the database schema and data to the new service-base
    -  Work Orders types (work-orders.types.ts)
    -  Estimates Module (estimates.types.ts, estimates.service.ts)
 
-### Current Status ⚠️
+### Current Status 
 
 The `work-orders.service.ts` file has too many complex methods that reference the old pricing model. The file needs manual review and refactoring because:
 

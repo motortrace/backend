@@ -280,7 +280,7 @@ export class AuthSupabaseController {
           });
           console.log(' Supabase user metadata updated with registration completion flag');
         } catch (metaErr) {
-          console.warn('⚠️ Failed to update Supabase user metadata:', metaErr);
+          console.warn(' Failed to update Supabase user metadata:', metaErr);
         }
 
         const response = {
@@ -546,7 +546,7 @@ export class AuthSupabaseController {
               });
               console.log(' Appointments deleted');
             } catch (error) {
-              console.warn('⚠️ No appointments to delete or table does not exist');
+              console.warn(' No appointments to delete or table does not exist');
             }
 
             // Delete customer vehicles first (due to foreign key constraints)
@@ -556,7 +556,7 @@ export class AuthSupabaseController {
               });
               console.log(' Customer vehicles deleted');
             } catch (error) {
-              console.warn('⚠️ No vehicles to delete or error occurred:', error);
+              console.warn(' No vehicles to delete or error occurred:', error);
             }
 
             // Delete customer record
@@ -572,7 +572,7 @@ export class AuthSupabaseController {
           });
           console.log(' User profile deleted');
         } else {
-          console.log('⚠️ No user profile found, proceeding with auth deletion only');
+          console.log(' No user profile found, proceeding with auth deletion only');
         }
       });
 
@@ -582,7 +582,7 @@ export class AuthSupabaseController {
         console.log(' User deleted from Supabase Auth');
       } catch (authError: any) {
         console.error('❌ Failed to delete user from Supabase Auth:', authError);
-        console.warn('⚠️ Database cleanup completed but Supabase Auth deletion failed');
+        console.warn(' Database cleanup completed but Supabase Auth deletion failed');
       }
 
       console.log(' Account deletion completed successfully');

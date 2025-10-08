@@ -237,7 +237,7 @@ export class InvoicesService implements IInvoicesService {
       });
       console.log(` Invoice PDF URL saved to database`);
     } catch (pdfError) {
-      console.error('⚠️ Failed to generate PDF during invoice creation:', pdfError);
+      console.error(' Failed to generate PDF during invoice creation:', pdfError);
       // Don't fail invoice creation if PDF generation fails
       // PDF can be regenerated later via GET endpoint
     }
