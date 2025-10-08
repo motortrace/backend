@@ -308,6 +308,26 @@ export class WorkOrderController {
     }
   }
 
+  async assignTechnicianToServiceLabor(req: Request, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      const { technicianId } = req.body;
+
+      const result = await this.workOrderService.assignTechnicianToServiceLabor(serviceId, technicianId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Technician assigned to ${result.assignedCount} labor item(s) successfully`,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async updateWorkOrderLabor(req: Request, res: Response) {
     try {
       const { laborId } = req.params;
@@ -899,6 +919,61 @@ export class WorkOrderController {
       res.json({
         success: true,
         message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getTechnicianActiveWork(req: any, res: Response) {
+    try {
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const activeWork = await this.workOrderService.getTechnicianActiveWork(technician.id);
+
+      res.json({
+        success: true,
+        data: activeWork,
+        message: `Found ${activeWork.totalActiveTasks} active task(s)`,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Service Advisor checks specific technician's active work
+  async checkTechnicianActiveWork(req: Request, res: Response) {
+    try {
+      const { technicianId } = req.params;
+
+      const activeWork = await this.workOrderService.getTechnicianActiveWork(technicianId);
+
+      res.json({
+        success: true,
+        data: activeWork,
+        message: `Found ${activeWork.totalActiveTasks} active task(s) for technician`,
       });
     } catch (error: any) {
       res.status(400).json({

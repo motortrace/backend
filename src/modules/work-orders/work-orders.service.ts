@@ -1055,6 +1055,34 @@ export class WorkOrderService {
             price: true,
           },
         },
+        laborItems: {
+          include: {
+            laborCatalog: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                estimatedMinutes: true,
+              },
+            },
+            technician: {
+              select: {
+                id: true,
+                employeeId: true,
+                userProfile: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -1184,6 +1212,70 @@ export class WorkOrderService {
     });
 
     return laborItem;
+  }
+
+  // Assign technician to all labor items of a service (bulk assignment)
+  async assignTechnicianToServiceLabor(serviceId: string, technicianId: string) {
+    // Verify service exists
+    const service = await this.prisma.workOrderService.findUnique({
+      where: { id: serviceId },
+      include: {
+        laborItems: true,
+      },
+    });
+
+    if (!service) {
+      throw new Error(`WorkOrderService with id ${serviceId} not found`);
+    }
+
+    // Verify technician exists
+    const technician = await this.prisma.technician.findUnique({
+      where: { id: technicianId },
+    });
+
+    if (!technician) {
+      throw new Error(`Technician with id ${technicianId} not found`);
+    }
+
+    // Update all labor items for this service
+    await this.prisma.workOrderLabor.updateMany({
+      where: { serviceId },
+      data: { technicianId },
+    });
+
+    // Fetch updated labor items with technician details
+    const updatedLaborItems = await this.prisma.workOrderLabor.findMany({
+      where: { serviceId },
+      include: {
+        technician: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        laborCatalog: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    return {
+      serviceId,
+      technicianId,
+      assignedCount: updatedLaborItems.length,
+      laborItems: updatedLaborItems,
+    };
   }
 
   // Update work order labor item
@@ -1895,6 +1987,131 @@ export class WorkOrderService {
     });
 
     return { message: 'Part installation completed successfully' };
+  }
+
+  // Get technician's active work (started but not finished)
+  async getTechnicianActiveWork(technicianId: string) {
+    // Get active labor items (started but not completed)
+    const activeLabor = await this.prisma.workOrderLabor.findMany({
+      where: {
+        technicianId,
+        OR: [
+          {
+            // Labor that has been started (has start time) but not ended
+            startTime: { not: null },
+            endTime: null,
+          },
+          {
+            // Labor that is marked as IN_PROGRESS
+            status: 'IN_PROGRESS',
+          },
+        ],
+      },
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+            status: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                make: true,
+                model: true,
+                year: true,
+                licensePlate: true,
+              },
+            },
+          },
+        },
+        service: {
+          select: {
+            id: true,
+            description: true,
+            cannedService: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+        laborCatalog: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            estimatedMinutes: true,
+          },
+        },
+      },
+      orderBy: {
+        startTime: 'desc',
+      },
+    });
+
+    // Get active parts (assigned and started but not installed)
+    const activeParts = await this.prisma.workOrderPart.findMany({
+      where: {
+        installedById: technicianId,
+        installedAt: null, // Not yet completed
+      },
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+            status: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                make: true,
+                model: true,
+                year: true,
+                licensePlate: true,
+              },
+            },
+          },
+        },
+        part: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            partNumber: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return {
+      technicianId,
+      activeLabor,
+      activeParts,
+      totalActiveTasks: activeLabor.length + activeParts.length,
+      summary: {
+        activeLaborCount: activeLabor.length,
+        activePartsCount: activeParts.length,
+      },
+    };
   }
 
   // Helper method to find ServiceAdvisor by Supabase user ID

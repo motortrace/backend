@@ -24,6 +24,7 @@ router.put('/:id/status', authenticateSupabaseToken, requireServiceAdvisor, work
 router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignServiceAdvisorSchema, 'body'), workOrderController.assignServiceAdvisor.bind(workOrderController));
 
 // Labor Assignment Routes
+router.put('/services/:serviceId/assign-technician-to-labor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToServiceLabor.bind(workOrderController));
 router.put('/labor/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToLabor.bind(workOrderController));
 router.put('/labor/:laborId', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateWorkOrderLaborSchema, 'body'), workOrderController.updateWorkOrderLabor.bind(workOrderController));
 router.put('/labor/:laborId/reset-subtotal', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.resetWorkOrderLaborSubtotal.bind(workOrderController));
@@ -61,6 +62,10 @@ router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrd
 router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
 router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));
 router.put('/parts/:partId/complete', authenticateSupabaseToken, requireTechnician, workOrderController.completePartInstallation.bind(workOrderController));
+
+// Technician Active Work Routes
+router.get('/technician/active-work', authenticateSupabaseToken, requireTechnician, workOrderController.getTechnicianActiveWork.bind(workOrderController));
+router.get('/technician/:technicianId/active-work', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.checkTechnicianActiveWork.bind(workOrderController));
 
 // Work Order Statistics Routes
 router.get('/statistics/overview', authenticateSupabaseToken, requireManager, workOrderController.getWorkOrderStatistics.bind(workOrderController));

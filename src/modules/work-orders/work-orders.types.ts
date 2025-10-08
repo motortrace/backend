@@ -382,6 +382,7 @@ export interface IWorkOrderService {
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
   assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
   assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
+  assignTechnicianToServiceLabor(serviceId: string, technicianId: string): Promise<any>;
   updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest): Promise<any>;
   resetWorkOrderLaborSubtotal(laborId: string): Promise<any>;
   getWorkOrderStatistics(filters: { startDate?: Date; endDate?: Date }): Promise<WorkOrderStatistics>;
@@ -407,4 +408,7 @@ export interface IWorkOrderService {
   startPartInstallation(partId: string, technicianId: string): Promise<any>;
   completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }): Promise<any>;
   findTechnicianBySupabaseUserId(supabaseUserId: string): Promise<any>;
+  
+  // Technician active work
+  getTechnicianActiveWork(technicianId: string): Promise<any>;
 }
