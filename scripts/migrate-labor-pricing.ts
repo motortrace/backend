@@ -90,7 +90,7 @@ async function migrateLaborPricing() {
       WHERE "price" = 0
     `;
 
-    console.log('✅ Migration completed successfully!');
+    console.log(' Migration completed successfully!');
     console.log('👉 Now run: npx prisma db push');
     console.log('   This will remove the old hours/rate columns and finalize the schema.');
 

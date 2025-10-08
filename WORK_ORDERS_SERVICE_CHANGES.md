@@ -336,8 +336,8 @@ data: {
 **CRITICAL:** The regex replacement `cannedServiceId:` → `// cannedServiceId:` was TOO BROAD.
 
 ### Keep cannedServiceId in:
-- ✅ `WorkOrderService` (services DO link to canned services)
-- ✅ `CannedService` queries
+-  `WorkOrderService` (services DO link to canned services)
+-  `CannedService` queries
 
 ### Remove cannedServiceId from:
 - ❌ `WorkOrderLabor` (labor belongs to services via `serviceId`, not canned services)
@@ -366,7 +366,7 @@ const currentLabor = await this.prisma.workOrderLabor.findUnique({
   select: { 
     id: true,
     workOrderId: true,
-    serviceId: true,  // ✅ USE THIS INSTEAD
+    serviceId: true,  //  USE THIS INSTEAD
   },
 });
 

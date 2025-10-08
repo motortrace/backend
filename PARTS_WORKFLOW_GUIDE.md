@@ -36,7 +36,7 @@ curl -X GET "http://localhost:3000/inventory?limit=50&search=filter" \
 
 Currently, there are **TWO** different ways parts can be added to a work order:
 
-#### Method 1: Via Estimate (Service Advisor) ✅ **CORRECT**
+#### Method 1: Via Estimate (Service Advisor)  **CORRECT**
 ```
 Service Advisor creates Estimate
   ↓
@@ -58,7 +58,7 @@ Customer never saw or approved these parts
 
 ---
 
-## ✅ RECOMMENDED PROPER WORKFLOW
+##  RECOMMENDED PROPER WORKFLOW
 
 ### **Phase 1: Estimate Creation (Service Advisor)**
 
@@ -241,7 +241,7 @@ This creates a request that:
 
 ---
 
-## 📊 Workflow Diagram
+##  Workflow Diagram
 
 ```
 ┌─────────────────┐
@@ -284,25 +284,25 @@ This creates a request that:
 
 ## 🎯 Benefits of Proper Workflow
 
-### ✅ **For Business:**
+###  **For Business:**
 - Clear approval trail
 - No surprise charges
 - Better inventory tracking
 - Reduced billing disputes
 
-### ✅ **For Customers:**
+###  **For Customers:**
 - Know exactly what parts are needed
 - See prices before approval
 - Track what was installed
 - Easy to verify on invoice
 
-### ✅ **For Service Advisors:**
+###  **For Service Advisors:**
 - Control over pricing
 - Professional estimates
 - Easy to communicate with customers
 - Track approval status
 
-### ✅ **For Technicians:**
+###  **For Technicians:**
 - Clear list of approved parts
 - No confusion about what to use
 - Easy to request additional parts
@@ -339,7 +339,7 @@ POST   /work-orders/:id/part-requests       # Request additional parts
 
 ---
 
-## 🚀 Next Steps
+##  Next Steps
 
 1. **Review Current Codebase**: Identify any direct WorkOrderPart creation endpoints
 2. **Add Permission Middleware**: Ensure only Service Advisors can modify estimates

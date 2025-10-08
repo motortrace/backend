@@ -469,10 +469,10 @@ export class StorageService {
           console.error('❌ Bucket creation failed. Please check your Supabase configuration.');
           console.error('❌ You may need to create the bucket manually in Supabase Studio');
         } else {
-          console.log(`✅ Created storage bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.PROFILE_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.PROFILE_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.PROFILE_IMAGES_BUCKET}`);
       }
 
       if (!carBucketExists) {
@@ -488,10 +488,10 @@ export class StorageService {
         if (createCarError) {
           console.error('❌ Error creating car-images bucket:', createCarError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
       }
 
       if (!templateBucketExists) {
@@ -507,10 +507,10 @@ export class StorageService {
         if (createTemplateError) {
           console.error('❌ Error creating template-images bucket:', createTemplateError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
       }
 
       if (!workOrderAttachmentsBucketExists) {
@@ -526,10 +526,10 @@ export class StorageService {
         if (createAttachmentsError) {
           console.error('❌ Error creating work-order-attachments bucket:', createAttachmentsError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+          console.log(` Created storage bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
       }
 
       if (!invoicesBucketExists) {
@@ -545,10 +545,10 @@ export class StorageService {
         if (createInvoicesError) {
           console.error('❌ Error creating invoices bucket:', createInvoicesError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.INVOICES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.INVOICES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.INVOICES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.INVOICES_BUCKET}`);
       }
     } catch (error) {
       console.error('❌ Error initializing storage:', error);

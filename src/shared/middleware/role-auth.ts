@@ -22,7 +22,7 @@ export const requireRole = (requiredRoles: AuthUserRole[]) => {
         });
       }
 
-      // ✅ OPTIMIZED: Read role from JWT token (req.user.role) instead of querying database
+      //  OPTIMIZED: Read role from JWT token (req.user.role) instead of querying database
       // Role is already validated by JWT signature and available in token claims
       if (!userRole || !requiredRoles.includes(userRole)) {
         return res.status(403).json({
@@ -56,7 +56,7 @@ export const requireServiceAdvisor = (req: AuthenticatedRequest, res: Response, 
       });
     }
 
-    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    //  OPTIMIZED: Use role from JWT token instead of database query
     if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
@@ -86,7 +86,7 @@ export const requireTechnician = (req: AuthenticatedRequest, res: Response, next
       });
     }
 
-    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    //  OPTIMIZED: Use role from JWT token instead of database query
     if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
@@ -116,7 +116,7 @@ export const requireInventoryManager = (req: AuthenticatedRequest, res: Response
       });
     }
 
-    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    //  OPTIMIZED: Use role from JWT token instead of database query
     if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
@@ -146,7 +146,7 @@ export const requireAdmin = (req: AuthenticatedRequest, res: Response, next: Nex
       });
     }
 
-    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    //  OPTIMIZED: Use role from JWT token instead of database query
     if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
@@ -176,7 +176,7 @@ export const requireManager = (req: AuthenticatedRequest, res: Response, next: N
       });
     }
 
-    // ✅ OPTIMIZED: Use role from JWT token instead of database query
+    //  OPTIMIZED: Use role from JWT token instead of database query
     if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,

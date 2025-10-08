@@ -228,14 +228,14 @@ export class InvoicesService implements IInvoicesService {
     let pdfUrl: string | null = null;
     try {
       pdfUrl = await this.generateInvoicePDF(invoice.id);
-      console.log(`✅ Invoice PDF generated automatically: ${pdfUrl}`);
+      console.log(` Invoice PDF generated automatically: ${pdfUrl}`);
       
       // Update the invoice record with the PDF URL
       await this.prisma.invoice.update({
         where: { id: invoice.id },
         data: { pdfUrl }
       });
-      console.log(`✅ Invoice PDF URL saved to database`);
+      console.log(` Invoice PDF URL saved to database`);
     } catch (pdfError) {
       console.error('⚠️ Failed to generate PDF during invoice creation:', pdfError);
       // Don't fail invoice creation if PDF generation fails

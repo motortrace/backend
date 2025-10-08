@@ -565,7 +565,7 @@ GET /technicians/tech_456/work-orders?date=2025-10-07
 
 ---
 
-## 📊 Status Flow Reference
+##  Status Flow Reference
 
 ### Inspection Status Flow
 ```

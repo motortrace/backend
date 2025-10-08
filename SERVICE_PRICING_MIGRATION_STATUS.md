@@ -1,31 +1,31 @@
 # Service-Based Pricing Migration Status
 
-## ✅ Completed
+##  Completed
 
 ### 1. Database Schema Changes
-- ✅ Removed `price`, `quantity`, `subtotal` from `WorkOrderLabor`
-- ✅ Made `serviceId` required in `WorkOrderLabor`
-- ✅ Changed `estimatedHours` to `estimatedMinutes` in `WorkOrderLabor`
-- ✅ Added `actualMinutes` to `WorkOrderLabor`
-- ✅ Removed `price` from `LaborCatalog`
-- ✅ Changed `estimatedHours` to `estimatedMinutes` in `LaborCatalog`
-- ✅ Added `skillLevel` to `LaborCatalog`
-- ✅ Made `cannedServiceId` optional in `WorkOrderService`
-- ✅ Added `laborItems` relation to `WorkOrderService`
-- ✅ Removed `serviceId` from `WorkOrderPart`
-- ✅ Removed discount fields from `WorkOrderLabor` and `WorkOrderPart`
-- ✅ Removed `subtotalLabor` from `WorkOrder`
-- ✅ Added `subtotalServices`, `subtotal`, `discountType`, `discountReason` to `WorkOrder`
-- ✅ Removed `ServiceDiscountType` enum
-- ✅ Schema pushed to database successfully
+-  Removed `price`, `quantity`, `subtotal` from `WorkOrderLabor`
+-  Made `serviceId` required in `WorkOrderLabor`
+-  Changed `estimatedHours` to `estimatedMinutes` in `WorkOrderLabor`
+-  Added `actualMinutes` to `WorkOrderLabor`
+-  Removed `price` from `LaborCatalog`
+-  Changed `estimatedHours` to `estimatedMinutes` in `LaborCatalog`
+-  Added `skillLevel` to `LaborCatalog`
+-  Made `cannedServiceId` optional in `WorkOrderService`
+-  Added `laborItems` relation to `WorkOrderService`
+-  Removed `serviceId` from `WorkOrderPart`
+-  Removed discount fields from `WorkOrderLabor` and `WorkOrderPart`
+-  Removed `subtotalLabor` from `WorkOrder`
+-  Added `subtotalServices`, `subtotal`, `discountType`, `discountReason` to `WorkOrder`
+-  Removed `ServiceDiscountType` enum
+-  Schema pushed to database successfully
 
 ### 2. Data Migration
-- ✅ Created migration script (`scripts/migrate-service-pricing.ts`)
-- ✅ Migrated existing `WorkOrderService` records to have prices
-- ✅ Linked all `WorkOrderLabor` records to their parent services
-- ✅ Converted hours to minutes in labor tracking
-- ✅ Calculated work order totals (services + parts)
-- ✅ Migration executed successfully (1 labor item, 1 work order)
+-  Created migration script (`scripts/migrate-service-pricing.ts`)
+-  Migrated existing `WorkOrderService` records to have prices
+-  Linked all `WorkOrderLabor` records to their parent services
+-  Converted hours to minutes in labor tracking
+-  Calculated work order totals (services + parts)
+-  Migration executed successfully (1 labor item, 1 work order)
 
 ## ⚠️ In Progress
 
@@ -122,10 +122,10 @@ The server currently won't start due to TypeScript errors. The following files n
 
 4. Update invoice PDF format if needed
 
-## 📊 Impact Summary
+##  Impact Summary
 
-- **Database**: ✅ Complete and tested
-- **Data Migration**: ✅ Complete (1 work order migrated)
+- **Database**:  Complete and tested
+- **Data Migration**:  Complete (1 work order migrated)
 - **TypeScript Code**: ⚠️ ~20 files need updates
 - **Invoice Generation**: ⚠️ Needs structure update
 - **Testing**: ❌ Not started

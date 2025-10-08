@@ -221,55 +221,55 @@ TOTAL                              Rs. 9,558
 
 ---
 
-## 🗄️ Schema Changes
+## Schema Changes
 
 ### **Changes Summary:**
 
 | Model | Old | New | Reason |
 |-------|-----|-----|--------|
-| **CannedService** | `price` exists | Keep `price` | ✅ Services have prices |
+| **CannedService** | `price` exists | Keep `price` |  Services have prices |
 | **LaborCatalog** | `price`, `hourlyRate` | Remove all pricing | ❌ Labor is tracking only |
-| **WorkOrderService** | No `unitPrice` | Add `unitPrice`, `subtotal` | ✅ Services are billable |
+| **WorkOrderService** | No `unitPrice` | Add `unitPrice`, `subtotal` |  Services are billable |
 | **WorkOrderLabor** | `price`, `quantity`, `subtotal` | Remove all pricing | ❌ Labor is tracking only |
-| **WorkOrderLabor** | `serviceId` optional | Make `serviceId` required | ✅ Labor must belong to service |
-| **WorkOrderLabor** | `estimatedHours` | Change to `estimatedMinutes` | ✅ More practical unit |
-| **WorkOrderPart** | `serviceId` exists | Remove `serviceId` | ✅ Parts are independent |
-| **WorkOrderPart** | Discount fields | Remove discounts | ✅ Discounts at work order level |
-| **WorkOrderLabor** | Discount fields | Remove discounts | ✅ Discounts at work order level |
+| **WorkOrderLabor** | `serviceId` optional | Make `serviceId` required |  Labor must belong to service |
+| **WorkOrderLabor** | `estimatedHours` | Change to `estimatedMinutes` |  More practical unit |
+| **WorkOrderPart** | `serviceId` exists | Remove `serviceId` |  Parts are independent |
+| **WorkOrderPart** | Discount fields | Remove discounts |  Discounts at work order level |
+| **WorkOrderLabor** | Discount fields | Remove discounts |  Discounts at work order level |
 
 ---
 
 ## 🎨 Benefits
 
 ### **For Customers:**
-- ✅ Simple, clear pricing
-- ✅ Easy-to-understand invoices
-- ✅ Package-based pricing (standard industry practice)
-- ✅ No confusing labor breakdowns
+-  Simple, clear pricing
+-  Easy-to-understand invoices
+-  Package-based pricing (standard industry practice)
+-  No confusing labor breakdowns
 
 ### **For Service Advisors:**
-- ✅ Easy to quote services
-- ✅ Quick work order creation
-- ✅ Simple price adjustments
-- ✅ Professional invoices
+-  Easy to quote services
+-  Quick work order creation
+-  Simple price adjustments
+-  Professional invoices
 
 ### **For Technicians:**
-- ✅ Clear task list
-- ✅ Time tracking for each operation
-- ✅ Performance metrics
-- ✅ No confusion about pricing
+-  Clear task list
+-  Time tracking for each operation
+-  Performance metrics
+-  No confusion about pricing
 
 ### **For Management:**
-- ✅ Track labor efficiency
-- ✅ Analyze service profitability
-- ✅ Monitor technician performance
-- ✅ Simple pricing updates
+-  Track labor efficiency
+-  Analyze service profitability
+-  Monitor technician performance
+-  Simple pricing updates
 
 ### **For System:**
-- ✅ Clean data model
-- ✅ No arbitrary price allocations
-- ✅ Easy to maintain
-- ✅ Scalable architecture
+-  Clean data model
+-  No arbitrary price allocations
+-  Easy to maintain
+-  Scalable architecture
 
 ---
 
@@ -305,7 +305,7 @@ TOTAL                              Rs. 9,558
 
 ---
 
-## 📊 Invoice Examples
+##  Invoice Examples
 
 ### **Simple Invoice (One Service + Parts)**
 ```
@@ -357,7 +357,7 @@ TOTAL                              Rs.21,559
 
 ---
 
-## 🚀 Implementation Status
+##  Implementation Status
 
 - [ ] Schema updated
 - [ ] Migration script created

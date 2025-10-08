@@ -10,7 +10,7 @@ async function migrateToServicePricing() {
     // Step 0: Regenerate Prisma client to match current database
     console.log('📝 Step 0: Regenerating Prisma client...');
     execSync('npx prisma generate', { stdio: 'inherit' });
-    console.log('✅ Step 0 complete\n');
+    console.log(' Step 0 complete\n');
     // Step 1: Add new columns and make old ones nullable
     console.log('📝 Step 1: Adding new columns...');
     
@@ -55,7 +55,7 @@ async function migrateToServicePricing() {
       DROP COLUMN IF EXISTS "subtotalLabor";
     `;
     
-    console.log('✅ Step 1 complete\n');
+    console.log(' Step 1 complete\n');
 
     // Step 2: Migrate WorkOrderService data
     console.log('📝 Step 2: Migrating WorkOrderService pricing...');
@@ -120,7 +120,7 @@ async function migrateToServicePricing() {
       console.log(`  ✓ Updated service ${service.id}: Rs. ${unitPrice} × ${service.quantity} = Rs. ${subtotal}`);
     }
     
-    console.log('✅ Step 2 complete\n');
+    console.log(' Step 2 complete\n');
 
     // Step 3: Link WorkOrderLabor to WorkOrderService
     console.log('📝 Step 3: Linking labor to services...');
@@ -207,7 +207,7 @@ async function migrateToServicePricing() {
       `;
     }
     
-    console.log(`✅ Step 3 complete - linked ${allLabor.length} labor items to services\n`);
+    console.log(` Step 3 complete - linked ${allLabor.length} labor items to services\n`);
 
     // Step 4: Calculate WorkOrder totals
     console.log('📝 Step 4: Calculating work order totals...');
@@ -248,7 +248,7 @@ async function migrateToServicePricing() {
       console.log(`  ✓ Work Order ${workOrder.workOrderNumber}: Services Rs. ${subtotalServices} + Parts Rs. ${subtotalParts} = Rs. ${subtotal}`);
     }
     
-    console.log('✅ Step 4 complete\n');
+    console.log(' Step 4 complete\n');
 
     // Step 5: Convert LaborCatalog hours to minutes
     console.log('📝 Step 5: Converting LaborCatalog to minutes...');
@@ -267,9 +267,9 @@ async function migrateToServicePricing() {
       WHERE "estimatedMinutes" IS NULL;
     `;
     
-    console.log('✅ Step 5 complete\n');
+    console.log(' Step 5 complete\n');
 
-    console.log('✅ Migration completed successfully!');
+    console.log(' Migration completed successfully!');
     console.log('');
     console.log('👉 Next steps:');
     console.log('   1. Review the migrated data');
