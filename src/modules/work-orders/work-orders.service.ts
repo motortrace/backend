@@ -117,6 +117,10 @@ export class WorkOrderService {
 
 
 
+    // Determine initial status: AWAITING_APPROVAL if services are added, otherwise PENDING
+    const hasServices = cannedServiceIds && cannedServiceIds.length > 0;
+    const initialStatus = hasServices ? WorkOrderStatus.AWAITING_APPROVAL : WorkOrderStatus.PENDING;
+
     // Create work order with services
     const workOrder = await this.prisma.workOrder.create({
       data: {
@@ -125,7 +129,7 @@ export class WorkOrderService {
         vehicleId: workOrderData.vehicleId,
         appointmentId: workOrderData.appointmentId,
         advisorId: workOrderData.advisorId,
-        status: workOrderData.status || WorkOrderStatus.PENDING,
+        status: workOrderData.status || initialStatus,
         jobType: workOrderData.jobType || JobType.REPAIR,
         priority: workOrderData.priority || JobPriority.NORMAL,
         source: workOrderData.source || JobSource.WALK_IN,
@@ -976,12 +980,49 @@ export class WorkOrderService {
   // Update work order labor item
   async updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest) {
     // Update the labor item (no subtotal - labor is for tracking only)
-    await this.prisma.workOrderLabor.update({
+    const updatedLabor = await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         ...data,
       },
+      include: {
+        service: { select: { id: true, status: true } },
+        workOrder: { select: { id: true } },
+      },
     });
+
+    // If labor status changed to IN_PROGRESS or COMPLETED, update parent service status
+    if (data.status) {
+      const serviceId = updatedLabor.service.id;
+      
+      // Get all labor items for this service
+      const serviceLaborItems = await this.prisma.workOrderLabor.findMany({
+        where: { serviceId },
+        select: { status: true },
+      });
+
+      // Determine service status based on labor statuses
+      const allLaborsCompleted = serviceLaborItems.every(l => l.status === ServiceStatus.COMPLETED);
+      const anyLaborInProgress = serviceLaborItems.some(l => l.status === ServiceStatus.IN_PROGRESS);
+
+      let newServiceStatus: ServiceStatus | null = null;
+      if (allLaborsCompleted) {
+        newServiceStatus = ServiceStatus.COMPLETED;
+      } else if (anyLaborInProgress && updatedLabor.service.status !== ServiceStatus.IN_PROGRESS) {
+        newServiceStatus = ServiceStatus.IN_PROGRESS;
+      }
+
+      // Update service status if it changed
+      if (newServiceStatus) {
+        await this.prisma.workOrderService.update({
+          where: { id: serviceId },
+          data: { status: newServiceStatus },
+        });
+      }
+
+      // Auto-update work order status
+      await this.autoUpdateWorkOrderStatus(updatedLabor.workOrder.id);
+    }
 
     return { id: laborId };
   }
@@ -1027,6 +1068,93 @@ export class WorkOrderService {
         totalAmount,
       },
     });
+  }
+
+  /**
+   * Auto-update work order status based on services and parts state
+   * Called after service/part approval, work start/completion
+   */
+  private async autoUpdateWorkOrderStatus(workOrderId: string) {
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        services: { select: { customerApproved: true, customerRejected: true, status: true } },
+        partsUsed: { select: { customerApproved: true, customerRejected: true, installedAt: true } },
+      },
+    });
+
+    if (!workOrder) return;
+
+    // Don't auto-update if status is CANCELLED, INVOICED, or PAID
+    const finalStatuses: WorkOrderStatus[] = [WorkOrderStatus.CANCELLED, WorkOrderStatus.INVOICED, WorkOrderStatus.PAID];
+    if (finalStatuses.includes(workOrder.status)) {
+      return;
+    }
+
+    const hasServices = workOrder.services.length > 0;
+    const hasParts = workOrder.partsUsed.length > 0;
+    const hasItems = hasServices || hasParts;
+
+    if (!hasItems) {
+      // No items yet - keep as PENDING
+      if (workOrder.status !== WorkOrderStatus.PENDING) {
+        await this.prisma.workOrder.update({
+          where: { id: workOrderId },
+          data: { status: WorkOrderStatus.PENDING },
+        });
+      }
+      return;
+    }
+
+    // Check if all non-rejected services are approved
+    const nonRejectedServices = workOrder.services.filter(s => !s.customerRejected);
+    const allServicesApproved = nonRejectedServices.every(s => s.customerApproved);
+
+    // Check if all non-rejected parts are approved
+    const nonRejectedParts = workOrder.partsUsed.filter(p => !p.customerRejected);
+    const allPartsApproved = nonRejectedParts.every(p => p.customerApproved);
+
+    // Check if any work has started
+    const anyServiceInProgress = workOrder.services.some(s => 
+      s.status === ServiceStatus.IN_PROGRESS || s.status === ServiceStatus.COMPLETED
+    );
+    const anyPartInstalled = workOrder.partsUsed.some(p => p.installedAt !== null);
+    const workStarted = anyServiceInProgress || anyPartInstalled;
+
+    // Check if all work is completed
+    const allServicesCompleted = nonRejectedServices.every(s => 
+      s.status === ServiceStatus.COMPLETED || s.status === ServiceStatus.CANCELLED
+    );
+    const allPartsInstalled = nonRejectedParts.every(p => p.installedAt !== null);
+    const allWorkCompleted = (nonRejectedServices.length === 0 || allServicesCompleted) && 
+                             (nonRejectedParts.length === 0 || allPartsInstalled);
+
+    // Determine new status
+    let newStatus: WorkOrderStatus | null = null;
+
+    if (allWorkCompleted && workOrder.status === WorkOrderStatus.IN_PROGRESS) {
+      newStatus = WorkOrderStatus.COMPLETED;
+    } else if (workStarted && workOrder.status === WorkOrderStatus.APPROVED) {
+      newStatus = WorkOrderStatus.IN_PROGRESS;
+    } else if (allServicesApproved && allPartsApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
+      newStatus = WorkOrderStatus.APPROVED;
+    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING) {
+      newStatus = WorkOrderStatus.AWAITING_APPROVAL;
+    }
+
+    // Update status if it changed
+    if (newStatus && newStatus !== workOrder.status) {
+      await this.prisma.workOrder.update({
+        where: { id: workOrderId },
+        data: { 
+          status: newStatus,
+          ...(newStatus === WorkOrderStatus.IN_PROGRESS && { openedAt: new Date() }),
+          ...(newStatus === WorkOrderStatus.COMPLETED && { closedAt: new Date() }),
+        },
+      });
+      
+      console.log(`✅ Auto-updated work order ${workOrderId} status: ${workOrder.status} → ${newStatus}`);
+    }
   }
 
   // REMOVED: resetWorkOrderLaborSubtotal()
@@ -1434,6 +1562,9 @@ export class WorkOrderService {
     // Recalculate work order totals
     await this.updateWorkOrderTotals(service.workOrderId);
 
+    // Auto-update work order status if all items approved
+    await this.autoUpdateWorkOrderStatus(service.workOrderId);
+
     return { message: 'Service approved successfully' };
   }
 
@@ -1500,6 +1631,9 @@ export class WorkOrderService {
 
     // Recalculate work order totals
     await this.updateWorkOrderTotals(part.workOrderId);
+
+    // Auto-update work order status if all items approved
+    await this.autoUpdateWorkOrderStatus(part.workOrderId);
 
     return { message: 'Part approved successfully' };
   }
@@ -1672,14 +1806,18 @@ export class WorkOrderService {
     }
 
     // Update part to mark installation complete
-    await this.prisma.workOrderPart.update({
+    const updatedPart = await this.prisma.workOrderPart.update({
       where: { id: partId },
       data: {
         installedAt: new Date(),
         notes: data.notes,
         warrantyInfo: data.warrantyInfo,
       },
+      select: { workOrderId: true },
     });
+
+    // Auto-update work order status when part is installed
+    await this.autoUpdateWorkOrderStatus(updatedPart.workOrderId);
 
     return { message: 'Part installation completed successfully' };
   }
