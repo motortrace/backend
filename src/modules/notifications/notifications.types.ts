@@ -79,8 +79,7 @@ export enum NotificationEventType {
 // ============================================================================
 
 export interface NotificationRecipient {
-  customerId?: string;
-  userId?: string;
+  userProfileId?: string;
   email?: string;
   phone?: string;
   name?: string;
@@ -206,7 +205,7 @@ export interface EmailTemplateData {
 // ============================================================================
 
 export interface NotificationPreferences {
-  customerId: string;
+  userProfileId: string;
   emailEnabled: boolean;
   pushEnabled: boolean;
   
@@ -231,7 +230,7 @@ export interface NotificationPreferences {
 
 export interface NotificationHistory {
   id: string;
-  customerId: string;
+  userProfileId: string;
   eventType: NotificationEventType;
   channel: NotificationChannel;
   status: 'SENT' | 'FAILED' | 'PENDING';

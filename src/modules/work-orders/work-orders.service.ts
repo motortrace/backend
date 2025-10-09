@@ -778,7 +778,15 @@ export class WorkOrderService {
     const existingWorkOrder = await this.prisma.workOrder.findUnique({
       where: { id },
       include: {
-        customer: { select: { id: true, name: true, email: true, phone: true } },
+        customer: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true, 
+            phone: true,
+            userProfile: { select: { id: true } }
+          } 
+        },
         vehicle: { select: { make: true, model: true, year: true } },
       },
     });
@@ -827,7 +835,7 @@ export class WorkOrderService {
         await this.notificationService.sendNotification({
           eventType,
           recipient: {
-            customerId: existingWorkOrder.customer.id,
+            userProfileId: existingWorkOrder.customer.userProfile?.id,
             email: existingWorkOrder.customer.email,
             name: existingWorkOrder.customer.name,
             phone: existingWorkOrder.customer.phone || undefined,

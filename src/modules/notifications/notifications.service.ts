@@ -11,7 +11,7 @@ import {
 } from './notifications.types';
 import { EmailTemplates } from './email-templates';
 
-export class NotificationService implements INotificationService {
+export class NotificationService {
   private emailTransporter: Transporter;
   private prisma: PrismaClient;
   private emailTemplates: EmailTemplates;
@@ -39,22 +39,14 @@ export class NotificationService implements INotificationService {
     try {
       const { recipient, eventType, data, channels, priority } = payload;
 
-      // Check if customer has opted in for this notification type
-      if (recipient.customerId) {
-        const shouldSend = await this.shouldSendNotification(
-          recipient.customerId,
-          eventType
-        );
-        if (!shouldSend) {
-          console.log(
-            `[Notification] Skipped ${eventType} for customer ${recipient.customerId} (preferences)`
-          );
-          return;
-        }
-      }
+
 
       // Determine which channels to use
       const activeChannels = channels || [NotificationChannel.EMAIL];
+
+      // Track which channels were used
+      let sentViaEmail = false;
+      let sentViaPush = false;
 
       // Send through each channel
       for (const channel of activeChannels) {
@@ -63,15 +55,20 @@ export class NotificationService implements INotificationService {
             case NotificationChannel.EMAIL:
               if (recipient.email) {
                 await this.sendEmailNotification(payload);
+                sentViaEmail = true;
               }
               break;
             case NotificationChannel.PUSH:
               // Implement push notifications here (e.g., Firebase FCM)
               console.log('[Notification] Push notifications not yet implemented');
+              sentViaPush = false; // Will be true when implemented
               break;
             case NotificationChannel.IN_APP:
-              // Supabase Realtime handles this automatically via RLS
-              console.log('[Notification] In-app via Supabase Realtime');
+              // Create in-app notification record
+              if (recipient.userProfileId) {
+                await this.createInAppNotification(payload, sentViaEmail, sentViaPush);
+                console.log('[Notification] In-app notification created');
+              }
               break;
           }
         } catch (channelError) {
@@ -83,6 +80,58 @@ export class NotificationService implements INotificationService {
       console.error('[Notification] Error sending notification:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create in-app notification record in database
+   */
+  private async createInAppNotification(
+    payload: NotificationPayload,
+    sentViaEmail: boolean = false,
+    sentViaPush: boolean = false
+  ): Promise<void> {
+    const { recipient, eventType, data, priority } = payload;
+
+    if (!recipient.userProfileId) {
+      console.warn('[Notification] Cannot create in-app notification without userProfileId');
+      return;
+    }
+
+    // Generate notification title and message
+    const templateData = this.emailTemplates.getTemplate(eventType, data);
+    
+    // Extract workOrderId from data if available
+    const workOrderId = (data as any).workOrderId || null;
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userProfileId: recipient.userProfileId,
+          workOrderId: workOrderId,
+          type: eventType as any,
+          title: templateData.subject,
+          message: this.stripHtmlTags(templateData.body),
+          priority: priority || 'NORMAL',
+          sentViaEmail: sentViaEmail,
+          sentViaPush: sentViaPush,
+          isRead: false,
+          actionUrl: templateData.actionUrl || null,
+          actionText: templateData.actionText || null,
+        },
+      });
+
+      console.log(`[Notification] In-app notification created for user ${recipient.userProfileId}`);
+    } catch (error) {
+      console.error('[Notification] Failed to create in-app notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper to strip HTML tags from text
+   */
+  private stripHtmlTags(html: string): string {
+    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   }
 
   /**
@@ -99,17 +148,6 @@ export class NotificationService implements INotificationService {
     const templateData = this.emailTemplates.getTemplate(eventType, data);
 
     await this.sendEmail(recipient.email, templateData);
-
-    // Log to history
-    await this.logNotification({
-      customerId: recipient.customerId!,
-      eventType,
-      channel: NotificationChannel.EMAIL,
-      status: 'SENT',
-      recipient: recipient.email,
-      subject: templateData.subject,
-      sentAt: new Date(),
-    });
   }
 
   /**
@@ -133,150 +171,6 @@ export class NotificationService implements INotificationService {
     }
   }
 
-  /**
-   * Get customer notification preferences
-   */
-  async getPreferences(customerId: string): Promise<NotificationPreferences | null> {
-    // TODO: Fetch from database once NotificationPreferences table is created
-    // For now, return default preferences
-    return {
-      customerId,
-      emailEnabled: true,
-      pushEnabled: false,
-      workOrderStatusChanges: true,
-      serviceApprovals: true,
-      partApprovals: true,
-      inspectionReports: true,
-      paymentConfirmations: true,
-      appointmentReminders: true,
-      vehicleReadyAlerts: true,
-      quietHoursEnabled: false,
-    };
-  }
-
-  /**
-   * Update customer notification preferences
-   */
-  async updatePreferences(
-    customerId: string,
-    preferences: Partial<NotificationPreferences>
-  ): Promise<NotificationPreferences> {
-    // TODO: Implement database update once NotificationPreferences table is created
-    console.log(`[Preferences] Updated for customer ${customerId}:`, preferences);
-    
-    const currentPreferences = await this.getPreferences(customerId);
-    return { ...currentPreferences!, ...preferences };
-  }
-
-  /**
-   * Get notification history for a customer
-   */
-  async getHistory(customerId: string, limit: number = 50): Promise<NotificationHistory[]> {
-    // TODO: Implement database query once NotificationHistory table is created
-    console.log(`[History] Fetching for customer ${customerId}, limit: ${limit}`);
-    return [];
-  }
-
-  /**
-   * Check if notification should be sent based on preferences
-   */
-  async shouldSendNotification(
-    customerId: string,
-    eventType: NotificationEventType
-  ): Promise<boolean> {
-    const preferences = await this.getPreferences(customerId);
-
-    if (!preferences) {
-      return true; // Send by default if no preferences found
-    }
-
-    // Check if notifications are globally disabled
-    if (!preferences.emailEnabled && !preferences.pushEnabled) {
-      return false;
-    }
-
-    // Check event-specific preferences
-    switch (eventType) {
-      case NotificationEventType.WORK_ORDER_STATUS_CHANGED:
-      case NotificationEventType.WORK_ORDER_COMPLETED:
-        return preferences.workOrderStatusChanges;
-
-      case NotificationEventType.SERVICE_APPROVAL_REQUIRED:
-      case NotificationEventType.SERVICE_APPROVED:
-      case NotificationEventType.SERVICE_REJECTED:
-        return preferences.serviceApprovals;
-
-      case NotificationEventType.PART_APPROVAL_REQUIRED:
-      case NotificationEventType.PART_APPROVED:
-      case NotificationEventType.PART_REJECTED:
-        return preferences.partApprovals;
-
-      case NotificationEventType.INSPECTION_COMPLETED:
-      case NotificationEventType.INSPECTION_ISSUE_FOUND:
-        return preferences.inspectionReports;
-
-      case NotificationEventType.PAYMENT_RECEIVED:
-      case NotificationEventType.INVOICE_GENERATED:
-        return preferences.paymentConfirmations;
-
-      case NotificationEventType.APPOINTMENT_REMINDER:
-      case NotificationEventType.APPOINTMENT_CONFIRMED:
-        return preferences.appointmentReminders;
-
-      case NotificationEventType.VEHICLE_READY_FOR_PICKUP:
-        return preferences.vehicleReadyAlerts;
-
-      default:
-        return true; // Send by default for other events
-    }
-  }
-
-  /**
-   * Check if current time is within quiet hours
-   */
-  private isQuietHours(preferences: NotificationPreferences): boolean {
-    if (!preferences.quietHoursEnabled || !preferences.quietHoursStart || !preferences.quietHoursEnd) {
-      return false;
-    }
-
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-
-    const [startHour, startMin] = preferences.quietHoursStart.split(':').map(Number);
-    const [endHour, endMin] = preferences.quietHoursEnd.split(':').map(Number);
-
-    const startTime = startHour * 60 + startMin;
-    const endTime = endHour * 60 + endMin;
-
-    if (startTime < endTime) {
-      return currentTime >= startTime && currentTime < endTime;
-    } else {
-      // Quiet hours span midnight
-      return currentTime >= startTime || currentTime < endTime;
-    }
-  }
-
-  /**
-   * Log notification to history
-   */
-  private async logNotification(historyData: Omit<NotificationHistory, 'id'>): Promise<void> {
-    // TODO: Implement database insert once NotificationHistory table is created
-    console.log('[History] Logged notification:', historyData);
-  }
-
-  /**
-   * Verify email configuration
-   */
-  async verifyEmailConfig(): Promise<boolean> {
-    try {
-      await this.emailTransporter.verify();
-      console.log('[Email] Configuration verified successfully');
-      return true;
-    } catch (error) {
-      console.error('[Email] Configuration verification failed:', error);
-      return false;
-    }
-  }
 }
 
 // Export singleton instance
