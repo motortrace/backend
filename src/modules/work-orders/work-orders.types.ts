@@ -411,4 +411,9 @@ export interface IWorkOrderService {
   
   // Technician active work
   getTechnicianActiveWork(technicianId: string): Promise<any>;
+
+    // Estimate PDF and approval helpers
+    generateEstimatePDF(workOrderId: string): Promise<string>;
+    expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
+    createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
 }

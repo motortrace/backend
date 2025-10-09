@@ -642,6 +642,7 @@ model WorkOrderApproval {
   method       ApprovalMethod?
   notes        String?      // Notes from the approval process
   customerSignature String? // URL to signature file or signature data
+  pdfUrl        String?      // URL to generated estimate PDF
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
