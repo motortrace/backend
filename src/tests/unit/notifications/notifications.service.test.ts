@@ -2,16 +2,24 @@ import { NotificationService } from '../../../modules/notifications/notification
 import { PrismaClient, WorkOrderStatus } from '@prisma/client';
 import { NotificationEventType, NotificationChannel, NotificationPriority } from '../../../modules/notifications/notifications.types';
 
-// Mock nodemailer
-const mockSendMail = jest.fn().mockResolvedValue({ messageId: 'test-message-id' });
-const mockVerify = jest.fn().mockResolvedValue(true);
+// Mock nodemailer - must be defined before jest.mock
+jest.mock('nodemailer', () => {
+  const mockSendMail = jest.fn().mockResolvedValue({ messageId: 'test-message-id' });
+  const mockVerify = jest.fn().mockResolvedValue(true);
+  
+  return {
+    createTransport: jest.fn().mockReturnValue({
+      sendMail: mockSendMail,
+      verify: mockVerify,
+    }),
+  };
+});
 
-jest.mock('nodemailer', () => ({
-  createTransport: jest.fn().mockReturnValue({
-    sendMail: mockSendMail,
-    verify: mockVerify,
-  }),
-}));
+// Get the mocked functions for use in tests
+const nodemailer = require('nodemailer');
+const mockTransport = nodemailer.createTransport();
+const mockSendMail = mockTransport.sendMail;
+const mockVerify = mockTransport.verify;
 
 describe('NotificationService', () => {
   let notificationService: NotificationService;

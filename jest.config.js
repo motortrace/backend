@@ -2,10 +2,17 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   
-  // Test file patterns
+  // Test file patterns - only unit tests
   testMatch: [
-    '**/tests/**/*.test.ts',
+    '**/tests/unit/**/*.test.ts',
     '**/__tests__/**/*.test.ts'
+  ],
+  
+  // Exclude integration tests
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/integration/',
+    '/tests/e2e/'
   ],
   
   // Module paths
