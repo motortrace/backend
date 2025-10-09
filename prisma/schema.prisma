@@ -348,13 +348,14 @@ enum UserRole {
 
 
 enum WorkOrderStatus {
-  PENDING
-  ESTIMATE
-  IN_PROGRESS
-  WAITING_FOR_PARTS
-  QC_PENDING
-  COMPLETED
-  CANCELLED
+  PENDING           // Work order created, no items added yet
+  AWAITING_APPROVAL // Services/parts added, waiting for customer approval
+  APPROVED          // Customer approved all services/parts
+  IN_PROGRESS       // Work has started (at least one service or part in progress)
+  COMPLETED         // All work finished
+  INVOICED          // Invoice generated
+  PAID              // Payment received
+  CANCELLED         // Work order cancelled
 }
 
 enum JobType {
