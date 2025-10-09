@@ -30,6 +30,7 @@ model UserProfile {
   admin          Admin?
   uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
   uploadedInspectionAttachments WorkOrderInspectionAttachment[] @relation("UploadedInspectionAttachments")
+  notifications  Notification[]
 }
 
 model ServiceAdvisor {
@@ -111,9 +112,6 @@ model Customer {
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
   appointments  Appointment[]
-  notifications Notification[]
-  notificationPreferences NotificationPreferences?
-  notificationHistory NotificationHistory[]
 }
 
 model Vehicle {
@@ -350,13 +348,14 @@ enum UserRole {
 
 
 enum WorkOrderStatus {
-  PENDING
-  ESTIMATE
-  IN_PROGRESS
-  WAITING_FOR_PARTS
-  QC_PENDING
-  COMPLETED
-  CANCELLED
+  PENDING           // Work order created, no items added yet
+  AWAITING_APPROVAL // Services/parts added, waiting for customer approval
+  APPROVED          // Customer approved all services/parts
+  IN_PROGRESS       // Work has started (at least one service or part in progress)
+  COMPLETED         // All work finished
+  INVOICED          // Invoice generated
+  PAID              // Payment received
+  CANCELLED         // Work order cancelled
 }
 
 enum JobType {
@@ -905,8 +904,8 @@ model InvoiceLineItem {
 
 model Notification {
   id          String    @id @default(cuid())
-  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId  String
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  userProfileId String
   workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
   workOrderId String?
   
@@ -936,82 +935,11 @@ model Notification {
   updatedAt   DateTime  @updatedAt
   expiresAt   DateTime? // Optional expiration date
   
-  // Relations
-  history     NotificationHistory[]
-  
-  @@index([customerId])
+  @@index([userProfileId])
   @@index([workOrderId])
   @@index([isRead])
   @@index([createdAt])
-  @@index([customerId, isRead])
-}
-
-model NotificationPreferences {
-  id          String    @id @default(cuid())
-  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId  String    @unique
-  
-  // Channel Preferences
-  emailEnabled  Boolean @default(true)
-  pushEnabled   Boolean @default(true)
-  inAppEnabled  Boolean @default(true)
-  
-  // Event Type Preferences
-  workOrderStatusChanges Boolean @default(true)
-  serviceApprovals       Boolean @default(true)
-  partApprovals          Boolean @default(true)
-  inspectionReports      Boolean @default(true)
-  paymentConfirmations   Boolean @default(true)
-  appointmentReminders   Boolean @default(true)
-  vehicleReadyAlerts     Boolean @default(true)
-  promotionalMessages    Boolean @default(false)
-  
-  // Quiet Hours
-  quietHoursEnabled Boolean @default(false)
-  quietHoursStart   String? // Format: "22:00"
-  quietHoursEnd     String? // Format: "08:00"
-  
-  // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  @@index([customerId])
-}
-
-model NotificationHistory {
-  id             String       @id @default(cuid())
-  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
-  notificationId String?
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId     String
-  
-  // Delivery Details
-  channel     NotificationChannel
-  status      NotificationDeliveryStatus
-  recipient   String?      // Email address or phone number
-  
-  // Content
-  subject     String?
-  message     String?      @db.Text
-  
-  // Delivery Tracking
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  failedAt    DateTime?
-  errorMessage String?     @db.Text
-  
-  // Metadata
-  metadata    Json?
-  
-  // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  @@index([notificationId])
-  @@index([customerId])
-  @@index([channel])
-  @@index([status])
-  @@index([sentAt])
+  @@index([userProfileId, isRead])
 }
 
 enum NotificationType {

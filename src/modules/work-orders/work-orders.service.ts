@@ -9,6 +9,8 @@ import {
   WorkOrderStatistics,
 } from './work-orders.types';
 import { PrismaClient } from '@prisma/client';
+import { NotificationService } from '../notifications/notifications.service';
+import { NotificationEventType, NotificationChannel, NotificationPriority } from '../notifications/notifications.types';
 
 // Type alias for work order with all includes
 type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
@@ -27,7 +29,11 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
 }>;
 
 export class WorkOrderService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private notificationService: NotificationService;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.notificationService = new NotificationService(prisma);
+  }
   
   // Get UserProfile by Supabase ID
   async getUserProfileBySupabaseId(supabaseUserId: string) {
@@ -111,6 +117,10 @@ export class WorkOrderService {
 
 
 
+    // Determine initial status: AWAITING_APPROVAL if services are added, otherwise PENDING
+    const hasServices = cannedServiceIds && cannedServiceIds.length > 0;
+    const initialStatus = hasServices ? WorkOrderStatus.AWAITING_APPROVAL : WorkOrderStatus.PENDING;
+
     // Create work order with services
     const workOrder = await this.prisma.workOrder.create({
       data: {
@@ -119,7 +129,7 @@ export class WorkOrderService {
         vehicleId: workOrderData.vehicleId,
         appointmentId: workOrderData.appointmentId,
         advisorId: workOrderData.advisorId,
-        status: workOrderData.status || WorkOrderStatus.PENDING,
+        status: workOrderData.status || initialStatus,
         jobType: workOrderData.jobType || JobType.REPAIR,
         priority: workOrderData.priority || JobPriority.NORMAL,
         source: workOrderData.source || JobSource.WALK_IN,
@@ -603,387 +613,6 @@ export class WorkOrderService {
     return cancelledWorkOrder;
   }
 
-  // Restore cancelled work order (change status back from CANCELLED)
-  // async restoreWorkOrder(id: string): Promise<WorkOrderWithDetails> {
-  //   // First check if work order exists
-  //   const existingWorkOrder = await this.prisma.workOrder.findUnique({
-  //     where: { id },
-  //   });
-
-  //   if (!existingWorkOrder) {
-  //     throw new Error('Work order not found');
-  //   }
-
-  //   // Check if work order is actually cancelled
-  //   if (existingWorkOrder.status !== WorkOrderStatus.CANCELLED) {
-  //     throw new Error('Work order is not cancelled and cannot be restored');
-  //   }
-
-  //   // Restore by changing status back to PENDING and updating workflow step
-  //   const restoredWorkOrder = await this.prisma.workOrder.update({
-  //     where: { id },
-  //     data: {
-  //       status: WorkOrderStatus.PENDING,
-  //       workflowStep: WorkflowStep.RECEIVED,
-  //       closedAt: null, // Clear the closed date
-  //       internalNotes: existingWorkOrder.internalNotes 
-  //         ? `${existingWorkOrder.internalNotes}\n\n[RESTORED] Work order restored on ${new Date().toISOString()}`
-  //         : `[RESTORED] Work order restored on ${new Date().toISOString()}`,
-  //     },
-  //     include: {
-  //       customer: {
-  //         select: {
-  //           id: true,
-  //           name: true,
-  //           email: true,
-  //           phone: true,
-  //         },
-  //       },
-  //       vehicle: {
-  //         select: {
-  //           id: true,
-  //           make: true,
-  //           model: true,
-  //           year: true,
-  //           licensePlate: true,
-  //           vin: true,
-  //         },
-  //       },
-  //       appointment: {
-  //         select: {
-  //           id: true,
-  //           requestedAt: true,
-  //           startTime: true,
-  //           endTime: true,
-  //         },
-  //       },
-  //       serviceAdvisor: {
-  //         select: {
-  //           id: true,
-  //           employeeId: true,
-  //           department: true,
-  //           userProfile: {
-  //             select: {
-  //               id: true,
-  //               name: true,
-  //               phone: true,
-  //             },
-  //           },
-  //         },
-  //       },
-  //       services: {
-  //         include: {
-  //           cannedService: {
-  //             select: {
-  //               id: true,
-  //               code: true,
-  //               name: true,
-  //               description: true,
-  //               duration: true,
-  //               price: true,
-  //             },
-  //           },
-  //         },
-  //       },
-  //       inspections: {
-  //         include: {
-  //           inspector: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       laborItems: {
-  //         include: {
-  //           laborCatalog: {
-  //             select: {
-  //               id: true,
-  //               code: true,
-  //               name: true,
-  //               estimatedHours: true,
-  //               hourlyRate: true,
-  //             },
-  //           },
-  //           technician: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       partsUsed: {
-  //         include: {
-  //           part: {
-  //             select: {
-  //               id: true,
-  //               name: true,
-  //               sku: true,
-  //               partNumber: true,
-  //               manufacturer: true,
-  //             },
-  //           },
-  //           installedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       payments: {
-  //         include: {
-  //           processedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       estimates: {
-  //         include: {
-  //           createdBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //           approvedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       attachments: {
-  //         include: {
-  //           uploadedBy: { select: { id: true, name: true } },
-  //         },
-  //       },
-  //     },
-  //   });
-
-  //   return restoredWorkOrder;
-  // }
-
-  // Get cancelled work orders (soft deleted)
-  // async getCancelledWorkOrders(): Promise<WorkOrderWithDetails[]> {
-  //   const cancelledWorkOrders = await this.prisma.workOrder.findMany({
-  //     where: { 
-  //       status: WorkOrderStatus.CANCELLED 
-  //     },
-  //     include: {
-  //       customer: {
-  //         select: {
-  //           id: true,
-  //           name: true,
-  //           email: true,
-  //           phone: true,
-  //         },
-  //       },
-  //       vehicle: {
-  //         select: {
-  //           id: true,
-  //           make: true,
-  //           model: true,
-  //           year: true,
-  //           licensePlate: true,
-  //           vin: true,
-  //         },
-  //       },
-  //       appointment: {
-  //         select: {
-  //           id: true,
-  //           requestedAt: true,
-  //           startTime: true,
-  //           endTime: true,
-  //         },
-  //       },
-  //       serviceAdvisor: {
-  //         select: {
-  //           id: true,
-  //           employeeId: true,
-  //           department: true,
-  //           userProfile: {
-  //             select: {
-  //               id: true,
-  //               name: true,
-  //               phone: true,
-  //             },
-  //           },
-  //         },
-  //       },
-  //       services: {
-  //         include: {
-  //           cannedService: {
-  //             select: {
-  //               id: true,
-  //               code: true,
-  //               name: true,
-  //               description: true,
-  //               duration: true,
-  //               price: true,
-  //             },
-  //           },
-  //         },
-  //       },
-  //       inspections: {
-  //         include: {
-  //           inspector: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       laborItems: {
-  //         include: {
-  //           laborCatalog: {
-  //             select: {
-  //               id: true,
-  //               code: true,
-  //               name: true,
-  //               estimatedHours: true,
-  //               hourlyRate: true,
-  //             },
-  //           },
-  //           technician: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       partsUsed: {
-  //         include: {
-  //           part: {
-  //             select: {
-  //               id: true,
-  //               name: true,
-  //               sku: true,
-  //               partNumber: true,
-  //               manufacturer: true,
-  //             },
-  //           },
-  //           installedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       payments: {
-  //         include: {
-  //           processedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       estimates: {
-  //         include: {
-  //           createdBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //           approvedBy: {
-  //             select: {
-  //               id: true,
-  //               userProfile: {
-  //                 select: {
-  //                   id: true,
-  //                   name: true,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         },
-  //       },
-  //       attachments: {
-  //         include: {
-  //           uploadedBy: { select: { id: true, name: true } },
-  //         },
-  //       },
-  //     },
-  //     orderBy: {
-  //       closedAt: 'desc', // Most recently cancelled first
-  //     },
-  //   });
-
-  //   return cancelledWorkOrders;
-  // }
-
-
-
-
-
-  // Create work order service
   async createWorkOrderService(data: CreateWorkOrderServiceRequest) {
     // Validate the canned service exists
     const cannedService = await this.prisma.cannedService.findUnique({
@@ -1149,6 +778,29 @@ export class WorkOrderService {
 
   // Update work order status
   async updateWorkOrderStatus(id: string, status: WorkOrderStatus, workflowStep?: WorkflowStep) {
+    // Get the current work order with customer and vehicle details (needed for notification)
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
+      where: { id },
+      include: {
+        customer: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true, 
+            phone: true,
+            userProfile: { select: { id: true } }
+          } 
+        },
+        vehicle: { select: { make: true, model: true, year: true } },
+      },
+    });
+
+    if (!existingWorkOrder) {
+      throw new Error('Work order not found');
+    }
+
+    const oldStatus = existingWorkOrder.status; // Store old status for comparison
+
     const updateData: any = { status };
 
     if (workflowStep) {
@@ -1165,10 +817,57 @@ export class WorkOrderService {
       updateData.closedAt = new Date();
     }
 
+    // Update the work order status
     const workOrder = await this.prisma.workOrder.update({
       where: { id },
       data: updateData,
     });
+
+    // Send notification if status actually changed
+    if (oldStatus !== status && existingWorkOrder.customer.email) {
+      try {
+        // Determine the event type based on the new status
+        let eventType = NotificationEventType.WORK_ORDER_STATUS_CHANGED;
+        let priority = NotificationPriority.NORMAL;
+
+        if (status === WorkOrderStatus.COMPLETED) {
+          eventType = NotificationEventType.WORK_ORDER_COMPLETED;
+          priority = NotificationPriority.HIGH;
+        }
+
+        // Send the notification
+        await this.notificationService.sendNotification({
+          eventType,
+          recipient: {
+            userProfileId: existingWorkOrder.customer.userProfile?.id,
+            email: existingWorkOrder.customer.email,
+            name: existingWorkOrder.customer.name,
+            phone: existingWorkOrder.customer.phone || undefined,
+          },
+          data: {
+            workOrderId: workOrder.id,
+            workOrderNumber: workOrder.workOrderNumber,
+            customerName: existingWorkOrder.customer.name,
+            customerEmail: existingWorkOrder.customer.email || undefined,
+            customerPhone: existingWorkOrder.customer.phone || undefined,
+            vehicleMake: existingWorkOrder.vehicle.make,
+            vehicleModel: existingWorkOrder.vehicle.model,
+            vehicleYear: existingWorkOrder.vehicle.year || undefined,
+            status: status,
+            oldStatus: oldStatus,
+            estimatedTotal: workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : undefined,
+            promisedDate: workOrder.promisedAt || undefined,
+          },
+          channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
+          priority,
+        });
+
+        console.log(`✅ Notification sent: Work order ${workOrder.workOrderNumber} status changed from ${oldStatus} to ${status}`);
+      } catch (notificationError) {
+        // Log error but don't fail the status update
+        console.error('Failed to send notification:', notificationError);
+      }
+    }
 
     return workOrder;
   }
@@ -1281,12 +980,49 @@ export class WorkOrderService {
   // Update work order labor item
   async updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest) {
     // Update the labor item (no subtotal - labor is for tracking only)
-    await this.prisma.workOrderLabor.update({
+    const updatedLabor = await this.prisma.workOrderLabor.update({
       where: { id: laborId },
       data: {
         ...data,
       },
+      include: {
+        service: { select: { id: true, status: true } },
+        workOrder: { select: { id: true } },
+      },
     });
+
+    // If labor status changed to IN_PROGRESS or COMPLETED, update parent service status
+    if (data.status) {
+      const serviceId = updatedLabor.service.id;
+      
+      // Get all labor items for this service
+      const serviceLaborItems = await this.prisma.workOrderLabor.findMany({
+        where: { serviceId },
+        select: { status: true },
+      });
+
+      // Determine service status based on labor statuses
+      const allLaborsCompleted = serviceLaborItems.every(l => l.status === ServiceStatus.COMPLETED);
+      const anyLaborInProgress = serviceLaborItems.some(l => l.status === ServiceStatus.IN_PROGRESS);
+
+      let newServiceStatus: ServiceStatus | null = null;
+      if (allLaborsCompleted) {
+        newServiceStatus = ServiceStatus.COMPLETED;
+      } else if (anyLaborInProgress && updatedLabor.service.status !== ServiceStatus.IN_PROGRESS) {
+        newServiceStatus = ServiceStatus.IN_PROGRESS;
+      }
+
+      // Update service status if it changed
+      if (newServiceStatus) {
+        await this.prisma.workOrderService.update({
+          where: { id: serviceId },
+          data: { status: newServiceStatus },
+        });
+      }
+
+      // Auto-update work order status
+      await this.autoUpdateWorkOrderStatus(updatedLabor.workOrder.id);
+    }
 
     return { id: laborId };
   }
@@ -1332,6 +1068,93 @@ export class WorkOrderService {
         totalAmount,
       },
     });
+  }
+
+  /**
+   * Auto-update work order status based on services and parts state
+   * Called after service/part approval, work start/completion
+   */
+  private async autoUpdateWorkOrderStatus(workOrderId: string) {
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        services: { select: { customerApproved: true, customerRejected: true, status: true } },
+        partsUsed: { select: { customerApproved: true, customerRejected: true, installedAt: true } },
+      },
+    });
+
+    if (!workOrder) return;
+
+    // Don't auto-update if status is CANCELLED, INVOICED, or PAID
+    const finalStatuses: WorkOrderStatus[] = [WorkOrderStatus.CANCELLED, WorkOrderStatus.INVOICED, WorkOrderStatus.PAID];
+    if (finalStatuses.includes(workOrder.status)) {
+      return;
+    }
+
+    const hasServices = workOrder.services.length > 0;
+    const hasParts = workOrder.partsUsed.length > 0;
+    const hasItems = hasServices || hasParts;
+
+    if (!hasItems) {
+      // No items yet - keep as PENDING
+      if (workOrder.status !== WorkOrderStatus.PENDING) {
+        await this.prisma.workOrder.update({
+          where: { id: workOrderId },
+          data: { status: WorkOrderStatus.PENDING },
+        });
+      }
+      return;
+    }
+
+    // Check if all non-rejected services are approved
+    const nonRejectedServices = workOrder.services.filter(s => !s.customerRejected);
+    const allServicesApproved = nonRejectedServices.every(s => s.customerApproved);
+
+    // Check if all non-rejected parts are approved
+    const nonRejectedParts = workOrder.partsUsed.filter(p => !p.customerRejected);
+    const allPartsApproved = nonRejectedParts.every(p => p.customerApproved);
+
+    // Check if any work has started
+    const anyServiceInProgress = workOrder.services.some(s => 
+      s.status === ServiceStatus.IN_PROGRESS || s.status === ServiceStatus.COMPLETED
+    );
+    const anyPartInstalled = workOrder.partsUsed.some(p => p.installedAt !== null);
+    const workStarted = anyServiceInProgress || anyPartInstalled;
+
+    // Check if all work is completed
+    const allServicesCompleted = nonRejectedServices.every(s => 
+      s.status === ServiceStatus.COMPLETED || s.status === ServiceStatus.CANCELLED
+    );
+    const allPartsInstalled = nonRejectedParts.every(p => p.installedAt !== null);
+    const allWorkCompleted = (nonRejectedServices.length === 0 || allServicesCompleted) && 
+                             (nonRejectedParts.length === 0 || allPartsInstalled);
+
+    // Determine new status
+    let newStatus: WorkOrderStatus | null = null;
+
+    if (allWorkCompleted && workOrder.status === WorkOrderStatus.IN_PROGRESS) {
+      newStatus = WorkOrderStatus.COMPLETED;
+    } else if (workStarted && workOrder.status === WorkOrderStatus.APPROVED) {
+      newStatus = WorkOrderStatus.IN_PROGRESS;
+    } else if (allServicesApproved && allPartsApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
+      newStatus = WorkOrderStatus.APPROVED;
+    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING) {
+      newStatus = WorkOrderStatus.AWAITING_APPROVAL;
+    }
+
+    // Update status if it changed
+    if (newStatus && newStatus !== workOrder.status) {
+      await this.prisma.workOrder.update({
+        where: { id: workOrderId },
+        data: { 
+          status: newStatus,
+          ...(newStatus === WorkOrderStatus.IN_PROGRESS && { openedAt: new Date() }),
+          ...(newStatus === WorkOrderStatus.COMPLETED && { closedAt: new Date() }),
+        },
+      });
+      
+      console.log(`✅ Auto-updated work order ${workOrderId} status: ${workOrder.status} → ${newStatus}`);
+    }
   }
 
   // REMOVED: resetWorkOrderLaborSubtotal()
@@ -1739,6 +1562,9 @@ export class WorkOrderService {
     // Recalculate work order totals
     await this.updateWorkOrderTotals(service.workOrderId);
 
+    // Auto-update work order status if all items approved
+    await this.autoUpdateWorkOrderStatus(service.workOrderId);
+
     return { message: 'Service approved successfully' };
   }
 
@@ -1805,6 +1631,9 @@ export class WorkOrderService {
 
     // Recalculate work order totals
     await this.updateWorkOrderTotals(part.workOrderId);
+
+    // Auto-update work order status if all items approved
+    await this.autoUpdateWorkOrderStatus(part.workOrderId);
 
     return { message: 'Part approved successfully' };
   }
@@ -1977,14 +1806,18 @@ export class WorkOrderService {
     }
 
     // Update part to mark installation complete
-    await this.prisma.workOrderPart.update({
+    const updatedPart = await this.prisma.workOrderPart.update({
       where: { id: partId },
       data: {
         installedAt: new Date(),
         notes: data.notes,
         warrantyInfo: data.warrantyInfo,
       },
+      select: { workOrderId: true },
     });
+
+    // Auto-update work order status when part is installed
+    await this.autoUpdateWorkOrderStatus(updatedPart.workOrderId);
 
     return { message: 'Part installation completed successfully' };
   }
