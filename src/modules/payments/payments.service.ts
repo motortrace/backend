@@ -551,13 +551,21 @@ export class PaymentService {
       paymentStatus = PaymentStatus.PENDING;
     }
 
-    // Update work order payment status
+    // Update work order payment status AND overall status if fully paid
+    const updateData: any = { 
+      paymentStatus,
+      paidAmount: totalPaid
+    };
+
+    // If fully paid, update work order status to PAID (only if currently INVOICED)
+    if (paymentStatus === PaymentStatus.PAID && workOrder.status === 'INVOICED') {
+      updateData.status = 'PAID';
+      console.log(`✅ Work order ${workOrderId} status updated to PAID`);
+    }
+
     await this.prisma.workOrder.update({
       where: { id: workOrderId },
-      data: { 
-        paymentStatus,
-        paidAmount: totalPaid
-      },
+      data: updateData,
     });
 
     // Update invoice(s) payment status and amounts
