@@ -60,14 +60,8 @@ export class WorkOrderService {
           approvedBy: {
             select: {
               id: true,
-              employeeId: true,
-              userProfile: {
-                select: {
-                  id: true,
-                  name: true,
-                  profileImage: true,
-                },
-              },
+              name: true,
+              profileImage: true,
             },
           },
         },

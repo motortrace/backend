@@ -31,6 +31,7 @@ model UserProfile {
   uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
   uploadedInspectionAttachments WorkOrderInspectionAttachment[] @relation("UploadedInspectionAttachments")
   notifications  Notification[]
+  workOrderApprovals WorkOrderApproval[] @relation("WorkOrderApprovals")
 }
 
 model ServiceAdvisor {
@@ -45,7 +46,6 @@ model ServiceAdvisor {
   // Relations
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
-  approvals      WorkOrderApproval[] @relation("Approvals")
   processedPayments Payment[] @relation("ProcessedPayments")
 }
 
@@ -637,7 +637,7 @@ model WorkOrderApproval {
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
-  approvedBy   ServiceAdvisor? @relation("Approvals", fields: [approvedById], references: [id])
+  approvedBy   UserProfile? @relation("WorkOrderApprovals", fields: [approvedById], references: [id])
   approvedById String?
   method       ApprovalMethod?
   notes        String?      // Notes from the approval process

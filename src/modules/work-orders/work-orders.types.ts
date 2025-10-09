@@ -284,11 +284,8 @@ export interface WorkOrderWithDetails {
     };
     approvedBy?: {
       id: string;
-      employeeId?: string;
-      userProfile: {
-        id: string;
-        name?: string;
-      };
+      name?: string;
+      profileImage?: string;
     };
   }[];
   attachments: {

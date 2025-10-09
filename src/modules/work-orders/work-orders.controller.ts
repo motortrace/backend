@@ -32,10 +32,10 @@ export class WorkOrderController {
           return res.status(401).json({ success: false, error: 'User not authenticated' });
         }
 
-        // Find service advisor
-        const serviceAdvisor = await this.workOrderService.findServiceAdvisorBySupabaseUserId(supabaseUserId);
-        if (!serviceAdvisor) {
-          return res.status(404).json({ success: false, error: 'Service advisor profile not found' });
+        // Find user profile
+        const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+        if (!userProfile) {
+          return res.status(404).json({ success: false, error: 'User profile not found' });
         }
 
         // Generate estimate PDF
@@ -48,7 +48,7 @@ export class WorkOrderController {
         const approval = await this.workOrderService.createWorkOrderApproval({
           workOrderId,
           status: 'PENDING',
-          approvedById: serviceAdvisor.id,
+          approvedById: userProfile.id,
           pdfUrl,
         });
 
