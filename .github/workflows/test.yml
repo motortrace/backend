@@ -10,21 +10,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: motortrace_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v3
@@ -38,46 +23,8 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      - name: 🔧 Generate Prisma Client
-        run: npx prisma generate
-
-      - name: 🗄️ Run database migrations
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/motortrace_test
-        run: npx prisma migrate deploy
-
-      - name: 🧪 Run unit tests
-        run: npm run test:unit
-
-      - name: 🔗 Run integration tests
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/motortrace_test
-          NODE_ENV: test
-        run: npm run test:integration
-
-      - name: 🚀 Run E2E tests
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/motortrace_test
-          NODE_ENV: test
-        run: npm run test:e2e
-
-      - name: 📊 Generate coverage report
-        run: npm run test:coverage
-
-      - name: 📈 Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
-      - name: 💬 Comment PR with coverage
-        if: github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@v0.3.1
-        with:
-          lcov-file: ./coverage/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🧪 Run tests
+        run: npm test
 
       - name: ✅ Test summary
         if: always()

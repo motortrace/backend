@@ -111,6 +111,9 @@ model Customer {
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
   appointments  Appointment[]
+  notifications Notification[]
+  notificationPreferences NotificationPreferences?
+  notificationHistory NotificationHistory[]
 }
 
 model Vehicle {
@@ -204,6 +207,7 @@ model WorkOrder {
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
   invoices        Invoice[]
+  notifications   Notification[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -893,4 +897,166 @@ model InvoiceLineItem {
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+model Notification {
+  id          String    @id @default(cuid())
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId  String
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  workOrderId String?
+  
+  // Notification Details
+  type        NotificationType
+  title       String
+  message     String    @db.Text
+  priority    NotificationPriority @default(NORMAL)
+  
+  // Read/Unread Status
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  
+  // Action URL (for deep linking)
+  actionUrl   String?
+  actionText  String?
+  
+  // Metadata (JSON field for flexible data storage)
+  metadata    Json?
+  
+  // Channels used
+  sentViaEmail Boolean  @default(false)
+  sentViaPush  Boolean  @default(false)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime? // Optional expiration date
+  
+  // Relations
+  history     NotificationHistory[]
+  
+  @@index([customerId])
+  @@index([workOrderId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([customerId, isRead])
+}
+
+model NotificationPreferences {
+  id          String    @id @default(cuid())
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId  String    @unique
+  
+  // Channel Preferences
+  emailEnabled  Boolean @default(true)
+  pushEnabled   Boolean @default(true)
+  inAppEnabled  Boolean @default(true)
+  
+  // Event Type Preferences
+  workOrderStatusChanges Boolean @default(true)
+  serviceApprovals       Boolean @default(true)
+  partApprovals          Boolean @default(true)
+  inspectionReports      Boolean @default(true)
+  paymentConfirmations   Boolean @default(true)
+  appointmentReminders   Boolean @default(true)
+  vehicleReadyAlerts     Boolean @default(true)
+  promotionalMessages    Boolean @default(false)
+  
+  // Quiet Hours
+  quietHoursEnabled Boolean @default(false)
+  quietHoursStart   String? // Format: "22:00"
+  quietHoursEnd     String? // Format: "08:00"
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([customerId])
+}
+
+model NotificationHistory {
+  id             String       @id @default(cuid())
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  notificationId String?
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId     String
+  
+  // Delivery Details
+  channel     NotificationChannel
+  status      NotificationDeliveryStatus
+  recipient   String?      // Email address or phone number
+  
+  // Content
+  subject     String?
+  message     String?      @db.Text
+  
+  // Delivery Tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  errorMessage String?     @db.Text
+  
+  // Metadata
+  metadata    Json?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([notificationId])
+  @@index([customerId])
+  @@index([channel])
+  @@index([status])
+  @@index([sentAt])
+}
+
+enum NotificationType {
+  WORK_ORDER_CREATED
+  WORK_ORDER_STATUS_CHANGED
+  WORK_ORDER_COMPLETED
+  SERVICE_APPROVAL_REQUIRED
+  SERVICE_APPROVED
+  SERVICE_REJECTED
+  PART_APPROVAL_REQUIRED
+  PART_APPROVED
+  PART_REJECTED
+  INSPECTION_COMPLETED
+  INSPECTION_ISSUE_FOUND
+  PAYMENT_RECEIVED
+  INVOICE_GENERATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLED
+  VEHICLE_READY_FOR_PICKUP
+  QC_PASSED
+  QC_FAILED
+  PROMOTIONAL
+  SYSTEM_ALERT
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationChannel {
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  CLICKED
+  READ
 }
