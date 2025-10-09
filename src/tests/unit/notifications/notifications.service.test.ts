@@ -1,6 +1,6 @@
-import { NotificationService } from '../../modules/notifications/notifications.service';
+import { NotificationService } from '../../../modules/notifications/notifications.service';
 import { PrismaClient, WorkOrderStatus } from '@prisma/client';
-import { NotificationEventType, NotificationChannel, NotificationPriority } from '../../modules/notifications/notifications.types';
+import { NotificationEventType, NotificationChannel, NotificationPriority } from '../../../modules/notifications/notifications.types';
 
 // Mock nodemailer
 const mockSendMail = jest.fn().mockResolvedValue({ messageId: 'test-message-id' });

@@ -1,7 +1,7 @@
 // Update the import path if the file was moved or renamed
-import { CustomerService } from '../../modules/customers/customers.service';
+import { CustomerService } from '../../../modules/customers/customers.service';
 import { PrismaClient } from '@prisma/client';
-import { CreateCustomerDto } from '../../modules/customers/customers.types';
+import { CreateCustomerDto } from '../../../modules/customers/customers.types';
 
 // Mock Prisma Client
 jest.mock('@prisma/client');
