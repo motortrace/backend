@@ -14,6 +14,38 @@ export class StorageService {
   private static readonly TEMPLATE_IMAGES_BUCKET = 'template-images';
   private static readonly WORK_ORDER_ATTACHMENTS_BUCKET = 'work-order-attachments';
   private static readonly INVOICES_BUCKET = 'invoices';
+  private static readonly ESTIMATES_BUCKET = 'estimates';
+  /**
+   * Upload an estimate PDF to Supabase Storage
+   */
+  static async uploadEstimatePDF(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    workOrderId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_PDF_SIZE) {
+        return { success: false, error: 'PDF size exceeds 20MB limit' };
+      }
+      const fileExtension = fileName.split('.').pop() || 'pdf';
+      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+      const serviceClient = this.getServiceClient();
+      const { error } = await serviceClient.storage
+        .from(this.ESTIMATES_BUCKET)
+        .upload(uniqueFileName, file, { contentType: 'application/pdf', upsert: false });
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload PDF to storage' };
+      }
+      const { data: urlData } = serviceClient.storage
+        .from(this.ESTIMATES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Estimate PDF upload error:', error);
+      return { success: false, error: 'Internal server error during PDF upload' };
+    }
+  }
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   private static readonly MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB for attachments
   private static readonly MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB for PDFs

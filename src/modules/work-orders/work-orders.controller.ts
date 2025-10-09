@@ -23,6 +23,46 @@ export class WorkOrderController {
 
   constructor(private readonly workOrderService: IWorkOrderService) {}
 
+    // Generate estimate PDF and create WorkOrderApproval entry
+    async generateEstimate(req: any, res: Response) {
+      try {
+        const { workOrderId } = req.params;
+        const supabaseUserId = req.user?.id;
+        if (!supabaseUserId) {
+          return res.status(401).json({ success: false, error: 'User not authenticated' });
+        }
+
+        // Find user profile
+        const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+        if (!userProfile) {
+          return res.status(404).json({ success: false, error: 'User profile not found' });
+        }
+
+        // Generate estimate PDF
+        const pdfUrl = await this.workOrderService.generateEstimatePDF(workOrderId);
+
+        // Expire previous WorkOrderApproval entries for this work order/status
+        await this.workOrderService.expirePreviousApprovals(workOrderId, 'PENDING');
+
+        // Create new WorkOrderApproval entry
+        const approval = await this.workOrderService.createWorkOrderApproval({
+          workOrderId,
+          status: 'PENDING',
+          approvedById: userProfile.id,
+          pdfUrl,
+        });
+
+        res.status(201).json({
+          success: true,
+          pdfUrl,
+          approval,
+          message: 'Estimate generated and approval entry created',
+        });
+      } catch (error: any) {
+        res.status(400).json({ success: false, error: error.message });
+      }
+    }
+
   // Work Order Management
   async createWorkOrder(req: any, res: Response) {
     try {
@@ -974,6 +1014,24 @@ export class WorkOrderController {
         success: true,
         data: activeWork,
         message: `Found ${activeWork.totalActiveTasks} active task(s) for technician`,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Work Order Approvals
+  async getWorkOrderApprovals(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const approvals = await this.workOrderService.getWorkOrderApprovals(workOrderId);
+
+      res.json({
+        success: true,
+        data: approvals,
       });
     } catch (error: any) {
       res.status(400).json({
