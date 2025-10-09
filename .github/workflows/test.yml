@@ -41,10 +41,10 @@ jobs:
       - name: 🔧 Generate Prisma Client
         run: npx prisma generate
 
-      - name: 🗄️ Run database migrations
+      - name: 🗄️ Push database schema
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/motortrace_test
-        run: npx prisma migrate deploy
+        run: npx prisma db push --skip-generate
 
       - name: 🧪 Run unit tests
         run: npm run test:unit
