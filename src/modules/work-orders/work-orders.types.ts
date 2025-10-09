@@ -416,4 +416,5 @@ export interface IWorkOrderService {
     generateEstimatePDF(workOrderId: string): Promise<string>;
     expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
+    getWorkOrderApprovals(workOrderId: string): Promise<any>;
 }

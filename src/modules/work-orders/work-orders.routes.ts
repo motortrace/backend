@@ -62,6 +62,7 @@ router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrd
 
 // Generate estimate PDF and approval entry
 router.post('/:workOrderId/generate-estimate', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.generateEstimate.bind(workOrderController));
+router.get('/:workOrderId/approvals', workOrderController.getWorkOrderApprovals.bind(workOrderController));
 router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
 router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));
 router.put('/parts/:partId/complete', authenticateSupabaseToken, requireTechnician, workOrderController.completePartInstallation.bind(workOrderController));

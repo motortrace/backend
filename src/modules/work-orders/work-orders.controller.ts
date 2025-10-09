@@ -1022,5 +1022,23 @@ export class WorkOrderController {
       });
     }
   }
+
+  // Work Order Approvals
+  async getWorkOrderApprovals(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const approvals = await this.workOrderService.getWorkOrderApprovals(workOrderId);
+
+      res.json({
+        success: true,
+        data: approvals,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 

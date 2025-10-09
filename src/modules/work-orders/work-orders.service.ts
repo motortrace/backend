@@ -52,6 +52,30 @@ export class WorkOrderService {
       return await this.prisma.workOrderApproval.create({ data });
     }
 
+    // Get WorkOrderApproval entries for a work order
+    async getWorkOrderApprovals(workOrderId: string) {
+      return await this.prisma.workOrderApproval.findMany({
+        where: { workOrderId },
+        include: {
+          approvedBy: {
+            select: {
+              id: true,
+              employeeId: true,
+              userProfile: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    }
+
   // Generate PDF estimate for a work order
   async generateEstimatePDF(workOrderId: string): Promise<string> {
     // Get work order with all details
