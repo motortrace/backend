@@ -65,6 +65,7 @@ export class WorkOrderService {
                 select: {
                   id: true,
                   name: true,
+                  profileImage: true,
                 },
               },
             },
