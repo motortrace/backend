@@ -15,6 +15,7 @@ export class StorageService {
   private static readonly WORK_ORDER_ATTACHMENTS_BUCKET = 'work-order-attachments';
   private static readonly INVOICES_BUCKET = 'invoices';
   private static readonly ESTIMATES_BUCKET = 'estimates';
+  private static readonly INSPECTIONS_BUCKET = 'inspections';
   /**
    * Upload an estimate PDF to Supabase Storage
    */
@@ -43,6 +44,38 @@ export class StorageService {
       return { success: true, url: urlData.publicUrl };
     } catch (error: any) {
       console.error('Estimate PDF upload error:', error);
+      return { success: false, error: 'Internal server error during PDF upload' };
+    }
+  }
+
+  /**
+   * Upload an inspection PDF to Supabase Storage
+   */
+  static async uploadInspectionPDF(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    workOrderId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_PDF_SIZE) {
+        return { success: false, error: 'PDF size exceeds 20MB limit' };
+      }
+      const fileExtension = fileName.split('.').pop() || 'pdf';
+      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+      const serviceClient = this.getServiceClient();
+      const { error } = await serviceClient.storage
+        .from(this.INSPECTIONS_BUCKET)
+        .upload(uniqueFileName, file, { contentType: 'application/pdf', upsert: false });
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload PDF to storage' };
+      }
+      const { data: urlData } = serviceClient.storage
+        .from(this.INSPECTIONS_BUCKET)
+        .getPublicUrl(uniqueFileName);
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Inspection PDF upload error:', error);
       return { success: false, error: 'Internal server error during PDF upload' };
     }
   }

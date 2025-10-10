@@ -49,7 +49,33 @@ export class WorkOrderService {
 
     // Create WorkOrderApproval entry
     async createWorkOrderApproval(data: { workOrderId: string; status: ApprovalStatus; approvedById: string; pdfUrl: string }) {
-      return await this.prisma.workOrderApproval.create({ data });
+      // Generate inspection PDF if inspections exist
+      let inspectionPdfUrl: string | undefined;
+      try {
+        // Check if work order has inspections
+        const workOrder = await this.prisma.workOrder.findUnique({
+          where: { id: data.workOrderId },
+          include: {
+            inspections: {
+              take: 1, // Just check if any exist
+            },
+          },
+        });
+
+        if (workOrder && workOrder.inspections && workOrder.inspections.length > 0) {
+          inspectionPdfUrl = await this.generateInspectionPDF(data.workOrderId);
+        }
+      } catch (error) {
+        console.warn('Failed to generate inspection PDF:', error);
+        // Continue without inspection PDF - don't fail the approval
+      }
+
+      return await this.prisma.workOrderApproval.create({
+        data: {
+          ...data,
+          inspectionPdfUrl,
+        },
+      });
     }
 
     // Get WorkOrderApproval entries for a work order
@@ -317,6 +343,366 @@ export class WorkOrderService {
     // Upload to Supabase Storage
     const { StorageService } = require('../storage/storage.service');
     const uploadResult = await StorageService.uploadEstimatePDF(
+      pdfBuffer,
+      fileName,
+      workOrderId
+    );
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Failed to upload PDF to storage');
+    }
+    return uploadResult.url!;
+  }
+
+  // Generate PDF inspection report for a work order
+  async generateInspectionPDF(workOrderId: string): Promise<string> {
+    // Get work order with inspection details
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        customer: true,
+        vehicle: true,
+        inspections: {
+          include: {
+            inspector: {
+              include: {
+                userProfile: true
+              }
+            },
+            template: true,
+            checklistItems: {
+              include: {
+                templateItem: true
+              },
+              orderBy: { createdAt: 'asc' }
+            },
+            attachments: {
+              orderBy: { uploadedAt: 'desc' }
+            },
+            tireChecks: {
+              orderBy: { position: 'asc' }
+            }
+          },
+          orderBy: { date: 'desc' }
+        }
+      }
+    });
+
+    if (!workOrder) throw new Error('WorkOrder not found');
+    if (!workOrder.inspections || workOrder.inspections.length === 0) {
+      throw new Error('No inspections found for this work order');
+    }
+
+    // Generate file name for storage
+    const fileName = `inspection-${workOrder.workOrderNumber}-${Date.now()}.pdf`;
+
+    // Format date
+    const formatDate = (date: Date) => date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Vehicle info
+    const vehicle = workOrder.vehicle;
+    const vehicleInfo = [
+      `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+      vehicle.licensePlate ? `License: ${vehicle.licensePlate}` : '',
+      vehicle.vin ? `VIN: ${vehicle.vin}` : '',
+      workOrder.odometerReading ? `Odometer: ${workOrder.odometerReading.toLocaleString()} km` : '',
+    ].filter(line => line).join('\n');
+
+    // Build PDF document definition
+    const pdfMake = require('pdfmake/build/pdfmake');
+    const pdfFonts = require('pdfmake/build/vfs_fonts');
+    if (pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
+      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+    }
+
+    const content: any[] = [
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'MotorTrace Auto Service', style: 'companyName', fontSize: 20, bold: true },
+              { text: 'No. 123, Service Center Road', style: 'companyInfo' },
+              { text: 'Colombo 00500, Sri Lanka', style: 'companyInfo' },
+              { text: 'Tel: +94 11 234 5678', style: 'companyInfo' },
+              { text: 'Email: service@motortrace.lk', style: 'companyInfo' },
+            ],
+          },
+          {
+            width: 'auto',
+            stack: [
+              { text: 'INSPECTION REPORT', style: 'reportTitle', fontSize: 24, bold: true, alignment: 'right' },
+              { text: `#${workOrder.workOrderNumber}`, style: 'reportNumber', fontSize: 14, alignment: 'right' },
+              { text: `Date: ${formatDate(new Date())}`, style: 'reportInfo', alignment: 'right' },
+            ],
+          },
+        ],
+      },
+      { text: '', margin: [0, 20, 0, 0] },
+      {
+        columns: [
+          {
+            width: '50%',
+            stack: [
+              { text: 'CUSTOMER:', style: 'sectionTitle', bold: true, fontSize: 11 },
+              { text: workOrder.customer.name, style: 'customerInfo', bold: true },
+              ...(workOrder.customer.email ? [{ text: workOrder.customer.email, style: 'customerInfo' }] : []),
+              ...(workOrder.customer.phone ? [{ text: workOrder.customer.phone, style: 'customerInfo' }] : []),
+            ],
+          },
+          {
+            width: '50%',
+            stack: [
+              { text: 'VEHICLE:', style: 'sectionTitle', bold: true, fontSize: 11 },
+              { text: vehicleInfo, style: 'customerInfo' },
+            ],
+          },
+        ],
+      },
+      { text: '', margin: [0, 20, 0, 0] },
+    ];
+
+    // Add each inspection
+    for (const [index, inspection] of workOrder.inspections.entries()) {
+      if (index > 0) {
+        content.push({ text: '', pageBreak: 'before' });
+      }
+
+      content.push(
+        { text: `Inspection ${index + 1}`, style: 'inspectionTitle', fontSize: 16, bold: true, margin: [0, 0, 0, 10] },
+        {
+          columns: [
+            {
+              width: '50%',
+              stack: [
+                { text: 'Template:', style: 'fieldLabel', bold: true },
+                { text: inspection.template?.name || 'Custom Inspection', style: 'fieldValue', margin: [0, 0, 0, 5] },
+              ],
+            },
+            {
+              width: '50%',
+              stack: [
+                { text: 'Inspector:', style: 'fieldLabel', bold: true },
+                { text: inspection.inspector?.userProfile?.name || 'Not Assigned', style: 'fieldValue', margin: [0, 0, 0, 5] },
+                { text: 'Date:', style: 'fieldLabel', bold: true },
+                { text: formatDate(inspection.date), style: 'fieldValue', margin: [0, 0, 0, 5] },
+              ],
+            },
+          ],
+        },
+        ...(inspection.notes ? [
+          { text: 'Notes:', style: 'fieldLabel', bold: true, margin: [0, 10, 0, 5] },
+          { text: inspection.notes, style: 'notes' },
+        ] : []),
+        { text: '', margin: [0, 15, 0, 0] },
+        { text: 'Checklist Items', style: 'sectionTitle', fontSize: 14, bold: true, margin: [0, 0, 0, 10] }
+      );
+
+      // Checklist items table
+      const checklistTableBody: any[][] = [
+        [
+          { text: 'Category', style: 'tableHeader', bold: true },
+          { text: 'Item', style: 'tableHeader', bold: true },
+          { text: 'Status', style: 'tableHeader', bold: true, alignment: 'center' },
+          { text: 'Notes', style: 'tableHeader', bold: true },
+        ],
+      ];
+
+      inspection.checklistItems.forEach(item => {
+        const statusColor = item.status === 'RED' ? '#ff0000' : item.status === 'YELLOW' ? '#ffa500' : '#008000';
+        checklistTableBody.push([
+          { text: item.category || '', style: 'tableCell' },
+          { text: item.item, style: 'tableCell' },
+          { text: item.status, style: 'tableCell', alignment: 'center', color: statusColor, bold: true },
+          { text: item.notes || '', style: 'tableCell' },
+        ]);
+      });
+
+      content.push({
+        table: {
+          headerRows: 1,
+          widths: ['auto', '*', 'auto', '*'],
+          body: checklistTableBody,
+        },
+        layout: {
+          fillColor: (rowIndex: number) => (rowIndex === 0 ? '#0066cc' : null),
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => '#cccccc',
+          vLineColor: () => '#cccccc',
+        },
+      });
+
+      // Attachments section
+      if (inspection.attachments && inspection.attachments.length > 0) {
+        content.push(
+          { text: '', margin: [0, 15, 0, 0] },
+          { text: 'Attachments', style: 'sectionTitle', fontSize: 14, bold: true, margin: [0, 0, 0, 10] }
+        );
+
+        // Process attachments - embed images, show text for other files
+        for (const attachment of inspection.attachments) {
+          if (attachment.fileType?.startsWith('image/')) {
+            try {
+              // Fetch image from Supabase storage (follow redirects)
+              const fetchBuffer = async (url: string, redirectLimit = 5): Promise<Buffer> => {
+                const { URL } = require('url');
+                const http = require('http');
+                const https = require('https');
+
+                return new Promise((resolve, reject) => {
+                  try {
+                    const parsed = new URL(url);
+                    const lib = parsed.protocol === 'http:' ? http : https;
+                    const req = lib.get(parsed.href, (res: any) => {
+                      // Follow redirects (3xx)
+                      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers && res.headers.location) {
+                        if (redirectLimit === 0) {
+                          reject(new Error('Too many redirects while fetching image'));
+                          return;
+                        }
+                        // Some Location headers are relative; construct absolute URL
+                        const location = res.headers.location.startsWith('http') ? res.headers.location : `${parsed.protocol}//${parsed.host}${res.headers.location}`;
+                        resolve(fetchBuffer(location, redirectLimit - 1));
+                        return;
+                      }
+
+                      if (res.statusCode !== 200) {
+                        reject(new Error(`Failed to fetch image: ${res.statusCode}`));
+                        return;
+                      }
+
+                      const chunks: Buffer[] = [];
+                      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                      res.on('end', () => resolve(Buffer.concat(chunks)));
+                    });
+                    req.on('error', reject);
+                  } catch (err) {
+                    reject(err);
+                  }
+                });
+              };
+
+              const imageBuffer = await fetchBuffer(attachment.fileUrl);
+
+              // Convert to base64
+              const base64Image = (imageBuffer as Buffer).toString('base64');
+
+              // Add image to PDF
+              content.push({
+                image: `data:${attachment.fileType};base64,${base64Image}`,
+                width: 200, // Fixed width for consistency
+                margin: [0, 0, 0, 10],
+              });
+
+              // Add description below image if available
+              if (attachment.description) {
+                content.push({
+                  text: attachment.description,
+                  style: 'imageCaption',
+                  margin: [0, 0, 0, 15],
+                });
+              }
+            } catch (error) {
+              console.warn(`Failed to embed image ${attachment.fileName}:`, error);
+              // Fallback to text description
+              content.push({
+                text: `${attachment.fileName || 'Unnamed file'} ${attachment.description ? ` - ${attachment.description}` : ''}`,
+                style: 'attachmentItem',
+                margin: [0, 0, 0, 5]
+              });
+            }
+          } else {
+            // Non-image attachment - show as text
+            content.push({
+              text: `${attachment.fileName || 'Unnamed file'} ${attachment.description ? ` - ${attachment.description}` : ''}`,
+              style: 'attachmentItem',
+              margin: [0, 0, 0, 5]
+            });
+          }
+        }
+      }
+
+      // Tire checks section
+      if (inspection.tireChecks && inspection.tireChecks.length > 0) {
+        content.push(
+          { text: '', margin: [0, 15, 0, 0] },
+          { text: 'Tire Inspection', style: 'sectionTitle', fontSize: 14, bold: true, margin: [0, 0, 0, 10] }
+        );
+
+        const tireTableBody: any[][] = [
+          [
+            { text: 'Position', style: 'tableHeader', bold: true },
+            { text: 'Brand/Model', style: 'tableHeader', bold: true },
+            { text: 'Size', style: 'tableHeader', bold: true },
+            { text: 'PSI', style: 'tableHeader', bold: true, alignment: 'center' },
+            { text: 'Tread Depth (mm)', style: 'tableHeader', bold: true, alignment: 'center' },
+            { text: 'Notes', style: 'tableHeader', bold: true },
+          ],
+        ];
+
+        inspection.tireChecks.forEach(tire => {
+          tireTableBody.push([
+            { text: tire.position, style: 'tableCell' },
+            { text: `${tire.brand || ''} ${tire.model || ''}`.trim() || '-', style: 'tableCell' },
+            { text: tire.size || '-', style: 'tableCell' },
+            { text: tire.psi?.toString() || '-', style: 'tableCell', alignment: 'center' },
+            { text: tire.treadDepth?.toString() || '-', style: 'tableCell', alignment: 'center' },
+            { text: tire.damageNotes || '-', style: 'tableCell' },
+          ]);
+        });
+
+        content.push({
+          table: {
+            headerRows: 1,
+            widths: ['auto', '*', 'auto', 'auto', 'auto', '*'],
+            body: tireTableBody,
+          },
+          layout: {
+            fillColor: (rowIndex: number) => (rowIndex === 0 ? '#0066cc' : null),
+            hLineWidth: () => 0.5,
+            vLineWidth: () => 0.5,
+            hLineColor: () => '#cccccc',
+            vLineColor: () => '#cccccc',
+          },
+        });
+      }
+    }
+
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 60],
+      content,
+      styles: {
+        companyName: { fontSize: 20, bold: true, color: '#0066cc' },
+        companyInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        reportTitle: { fontSize: 24, bold: true, color: '#0066cc' },
+        reportNumber: { fontSize: 14, marginTop: 5 },
+        reportInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        sectionTitle: { fontSize: 11, bold: true, marginBottom: 5 },
+        inspectionTitle: { fontSize: 16, bold: true, color: '#0066cc' },
+        fieldLabel: { fontSize: 10, bold: true, marginBottom: 2 },
+        fieldValue: { fontSize: 10, marginBottom: 2 },
+        customerInfo: { fontSize: 10, marginTop: 2 },
+        tableHeader: { fontSize: 10, bold: true, color: 'white', fillColor: '#0066cc', margin: [5, 5, 5, 5] },
+        tableCell: { fontSize: 9, margin: [5, 5, 5, 5] },
+        notes: { fontSize: 9, color: '#666666', marginTop: 5 },
+        attachmentItem: { fontSize: 9, margin: [0, 0, 0, 3] },
+        imageCaption: { fontSize: 8, color: '#666666', margin: [0, 0, 0, 5], italics: true },
+      },
+      defaultStyle: { font: 'Roboto' },
+    };
+
+    // Generate PDF buffer using pdfMake
+    const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+        resolve(buffer);
+      });
+    });
+
+    // Upload to Supabase Storage
+    const { StorageService } = require('../storage/storage.service');
+    const uploadResult = await StorageService.uploadInspectionPDF(
       pdfBuffer,
       fileName,
       workOrderId
@@ -995,6 +1381,7 @@ export class WorkOrderService {
                   select: {
                     id: true,
                     name: true,
+                    profileImage: true,
                   },
                 },
               },
