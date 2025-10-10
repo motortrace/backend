@@ -512,6 +512,7 @@ export class AppointmentService {
         name: appointment.customer.name,
         email: appointment.customer.email,
         phone: appointment.customer.phone,
+        userProfileId: appointment.customer.userProfileId,
       },
       vehicle: {
         id: appointment.vehicle.id,

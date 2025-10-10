@@ -42,6 +42,19 @@ router.get(
   vehiclesController.getVehiclesByCustomer.bind(vehiclesController)
 );
 
+// Mileage and recommendations routes
+router.get(
+  '/:id/mileage',
+  validateRequest(vehicleIdSchema, 'params'),
+  vehiclesController.getVehicleMileage.bind(vehiclesController)
+);
+
+router.get(
+  '/:id/recommendations',
+  validateRequest(vehicleIdSchema, 'params'),
+  vehiclesController.getVehicleRecommendations.bind(vehiclesController)
+);
+
 // Param routes LAST
 router.get(
   '/:id',

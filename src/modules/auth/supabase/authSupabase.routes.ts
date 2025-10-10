@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateSupabaseToken } from './authSupabase.middleware';
-import { signUp, signIn, signOut, getMe, completeOnboarding, googleAuth, getHeader, deleteAccount, requestPasswordReset, resetPassword, changePassword, verifyResetToken, verifyOTP, getProfile, updateProfile } from './authSupabase.controller';
+import { signUp, signIn, signOut, getMe, completeOnboarding, googleAuth, getHeader, deleteAccount, requestPasswordReset, resetPassword, changePassword, verifyResetToken, verifyOTP, getProfile, updateProfile, getLoginActivity, getActiveSessions, logoutSession } from './authSupabase.controller';
 
 const router = Router();
 
@@ -35,5 +35,10 @@ router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
 router.post('/change-password', authenticateSupabaseToken, changePassword);
 router.post('/verify-reset-token', verifyResetToken);
+
+// Session management routes
+router.get('/login-activity', authenticateSupabaseToken, getLoginActivity);
+router.get('/active-sessions', authenticateSupabaseToken, getActiveSessions);
+router.post('/logout-session', authenticateSupabaseToken, logoutSession);
 
 export default router;

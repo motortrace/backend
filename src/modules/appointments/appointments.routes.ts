@@ -14,6 +14,8 @@ import {
 const router = Router();
 const appointmentController = new AppointmentController();
 
+console.log('📋 Registering appointment routes...');
+
 // Appointment Management Routes
 router.post('/', validateCreateAppointment, appointmentController.createAppointment.bind(appointmentController));
 router.get('/', appointmentController.getAppointments.bind(appointmentController));
@@ -36,6 +38,16 @@ router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, validateUpd
 router.delete('/:id', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.deleteAppointment.bind(appointmentController));
 router.post('/:id/assign', authenticateSupabaseToken, requireServiceAdvisor, validateAssignAppointment, appointmentController.assignAppointment.bind(appointmentController));
 
+// Customer-specific routes for rescheduling and canceling their own appointments
+router.put('/:id/reschedule', authenticateSupabaseToken, validateUpdateAppointment, (req, res) => {
+  console.log('🔄 Reschedule route hit:', req.params.id);
+  appointmentController.rescheduleAppointment(req, res);
+});
+router.delete('/:id/cancel', authenticateSupabaseToken, (req, res) => {
+  console.log('🗑️ Cancel route hit:', req.params.id);
+  appointmentController.cancelAppointment(req, res);
+});
+
 
 
 // Shop Settings Management Routes
@@ -43,5 +55,8 @@ router.put('/shop/operating-hours', validateShopOperatingHours, appointmentContr
 router.get('/shop/operating-hours', appointmentController.getOperatingHours.bind(appointmentController));
 router.put('/shop/capacity-settings', validateShopCapacitySettings, appointmentController.updateCapacitySettings.bind(appointmentController));
 router.get('/shop/capacity-settings', appointmentController.getCapacitySettings.bind(appointmentController));
+
+// Service Advisor Contact
+router.get('/service-advisor', appointmentController.getServiceAdvisor.bind(appointmentController));
 
 export default router; 

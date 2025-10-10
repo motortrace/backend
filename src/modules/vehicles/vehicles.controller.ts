@@ -172,11 +172,48 @@ export class VehiclesController {
     }
   }
 
+  // Get vehicle mileage
+  async getVehicleMileage(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const mileage = await this.vehiclesService.getVehicleMileage(id);
+
+      res.json({
+        message: 'Vehicle mileage retrieved successfully',
+        data: mileage,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'Failed to retrieve vehicle mileage',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get vehicle service recommendations
+  async getVehicleRecommendations(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status } = req.query;
+      const recommendations = await this.vehiclesService.getVehicleRecommendations(id, status as string);
+
+      res.json({
+        message: 'Vehicle recommendations retrieved successfully',
+        data: recommendations,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'Failed to retrieve vehicle recommendations',
+        message: error.message,
+      });
+    }
+  }
+
   // Get vehicle statistics
   async getVehicleStatistics(req: Request, res: Response) {
     try {
       const statistics = await this.vehiclesService.getVehicleStatistics();
-      
+
       res.json({
         message: 'Vehicle statistics retrieved successfully',
         data: statistics,

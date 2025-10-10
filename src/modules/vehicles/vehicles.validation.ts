@@ -17,6 +17,8 @@ export const updateVehicleSchema = z.object({
   year: z.number().int().min(1900).max(new Date().getFullYear() + 1).optional(),
   vin: z.string().length(17).optional(),
   licensePlate: z.string().max(20).optional(),
+  imageUrl: z.string().url().optional(),
+  status: z.enum(['ACTIVE', 'MAINTENANCE', 'INACTIVE', 'ISSUES']).optional(),
 });
 
 // Vehicle ID schema

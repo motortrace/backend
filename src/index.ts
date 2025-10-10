@@ -5,7 +5,7 @@ import prisma from './infrastructure/database/prisma';
 import { StorageService } from './modules/storage/storage.service';
 import { Server } from 'http';
 
-const PORT = config.port || 3000;
+const PORT = parseInt(config.port) || 3000;
 
 // Declare server variable in the outer scope with proper typing
 let server: Server;
@@ -31,8 +31,9 @@ async function initializeServices() {
 
 // Start server after initializing services
 initializeServices().then(() => {
-  server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on http://0.0.0.0:${PORT} (accessible from all interfaces)`);
+    console.log(`📱 Android emulator access: http://10.0.2.2:${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🗄️  DB check: http://localhost:${PORT}/test-db`);
     console.log(`📁 Storage endpoints: http://localhost:${PORT}/storage`);

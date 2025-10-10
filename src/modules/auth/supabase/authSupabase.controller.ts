@@ -24,44 +24,169 @@ export async function signUp(req: Request, res: Response) {
 }
 
 export async function signIn(req: Request, res: Response) {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-    const data = await authSupabaseService.signIn(email, password);
-    
-    // Debug: Log what the service returned
-    console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
-    
-    // Return user data with flattened metadata used by mobile app
-    res.status(200).json({ 
-      message: 'Login successful', 
-      data: {
-        user: {
-          id: data.user?.id,
-          email: data.user?.email,
-          role: (data.user as any)?.user_metadata?.role || 'customer',
-          isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true
-        },
-        access_token: data.session?.access_token,
-        refresh_token: data.session?.refresh_token,
-        expires_at: data.session?.expires_at
-      }
-    });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || 'Login failed' });
-  }
-}
+   try {
+     const { email, password } = req.body;
+     if (!email || !password) {
+       return res.status(400).json({ error: 'Email and password are required' });
+     }
+     const data = await authSupabaseService.signIn(email, password);
+
+     // Debug: Log what the service returned
+     console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
+
+     // Get customerId if user is a customer
+     let customerId = null;
+     const userRole = (data.user as any)?.user_metadata?.role || 'customer';
+     if (userRole === 'customer') {
+       try {
+         const userProfile = await prisma.userProfile.findUnique({
+           where: { supabaseUserId: data.user?.id },
+           include: { customer: true }
+         });
+         customerId = userProfile?.customer?.id || null;
+         console.log('🔍 Customer ID found:', customerId);
+       } catch (customerError) {
+         console.warn('⚠️ Could not fetch customer ID:', customerError);
+         // Don't fail the login if customer lookup fails
+         customerId = null;
+       }
+     }
+
+     // Store successful login activity (don't fail login if this fails)
+     try {
+       await prisma.loginActivity.create({
+         data: {
+           userId: data.user?.id || '',
+           action: 'LOGIN_SUCCESS',
+           deviceInfo: req.headers['user-agent'] || 'Unknown',
+           ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+           userAgent: req.headers['user-agent'] || 'Unknown',
+           location: 'Unknown' // Could be enhanced with IP geolocation service
+         }
+       });
+       console.log('✅ Login activity recorded');
+     } catch (activityError: any) {
+       console.warn('⚠️ Could not record login activity (non-critical):', activityError?.message || activityError);
+     }
+
+     // Create or update user session (don't fail login if this fails)
+     try {
+       const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+       const expiresAt = new Date();
+       expiresAt.setHours(expiresAt.getHours() + 24); // 24 hour session
+
+       await prisma.userSession.upsert({
+         where: { sessionId: sessionId },
+         update: {
+           lastActivity: new Date(),
+           expiresAt: expiresAt
+         },
+         create: {
+           userId: data.user?.id || '',
+           sessionId: sessionId,
+           deviceInfo: req.headers['user-agent'] || 'Unknown',
+           ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+           userAgent: req.headers['user-agent'] || 'Unknown',
+           location: 'Unknown',
+           isActive: true,
+           lastActivity: new Date(),
+           expiresAt: expiresAt
+         }
+       });
+       console.log('✅ User session created/updated');
+     } catch (sessionError: any) {
+       console.warn('⚠️ Could not create user session (non-critical):', sessionError?.message || sessionError);
+     }
+
+     // Return user data with flattened metadata used by mobile app
+     res.status(200).json({
+       message: 'Login successful',
+       data: {
+         user: {
+           id: data.user?.id,
+           email: data.user?.email,
+           role: userRole,
+           isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true,
+           customerId: customerId
+         },
+         access_token: data.session?.access_token,
+         refresh_token: data.session?.refresh_token,
+         expires_at: data.session?.expires_at
+       }
+     });
+   } catch (error: any) {
+     // Store failed login attempt
+     try {
+       await prisma.loginActivity.create({
+         data: {
+           userId: 'unknown', // We don't know the user ID for failed logins
+           action: 'LOGIN_FAILED',
+           deviceInfo: req.headers['user-agent'] || 'Unknown',
+           ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+           userAgent: req.headers['user-agent'] || 'Unknown',
+           location: 'Unknown',
+           reason: error.message || 'Login failed'
+         }
+       });
+     } catch (activityError) {
+       console.warn('⚠️ Could not record failed login activity:', activityError);
+     }
+
+     res.status(400).json({ error: error.message || 'Login failed' });
+   }
+ }
 
 export async function signOut(req: Request, res: Response) {
-  try {
-    await authSupabaseService.signOut();
-    res.status(200).json({ message: 'Signed out successfully' });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || 'Sign out failed' });
-  }
-}
+   try {
+     // Get user from request if available (authenticated request)
+     const userId = (req as any).user?.id;
+
+     if (userId) {
+       // Record logout activity
+       try {
+         await prisma.loginActivity.create({
+           data: {
+             userId: userId,
+             action: 'LOGOUT',
+             deviceInfo: req.headers['user-agent'] || 'Unknown',
+             ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+             userAgent: req.headers['user-agent'] || 'Unknown',
+             location: 'Unknown'
+           }
+         });
+         console.log('✅ Logout activity recorded');
+       } catch (activityError) {
+         console.warn('⚠️ Could not record logout activity:', activityError);
+       }
+
+       // Deactivate user sessions (optional - could be done based on session token)
+       try {
+         // For now, we'll just mark recent sessions as inactive
+         // In a production app, you'd invalidate the specific session
+         await prisma.userSession.updateMany({
+           where: {
+             userId: userId,
+             isActive: true,
+             lastActivity: {
+               lt: new Date(Date.now() - 24 * 60 * 60 * 1000) // Older than 24 hours
+             }
+           },
+           data: {
+             isActive: false
+           }
+         });
+         console.log('✅ Old user sessions deactivated');
+       } catch (sessionError) {
+         console.warn('⚠️ Could not deactivate user sessions:', sessionError);
+       }
+     }
+
+     await authSupabaseService.signOut();
+     res.status(200).json({ message: 'Signed out successfully' });
+   } catch (error: any) {
+     res.status(400).json({ error: error.message || 'Sign out failed' });
+   }
+ }
 
 // Get current user profile
 export async function getMe(req: AuthenticatedRequest, res: Response) {
@@ -159,8 +284,9 @@ export async function completeOnboarding(req: AuthenticatedRequest, res: Respons
       console.log('✅ User profile saved:', userProfile);
 
       // If user is a customer, create customer record
+      let customer = null;
       if (req.user.role === 'customer') {
-        const customer = await prisma.customer.upsert({
+        customer = await prisma.customer.upsert({
           where: { userProfileId: userProfile.id },
           update: {
             name,
@@ -194,6 +320,9 @@ export async function completeOnboarding(req: AuthenticatedRequest, res: Respons
         console.warn('⚠️ Failed to update Supabase user metadata:', metaErr);
       }
 
+      // Get customerId for the response
+      const customerId = customer?.id || null;
+
       const response = {
         message: 'Onboarding completed successfully',
         user: {
@@ -203,7 +332,8 @@ export async function completeOnboarding(req: AuthenticatedRequest, res: Respons
           name,
           contact,
           profileImageUrl,
-          isRegistrationComplete: true
+          isRegistrationComplete: true,
+          customerId: customerId
         }
       };
 
@@ -238,6 +368,7 @@ export async function getHeader(req: AuthenticatedRequest, res: Response) {
     const userProfile = await prisma.userProfile.findUnique({
       where: { supabaseUserId: req.user.id },
       select: {
+        id: true,
         name: true,
         profileImage: true,
         isRegistrationComplete: true
@@ -245,10 +376,24 @@ export async function getHeader(req: AuthenticatedRequest, res: Response) {
     });
 
     if (!userProfile) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'User profile not found',
         message: 'Please complete your profile setup'
       });
+    }
+
+    // Get customerId if user is a customer
+    let customerId = null;
+    if (req.user.role === 'customer') {
+      try {
+        const customer = await prisma.customer.findFirst({
+          where: { userProfileId: userProfile.id }
+        });
+        customerId = customer?.id || null;
+        console.log('🔍 Customer ID found in header:', customerId);
+      } catch (customerError) {
+        console.warn('⚠️ Could not fetch customer ID in header:', customerError);
+      }
     }
 
     // Build absolute profile image URL for mobile clients (Android emulator cannot resolve localhost)
@@ -272,9 +417,13 @@ export async function getHeader(req: AuthenticatedRequest, res: Response) {
     const response = {
       success: true,
       user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
         fullname: userProfile.name || 'User',
         profile_image: normalizeImageUrl(userProfile.profileImage),
-        isRegistrationComplete: userProfile.isRegistrationComplete
+        isRegistrationComplete: userProfile.isRegistrationComplete,
+        customerId: customerId
       },
       message: 'User header data retrieved successfully'
     };
@@ -406,46 +555,109 @@ export async function updateProfile(req: AuthenticatedRequest, res: Response) {
 
 // Google authentication
 export async function googleAuth(req: Request, res: Response) {
-  try {
-    const { idToken, role = 'customer' } = req.body;
+   try {
+     const { idToken, role = 'customer' } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ error: 'Google ID token is required' });
-    }
+     if (!idToken) {
+       return res.status(400).json({ error: 'Google ID token is required' });
+     }
 
-    console.log('🔍 Google auth request received:', { role });
+     console.log('🔍 Google auth request received:', { role });
 
-    // Use Supabase to verify the Google ID token
-    const data = await authSupabaseService.googleSignIn(idToken, role);
-    
-    console.log('✅ Google auth successful:', { 
-      userId: data.user?.id, 
-      email: data.user?.email,
-      hasSession: !!data.session 
-    });
+     // Use Supabase to verify the Google ID token
+     const data = await authSupabaseService.googleSignIn(idToken, role);
 
-    res.json({
-      message: 'Google authentication successful',
-      data: {
-        user: {
-          id: data.user?.id,
-          email: data.user?.email,
-          role: data.user?.user_metadata?.role || role,
-          isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false
-        },
-        access_token: data.session?.access_token,
-        refresh_token: data.session?.refresh_token,
-        expires_at: data.session?.expires_at
-      }
-    });
-  } catch (error: any) {
-    console.error('❌ Google auth error:', error);
-    res.status(400).json({ 
-      error: 'Google authentication failed',
-      message: error.message 
-    });
-  }
-}
+     console.log('✅ Google auth successful:', {
+       userId: data.user?.id,
+       email: data.user?.email,
+       hasSession: !!data.session
+     });
+
+     // Get customerId if user is a customer
+     let customerId = null;
+     const userRole = data.user?.user_metadata?.role || role;
+     if (userRole === 'customer') {
+       try {
+         const userProfile = await prisma.userProfile.findUnique({
+           where: { supabaseUserId: data.user?.id },
+           include: { customer: true }
+         });
+         customerId = userProfile?.customer?.id || null;
+         console.log('🔍 Customer ID found for Google auth:', customerId);
+       } catch (customerError) {
+         console.warn('⚠️ Could not fetch customer ID for Google auth:', customerError);
+       }
+     }
+
+     // Store successful Google login activity (don't fail login if this fails)
+     try {
+       await prisma.loginActivity.create({
+         data: {
+           userId: data.user?.id || '',
+           action: 'LOGIN_SUCCESS',
+           deviceInfo: req.headers['user-agent'] || 'Unknown',
+           ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+           userAgent: req.headers['user-agent'] || 'Unknown',
+           location: 'Unknown'
+         }
+       });
+       console.log('✅ Google login activity recorded');
+     } catch (activityError: any) {
+       console.warn('⚠️ Could not record Google login activity (non-critical):', activityError?.message || activityError);
+     }
+
+     // Create or update user session for Google auth (don't fail login if this fails)
+     try {
+       const sessionId = `google_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+       const expiresAt = new Date();
+       expiresAt.setHours(expiresAt.getHours() + 24); // 24 hour session
+
+       await prisma.userSession.upsert({
+         where: { sessionId: sessionId },
+         update: {
+           lastActivity: new Date(),
+           expiresAt: expiresAt
+         },
+         create: {
+           userId: data.user?.id || '',
+           sessionId: sessionId,
+           deviceInfo: req.headers['user-agent'] || 'Unknown',
+           ipAddress: req.ip || req.connection?.remoteAddress || 'Unknown',
+           userAgent: req.headers['user-agent'] || 'Unknown',
+           location: 'Unknown',
+           isActive: true,
+           lastActivity: new Date(),
+           expiresAt: expiresAt
+         }
+       });
+       console.log('✅ Google user session created/updated');
+     } catch (sessionError: any) {
+       console.warn('⚠️ Could not create Google user session (non-critical):', sessionError?.message || sessionError);
+     }
+
+     res.json({
+       message: 'Google authentication successful',
+       data: {
+         user: {
+           id: data.user?.id,
+           email: data.user?.email,
+           role: userRole,
+           isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false,
+           customerId: customerId
+         },
+         access_token: data.session?.access_token,
+         refresh_token: data.session?.refresh_token,
+         expires_at: data.session?.expires_at
+       }
+     });
+   } catch (error: any) {
+     console.error('❌ Google auth error:', error);
+     res.status(400).json({
+       error: 'Google authentication failed',
+       message: error.message
+     });
+   }
+ }
 
 export async function deleteAccount(req: AuthenticatedRequest, res: Response) {
   try {
@@ -829,36 +1041,254 @@ export async function verifyOTP(req: Request, res: Response) {
   }
 }
 
-// Verify reset token (legacy function for compatibility)
-export async function verifyResetToken(req: Request, res: Response) {
+// Get login activity/history for the current user
+export async function getLoginActivity(req: AuthenticatedRequest, res: Response) {
   try {
-    const { token } = req.body;
-    
-    if (!token) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Token is required' 
-      });
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const user = await authSupabaseService.verifyResetToken(token);
+    // Fetch real login activity from database
+    const activities = await prisma.loginActivity.findMany({
+      where: {
+        userId: req.user.id
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 50 // Limit to last 50 activities
+    });
+
+    // Transform the data to match the expected format
+    const formattedActivities = activities.map((activity, index) => {
+      const createdAt = new Date(activity.createdAt);
+      const now = new Date();
+      const diffMs = now.getTime() - createdAt.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+      let timeString;
+      if (diffHours < 1) {
+        timeString = 'Just now';
+      } else if (diffHours < 24) {
+        timeString = `${Math.floor(diffHours)} hours ago`;
+      } else if (diffDays < 7) {
+        timeString = `${Math.floor(diffDays)} days ago`;
+      } else {
+        timeString = createdAt.toLocaleDateString();
+      }
+
+      // Extract device info from user agent
+      let device = 'Unknown Device';
+      const ua = activity.userAgent || '';
+      if (ua.includes('iPhone')) device = 'iPhone';
+      else if (ua.includes('iPad')) device = 'iPad';
+      else if (ua.includes('Android')) device = 'Android Phone';
+      else if (ua.includes('Mac')) device = 'MacBook';
+      else if (ua.includes('Windows')) device = 'Windows PC';
+      else if (ua.includes('Chrome') && !ua.includes('Mobile')) device = 'Chrome Browser';
+      else if (ua.includes('Safari') && !ua.includes('Mobile')) device = 'Safari Browser';
+      else if (ua.includes('Firefox')) device = 'Firefox Browser';
+
+      return {
+        id: index + 1,
+        device: device,
+        location: activity.location || 'Unknown',
+        time: timeString,
+        status: activity.action === 'LOGIN_SUCCESS' ? 'success' : activity.action === 'LOGIN_FAILED' ? 'failed' : 'unknown',
+        ip: activity.ipAddress || 'Unknown',
+        userAgent: activity.userAgent || 'Unknown'
+      };
+    });
 
     res.json({
       success: true,
-      message: 'Token is valid',
+      message: 'Login activity retrieved successfully',
       data: {
-        userId: user?.id,
-        email: user?.email,
-        isValid: true
+        activities: formattedActivities
       }
     });
 
   } catch (error: any) {
-    console.error('❌ Token verification error:', error);
-    res.status(400).json({
+    console.error('❌ Get login activity error:', error);
+    res.status(500).json({
       success: false,
-      error: 'Invalid or expired token',
+      error: 'Could not retrieve login activity',
       message: error.message
     });
   }
 }
+
+// Get active sessions for the current user
+export async function getActiveSessions(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Fetch real active sessions from database
+    const sessions = await prisma.userSession.findMany({
+      where: {
+        userId: req.user.id,
+        isActive: true,
+        expiresAt: {
+          gt: new Date() // Not expired
+        }
+      },
+      orderBy: {
+        lastActivity: 'desc'
+      }
+    });
+
+    // Transform the data to match the expected format
+    const formattedSessions = sessions.map((session) => {
+      const lastActivity = new Date(session.lastActivity);
+      const now = new Date();
+      const diffMs = now.getTime() - lastActivity.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+      let timeString;
+      if (diffHours < 1) {
+        timeString = 'Active now';
+      } else if (diffHours < 24) {
+        timeString = `${Math.floor(diffHours)} hours ago`;
+      } else if (diffDays < 7) {
+        timeString = `${Math.floor(diffDays)} days ago`;
+      } else {
+        timeString = lastActivity.toLocaleDateString();
+      }
+
+      // Extract device info from user agent
+      let device = 'Unknown Device';
+      const ua = session.userAgent || '';
+      if (ua.includes('iPhone')) device = 'iPhone';
+      else if (ua.includes('iPad')) device = 'iPad';
+      else if (ua.includes('Android')) device = 'Android Phone';
+      else if (ua.includes('Mac')) device = 'MacBook';
+      else if (ua.includes('Windows')) device = 'Windows PC';
+      else if (ua.includes('Chrome') && !ua.includes('Mobile')) device = 'Chrome Browser';
+      else if (ua.includes('Safari') && !ua.includes('Mobile')) device = 'Safari Browser';
+      else if (ua.includes('Firefox')) device = 'Firefox Browser';
+
+      // Check if this is the current session (simplified check)
+      const isCurrentSession = session.ipAddress === (req.ip || req.connection?.remoteAddress);
+
+      return {
+        id: session.id,
+        device: device,
+        location: session.location || 'Unknown',
+        time: timeString,
+        status: isCurrentSession ? 'current' : 'success',
+        ip: session.ipAddress || 'Unknown',
+        userAgent: session.userAgent || 'Unknown',
+        lastActivity: session.lastActivity.toISOString()
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'Active sessions retrieved successfully',
+      data: {
+        sessions: formattedSessions
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Get active sessions error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Could not retrieve active sessions',
+      message: error.message
+    });
+  }
+}
+
+// Logout from a specific session (terminate session)
+export async function logoutSession(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Session ID is required'
+      });
+    }
+
+    // Terminate the specific session in the database
+    const terminatedSession = await prisma.userSession.updateMany({
+      where: {
+        id: sessionId,
+        userId: req.user.id, // Ensure user can only terminate their own sessions
+        isActive: true
+      },
+      data: {
+        isActive: false
+      }
+    });
+
+    if (terminatedSession.count === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found or already terminated'
+      });
+    }
+
+    console.log(`🔐 Terminated session: ${sessionId} for user: ${req.user.id}`);
+
+    res.json({
+      success: true,
+      message: 'Session terminated successfully',
+      data: {
+        terminatedSessionId: sessionId
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Logout session error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Could not terminate session',
+      message: error.message
+    });
+  }
+}
+
+// Verify reset token (legacy function for compatibility)
+export async function verifyResetToken(req: Request, res: Response) {
+   try {
+     const { token } = req.body;
+
+     if (!token) {
+       return res.status(400).json({
+         success: false,
+         error: 'Token is required'
+       });
+     }
+
+     const user = await authSupabaseService.verifyResetToken(token);
+
+     res.json({
+       success: true,
+       message: 'Token is valid',
+       data: {
+         userId: user?.id,
+         email: user?.email,
+         isValid: true
+       }
+     });
+
+   } catch (error: any) {
+     console.error('❌ Token verification error:', error);
+     res.status(400).json({
+       success: false,
+       error: 'Invalid or expired token',
+       message: error.message
+     });
+   }
+ }

@@ -32,6 +32,7 @@ export class VehiclesService {
         year: data.year,
         vin: data.vin,
         licensePlate: data.licensePlate,
+        imageUrl: data.imageUrl,
       },
       include: {
         customer: {
@@ -229,6 +230,74 @@ export class VehiclesService {
       })),
       recentAdditions: recentAdditions as VehicleResponse[],
     };
+  }
+
+  // Get vehicle mileage
+  async getVehicleMileage(vehicleId: string): Promise<any> {
+    // Check if vehicle exists
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+    });
+    if (!vehicle) {
+      throw new Error('Vehicle not found');
+    }
+
+    // Get the latest mileage entry
+    const latestMileage = await prisma.vehicleMileage.findUnique({
+      where: { vehicleId },
+      select: {
+        currentMileage: true,
+        lastUpdated: true,
+      },
+    });
+
+    return {
+      currentMileage: latestMileage?.currentMileage || 0,
+      lastUpdated: latestMileage?.lastUpdated || null,
+    };
+  }
+
+  // Get vehicle service recommendations
+  async getVehicleRecommendations(vehicleId: string, status?: string): Promise<any[]> {
+    // Check if vehicle exists
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+    });
+    if (!vehicle) {
+      throw new Error('Vehicle not found');
+    }
+
+    const where: any = { vehicleId };
+    if (status) {
+      where.status = status;
+    }
+
+    const recommendations = await prisma.serviceRecommendation.findMany({
+      where,
+      include: {
+        rule: {
+          select: {
+            name: true,
+            serviceType: true,
+            category: true,
+            priority: true,
+            severity: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return recommendations.map(rec => ({
+      id: rec.id,
+      reason: rec.reason,
+      status: rec.status,
+      priority: rec.priority,
+      severity: rec.severity,
+      dueMileage: rec.dueMileage,
+      dueDate: rec.dueDate,
+      rule: rec.rule,
+    }));
   }
 
   // Search vehicles

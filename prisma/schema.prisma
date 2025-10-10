@@ -29,6 +29,7 @@ model UserProfile {
   manager        Manager?
   admin          Admin?
   mileageEntries MileageEntry[]
+  carExpenses    CarExpense[]
 }
 
 model ServiceAdvisor {
@@ -37,6 +38,7 @@ model ServiceAdvisor {
   userProfileId  String        @unique
   employeeId     String?       @unique
   department     String?
+  mobile         String?       // Mobile phone number for service advisor
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -126,7 +128,9 @@ model Vehicle {
   year         Int?
   vin          String?       @unique
   licensePlate String?
+  color        String?       // Vehicle color
   imageUrl     String?       // URL to vehicle image stored in Supabase Storage
+  status       VehicleStatus @default(ACTIVE) // Vehicle status for tracking condition
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -137,6 +141,7 @@ model Vehicle {
   serviceRecommendations ServiceRecommendation[]
   serviceHistory VehicleServiceHistory[]
   vehicleProfile VehicleProfile?
+  expenses      CarExpense[]
 }
 
 model WorkOrder {
@@ -1027,6 +1032,13 @@ enum ServiceInterval {
   EXTENDED  // Extended intervals for optimal conditions
 }
 
+enum VehicleStatus {
+  ACTIVE      // Vehicle is in active use
+  MAINTENANCE // Currently undergoing maintenance
+  INACTIVE    // Temporarily not in use
+  ISSUES      // Has known issues requiring attention
+}
+
 // Mileage Tracking - Tracks vehicle mileage over time
 model MileageEntry {
   id          String   @id @default(cuid())
@@ -1067,6 +1079,48 @@ model VehicleMileage {
   entries MileageEntry[]
 
   @@index([vehicleId])
+}
+
+// Car Expenses - Track all car-related expenses
+model CarExpense {
+  id          String      @id @default(cuid())
+  vehicle     Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+
+  // Expense Details
+  category    ExpenseCategory
+  description String
+  amount      Decimal     @db.Decimal(10,2)
+  date        DateTime    // When the expense occurred
+
+  // Additional Info
+  provider    String?     // Who provided the service/product
+  receiptUrl  String?     // URL to receipt image/document
+  notes       String?     // Additional notes
+
+  // Metadata
+  createdBy   UserProfile? @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([vehicleId, date])
+  @@index([vehicleId, category])
+}
+
+enum ExpenseCategory {
+  MAINTENANCE    // Oil changes, filters, belts, etc.
+  REPAIR         // Engine repairs, brake work, etc.
+  FUEL           // Gasoline, diesel, electricity
+  INSURANCE      // Insurance premiums
+  REGISTRATION   // License plate registration/renewal
+  TIRES          // Tire purchase/replacement
+  PARTS          // Spare parts and accessories
+  WASHING        // Car washing/detailing
+  PARKING        // Parking fees
+  TOLLS          // Toll road fees
+  FINES          // Traffic fines/violations
+  OTHER          // Miscellaneous expenses
 }
 
 // Invoice Management
@@ -1133,4 +1187,45 @@ model InvoiceLineItem {
  updatedAt        DateTime    @updatedAt
 
  @@index([invoiceId])
+}
+
+// User Session Management - Tracks active user sessions
+model UserSession {
+ id          String   @id @default(cuid())
+ userId      String   // Supabase user ID
+ sessionId   String   @unique // Unique session identifier
+ deviceInfo  String?  // Device/browser information
+ ipAddress   String?  // IP address
+ userAgent   String?  // User agent string
+ location    String?  // Geographic location (city, country)
+ isActive    Boolean  @default(true)
+ lastActivity DateTime @default(now())
+ createdAt   DateTime @default(now())
+ expiresAt   DateTime? // Session expiration time
+
+ @@index([userId, isActive])
+ @@index([sessionId])
+ @@index([expiresAt])
+}
+
+// Login Activity - Tracks all login attempts and successful logins
+model LoginActivity {
+ id          String   @id @default(cuid())
+ userId      String   // Supabase user ID
+ action      LoginAction // LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT
+ deviceInfo  String?  // Device/browser information
+ ipAddress   String?  // IP address
+ userAgent   String?  // User agent string
+ location    String?  // Geographic location
+ reason      String?  // Failure reason for failed logins
+ createdAt   DateTime @default(now())
+
+ @@index([userId, createdAt])
+ @@index([action])
+}
+
+enum LoginAction {
+ LOGIN_SUCCESS
+ LOGIN_FAILED
+ LOGOUT
 }

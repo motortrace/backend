@@ -103,6 +103,7 @@ export interface AppointmentWithServices {
     name: string;
     email?: string;
     phone?: string;
+    userProfileId?: string;
   };
   vehicle: {
     id: string;

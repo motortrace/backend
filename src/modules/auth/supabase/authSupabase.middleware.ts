@@ -8,8 +8,8 @@ export const authenticateSupabaseToken = async (
   next: NextFunction
 ) => {
   try {
-    console.log('🔐 Auth middleware called for:', req.path);
-    console.log('🔐 Headers:', req.headers);
+    console.log('🔐 Auth middleware called for:', req.method, req.path);
+    console.log('🔐 Headers present:', !!req.headers.authorization);
     
     const authHeader = req.headers.authorization;
     if (!authHeader) {
