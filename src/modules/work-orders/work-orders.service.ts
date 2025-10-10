@@ -462,7 +462,7 @@ export class WorkOrderService {
     ];
 
     // Add each inspection
-    workOrder.inspections.forEach((inspection, index) => {
+    for (const [index, inspection] of workOrder.inspections.entries()) {
       if (index > 0) {
         content.push({ text: '', pageBreak: 'before' });
       }
@@ -539,13 +539,87 @@ export class WorkOrderService {
           { text: 'Attachments', style: 'sectionTitle', fontSize: 14, bold: true, margin: [0, 0, 0, 10] }
         );
 
-        inspection.attachments.forEach(attachment => {
-          content.push({
-            text: `${attachment.fileName || 'Unnamed file'} ${attachment.description ? ` - ${attachment.description}` : ''}`,
-            style: 'attachmentItem',
-            margin: [0, 0, 0, 5]
-          });
-        });
+        // Process attachments - embed images, show text for other files
+        for (const attachment of inspection.attachments) {
+          if (attachment.fileType?.startsWith('image/')) {
+            try {
+              // Fetch image from Supabase storage (follow redirects)
+              const fetchBuffer = async (url: string, redirectLimit = 5): Promise<Buffer> => {
+                const { URL } = require('url');
+                const http = require('http');
+                const https = require('https');
+
+                return new Promise((resolve, reject) => {
+                  try {
+                    const parsed = new URL(url);
+                    const lib = parsed.protocol === 'http:' ? http : https;
+                    const req = lib.get(parsed.href, (res: any) => {
+                      // Follow redirects (3xx)
+                      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers && res.headers.location) {
+                        if (redirectLimit === 0) {
+                          reject(new Error('Too many redirects while fetching image'));
+                          return;
+                        }
+                        // Some Location headers are relative; construct absolute URL
+                        const location = res.headers.location.startsWith('http') ? res.headers.location : `${parsed.protocol}//${parsed.host}${res.headers.location}`;
+                        resolve(fetchBuffer(location, redirectLimit - 1));
+                        return;
+                      }
+
+                      if (res.statusCode !== 200) {
+                        reject(new Error(`Failed to fetch image: ${res.statusCode}`));
+                        return;
+                      }
+
+                      const chunks: Buffer[] = [];
+                      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                      res.on('end', () => resolve(Buffer.concat(chunks)));
+                    });
+                    req.on('error', reject);
+                  } catch (err) {
+                    reject(err);
+                  }
+                });
+              };
+
+              const imageBuffer = await fetchBuffer(attachment.fileUrl);
+
+              // Convert to base64
+              const base64Image = (imageBuffer as Buffer).toString('base64');
+
+              // Add image to PDF
+              content.push({
+                image: `data:${attachment.fileType};base64,${base64Image}`,
+                width: 200, // Fixed width for consistency
+                margin: [0, 0, 0, 10],
+              });
+
+              // Add description below image if available
+              if (attachment.description) {
+                content.push({
+                  text: attachment.description,
+                  style: 'imageCaption',
+                  margin: [0, 0, 0, 15],
+                });
+              }
+            } catch (error) {
+              console.warn(`Failed to embed image ${attachment.fileName}:`, error);
+              // Fallback to text description
+              content.push({
+                text: `${attachment.fileName || 'Unnamed file'} ${attachment.description ? ` - ${attachment.description}` : ''}`,
+                style: 'attachmentItem',
+                margin: [0, 0, 0, 5]
+              });
+            }
+          } else {
+            // Non-image attachment - show as text
+            content.push({
+              text: `${attachment.fileName || 'Unnamed file'} ${attachment.description ? ` - ${attachment.description}` : ''}`,
+              style: 'attachmentItem',
+              margin: [0, 0, 0, 5]
+            });
+          }
+        }
       }
 
       // Tire checks section
@@ -592,7 +666,7 @@ export class WorkOrderService {
           },
         });
       }
-    });
+    }
 
     const docDefinition = {
       pageSize: 'A4',
@@ -613,6 +687,7 @@ export class WorkOrderService {
         tableCell: { fontSize: 9, margin: [5, 5, 5, 5] },
         notes: { fontSize: 9, color: '#666666', marginTop: 5 },
         attachmentItem: { fontSize: 9, margin: [0, 0, 0, 3] },
+        imageCaption: { fontSize: 8, color: '#666666', margin: [0, 0, 0, 5], italics: true },
       },
       defaultStyle: { font: 'Roboto' },
     };
