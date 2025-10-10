@@ -643,6 +643,7 @@ model WorkOrderApproval {
   notes        String?      // Notes from the approval process
   customerSignature String? // URL to signature file or signature data
   pdfUrl        String?      // URL to generated estimate PDF
+  inspectionPdfUrl String?   // URL to generated inspection PDF
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
