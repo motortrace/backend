@@ -39,7 +39,7 @@ class OTPService {
 
     this.otpStorage.set(email.toLowerCase(), otpData);
 
-    console.log(`✅ OTP generated for ${email}: ${otp} (expires at ${expiresAt.toISOString()})`);
+    console.log(` OTP generated for ${email}: ${otp} (expires at ${expiresAt.toISOString()})`);
     return otp;
   }
 
@@ -103,7 +103,7 @@ class OTPService {
     if (otpData.code === inputOTP) {
       // OTP is valid, remove it from storage
       this.otpStorage.delete(emailKey);
-      console.log(`✅ OTP verified and consumed for ${email}`);
+      console.log(` OTP verified and consumed for ${email}`);
       return { valid: true, message: 'OTP verified successfully' };
     } else {
       console.log(`❌ Invalid OTP attempt for ${email}. Attempt ${otpData.attempts}/${this.MAX_ATTEMPTS}`);

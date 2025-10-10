@@ -744,7 +744,7 @@ export class InspectionTemplatesController {
         });
       }
 
-      console.log('✅ Template image uploaded successfully:', result.url);
+      console.log(' Template image uploaded successfully:', result.url);
 
       res.json({
         success: true,
@@ -817,7 +817,7 @@ export class InspectionTemplatesController {
         });
       }
 
-      console.log('✅ Template image deleted successfully');
+      console.log(' Template image deleted successfully');
 
       res.json({
         success: true,

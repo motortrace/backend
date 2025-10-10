@@ -30,6 +30,8 @@ model UserProfile {
   admin          Admin?
   uploadedAttachments WorkOrderAttachment[] @relation("UploadedAttachments")
   uploadedInspectionAttachments WorkOrderInspectionAttachment[] @relation("UploadedInspectionAttachments")
+  notifications  Notification[]
+  workOrderApprovals WorkOrderApproval[] @relation("WorkOrderApprovals")
 }
 
 model ServiceAdvisor {
@@ -44,8 +46,6 @@ model ServiceAdvisor {
   // Relations
   advisorWorkOrders WorkOrder[] @relation("AdvisorWorkOrders")
   assignedAppointments Appointment[] @relation("AssignedAppointments")
-  createdEstimates WorkOrderEstimate[] @relation("CreatedEstimates")
-  approvals      WorkOrderApproval[] @relation("Approvals")
   processedPayments Payment[] @relation("ProcessedPayments")
 }
 
@@ -112,7 +112,6 @@ model Customer {
   vehicles      Vehicle[]
   workOrders    WorkOrder[]
   appointments  Appointment[]
-  approvedEstimates WorkOrderEstimate[] @relation("ApprovedEstimates")
 }
 
 model Vehicle {
@@ -161,9 +160,16 @@ model WorkOrder {
   estimateNotes   String?
   estimateApproved Boolean       @default(false)
 
-  subtotalLabor  Decimal?       @db.Decimal(10,2)
-  subtotalParts   Decimal?       @db.Decimal(10,2)
+  // Pricing breakdown
+  subtotalServices Decimal?      @db.Decimal(10,2)  // Sum of WorkOrderService.subtotal
+  subtotalParts   Decimal?       @db.Decimal(10,2)  // Sum of WorkOrderPart.subtotal
+  subtotal        Decimal?       @db.Decimal(10,2)  // subtotalServices + subtotalParts
+  
+  // Discount (applied at work order level only)
   discountAmount  Decimal?       @db.Decimal(10,2)
+  discountType    String?        // "FIXED" or "PERCENTAGE"
+  discountReason  String?        // Reason for discount (e.g., "Loyal customer", "Promotional offer")
+  
   taxAmount       Decimal?       @db.Decimal(10,2)
   totalAmount     Decimal?       @db.Decimal(10,2)
   paidAmount      Decimal?       @db.Decimal(10,2) @default(0)
@@ -195,11 +201,11 @@ model WorkOrder {
   qcChecks        WorkOrderQC[]
   attachments     WorkOrderAttachment[]
   payments        Payment[]
-  estimates       WorkOrderEstimate[]
   services        WorkOrderService[]
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
   invoices        Invoice[]
+  notifications   Notification[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -231,6 +237,7 @@ model CannedServiceLabor {
   laborCatalog   LaborCatalog  @relation(fields: [laborCatalogId], references: [id], onDelete: Cascade)
   laborCatalogId String
   sequence       Int           @default(1) // Order of operations
+  estimatedMinutes Int?        // Estimated time for this labor operation in minutes
   notes          String?       // Additional notes for this labor operation
   
   @@unique([cannedServiceId, laborCatalogId])
@@ -249,23 +256,25 @@ model CannedServicePartsCategory {
   @@unique([cannedServiceId, categoryId])
 }
 
-// Individual billable labor operations that technicians perform
-// Examples: "Cooling System Pressure Test" (0.7 hrs), "Fuel Injector Test" (1.2 hrs)
+// Individual labor operations that technicians perform (TRACKING ONLY - NO PRICES)
+// Examples: "Oil Drain & Fill", "Filter Installation", "Brake Inspection"
 model LaborCatalog {
   id          String         @id @default(cuid())
   code        String         @unique
   name        String
   description String?
-  estimatedHours Decimal     @db.Decimal(5,2) // Estimated hours (e.g., 0.7, 1.2, 2.5)
-  hourlyRate  Decimal        @db.Decimal(10,2) // Standard hourly rate for this operation
+  
+  // Time estimation (for scheduling only, NOT for billing)
+  estimatedMinutes Int?       // Estimated time in minutes (e.g., 30, 45, 90)
+  
   category    String?        // e.g., "Engine", "Brakes", "Electrical", "Diagnostic"
+  skillLevel  String?        // e.g., "Basic", "Intermediate", "Advanced"
   isActive    Boolean        @default(true)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   // Relations
   cannedServices CannedServiceLabor[] // Services that use this labor operation
-  estimateLaborItems EstimateLabor[]
   laborItems WorkOrderLabor[]
 }
 
@@ -324,7 +333,6 @@ model InventoryItem {
   categoryId   String
   
   // Relations
-  estimatePartItems EstimatePart[]
   workOrderParts WorkOrderPart[]
 }
 
@@ -340,13 +348,14 @@ enum UserRole {
 
 
 enum WorkOrderStatus {
-  PENDING
-  ESTIMATE
-  IN_PROGRESS
-  WAITING_FOR_PARTS
-  QC_PENDING
-  COMPLETED
-  CANCELLED
+  PENDING           // Work order created, no items added yet
+  AWAITING_APPROVAL // Services/parts added, waiting for customer approval
+  APPROVED          // Customer approved all services/parts
+  IN_PROGRESS       // Work has started (at least one service or part in progress)
+  COMPLETED         // All work finished
+  INVOICED          // Invoice generated
+  PAID              // Payment received
+  CANCELLED         // Work order cancelled
 }
 
 enum JobType {
@@ -550,96 +559,34 @@ model WorkOrderInspectionAttachment {
   uploadedAt   DateTime   @default(now())
 }
 
-// Estimates & Approvals
-model WorkOrderEstimate {
-  id           String    @id @default(cuid())
-  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id])
-  workOrderId  String
-  version      Int       @default(1) // Track estimate versions
-  description  String?   // Brief description of what this estimate covers
-  totalAmount  Decimal   @db.Decimal(10,2)
-  laborAmount Decimal?  @db.Decimal(10,2) // Labor portion
-  partsAmount  Decimal?  @db.Decimal(10,2) // Parts portion
-  taxAmount    Decimal?  @db.Decimal(10,2) // Tax amount
-  discountAmount Decimal? @db.Decimal(10,2) // Any discounts
-  notes        String?   // Additional notes about the estimate
-  isVisibleToCustomer Boolean @default(false) // Control customer visibility
-  createdBy    ServiceAdvisor? @relation("CreatedEstimates", fields: [createdById], references: [id])
-  createdById  String?
-  createdAt    DateTime  @default(now())
-  approved     Boolean   @default(false)
-  approvedAt   DateTime?
-  approvedBy   Customer? @relation("ApprovedEstimates", fields: [approvedById], references: [id])
-  approvedById String?
-  
-  // Relations
-  estimateLaborItems EstimateLabor[]
-  estimatePartItems EstimatePart[]
-  approvals     WorkOrderApproval[]
-}
-
-model EstimateLabor {
-  id               String          @id @default(cuid())
-  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
-  estimateId       String
-  laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
-  laborCatalogId   String?         // Optional - for catalog-based labor operations
-  description      String          // Description of the labor to be performed
-  hours            Decimal         @db.Decimal(5,2) // Estimated hours (e.g., 2.5 hours)
-  rate             Decimal         @db.Decimal(10,2) // Hourly rate
-  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
-  notes            String?         // Additional notes about the labor
-  customerApproved Boolean         @default(false) // Customer approval status
-  customerNotes    String?         // Customer's notes or comments
-  cannedServiceId  String?         // Reference to canned service if this labor came from one
-  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
-  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-}
-
-model EstimatePart {
-  id               String        @id @default(cuid())
-  estimate         WorkOrderEstimate @relation(fields: [estimateId], references: [id])
-  estimateId       String
-  part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  inventoryItemId  String
-  quantity         Int           @default(1)
-  unitPrice        Decimal       @db.Decimal(10,2) // Estimated price
-  subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
-  source           PartSource    @default(INVENTORY)
-  supplierName     String?       // Supplier name if not from inventory
-  warrantyInfo     String?       // Warranty information for the part
-  notes            String?       // Additional notes about the part
-  customerApproved Boolean       @default(false) // Customer approval status
-  customerNotes    String?       // Customer's notes or comments
-  cannedServiceId  String?       // Reference to canned service if this part came from one
-  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
-  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-}
-
-// Labor & Parts Usage - Populated from estimates when approved
+// Labor & Parts Usage
 model WorkOrderLabor {
   id               String          @id @default(cuid())
   workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId      String
+  
+  // Parent service (REQUIRED - labor must belong to a service)
+  service          WorkOrderService @relation(fields: [serviceId], references: [id])
+  serviceId        String
+  
   laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
   laborCatalogId   String?         // Optional - for catalog-based labor operations
-  description      String          // Description of the labor performed (manual or from catalog)
-  hours            Decimal         @db.Decimal(5,2) // Hours worked (e.g., 2.5 hours)
-  rate             Decimal         @db.Decimal(10,2) // Hourly rate
+  description      String          // Description of the labor performed
+  
+  // NO PRICING - labor is for tracking only, not billing!
+  // Customer pays for the parent service, not individual labor operations
+  
   technician       Technician?    @relation("LaborWork", fields: [technicianId], references: [id])
   technicianId     String?
-  subtotal         Decimal         @db.Decimal(10,2) // hours * rate
+  
+  // Time tracking (for scheduling and performance metrics)
+  estimatedMinutes Int?            // Estimated time in minutes
   startTime        DateTime?       // When the work started
   endTime          DateTime?       // When the work ended
+  actualMinutes    Int?            // Actual time taken (calculated from start/end)
+  
   status           ServiceStatus  @default(PENDING) // Status of the labor work
   notes            String?         // Additional notes about the labor
-  cannedServiceId  String?         // Reference to canned service if this labor came from one
-  serviceDiscountAmount Decimal?   @db.Decimal(10,2) // Discount amount for this service
-  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 }
@@ -648,24 +595,38 @@ model WorkOrderPart {
   id               String        @id @default(cuid())
   workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
   workOrderId      String
+  
+  // NO serviceId - parts are independent, not tied to services
+  
   part             InventoryItem @relation(fields: [inventoryItemId], references: [id])
   inventoryItemId  String
+  description      String?       // Additional description if needed
   quantity         Int           @default(1)
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
+  
+  // Customer approval status
+  customerApproved Boolean       @default(false)
+  customerRejected Boolean       @default(false)
+  customerNotes    String?       // Customer feedback on this part
+  
+  // Timestamps
+  approvedAt       DateTime?     // When customer approved
+  rejectedAt       DateTime?     // When customer rejected
+  
   source           PartSource    @default(INVENTORY)
   supplierName     String?       // Supplier name if not from inventory
   supplierInvoice  String?       // Supplier invoice number
   warrantyInfo     String?       // Warranty information for the part
-  notes            String?       // Additional notes about the part usage
+  notes            String?       // Internal notes
   installedAt      DateTime?     // When the part was installed
-  installedBy      Technician?  @relation("PartInstallations", fields: [installedById], references: [id])
+  installedBy      Technician?   @relation("PartInstallations", fields: [installedById], references: [id])
   installedById    String?
-  cannedServiceId  String?       // Reference to canned service if this part came from one
-  serviceDiscountAmount Decimal? @db.Decimal(10,2) // Discount amount for this service
-  serviceDiscountType ServiceDiscountType? // Type of discount (fixed or percentage)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+  
+  @@index([workOrderId])
+  @@index([customerApproved])
 }
 
 
@@ -673,16 +634,16 @@ model WorkOrderApproval {
   id           String       @id @default(cuid())
   workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
   workOrderId  String
-  estimate     WorkOrderEstimate? @relation(fields: [estimateId], references: [id])
-  estimateId   String?
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
-  approvedBy   ServiceAdvisor? @relation("Approvals", fields: [approvedById], references: [id])
+  approvedBy   UserProfile? @relation("WorkOrderApprovals", fields: [approvedById], references: [id])
   approvedById String?
   method       ApprovalMethod?
   notes        String?      // Notes from the approval process
   customerSignature String? // URL to signature file or signature data
+  pdfUrl        String?      // URL to generated estimate PDF
+  inspectionPdfUrl String?   // URL to generated inspection PDF
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -709,11 +670,6 @@ enum PartSource {
   CUSTOMER_SUPPLIED // Customer provided the part
   WARRANTY         // Warranty replacement
   SALVAGE          // Used/salvage part
-}
-
-enum ServiceDiscountType {
-  FIXED           // Fixed dollar amount discount
-  PERCENTAGE      // Percentage-based discount
 }
 
 // QC, Attachments & Payments
@@ -813,26 +769,49 @@ enum PaymentStatus {
 }
 
 enum ServiceStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
+  ESTIMATED       // In estimate, awaiting customer approval
+  PENDING         // Approved, waiting to start
+  IN_PROGRESS     // Work in progress
+  COMPLETED       // Work completed
+  CANCELLED       // Cancelled
 }
 
 model WorkOrderService {
   id               String        @id @default(cuid())
   workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
   workOrderId      String
-  cannedService    CannedService @relation(fields: [cannedServiceId], references: [id])
-  cannedServiceId  String
-  description      String?       // Custom description (overrides canned service description if needed)
-  quantity         Int           @default(1)
-  unitPrice        Decimal       @db.Decimal(10,2)
-  subtotal         Decimal       @db.Decimal(10,2)
-  status           ServiceStatus @default(PENDING)
-  notes            String?
+  
+  // Template reference (optional - can create custom services)
+  cannedService    CannedService? @relation(fields: [cannedServiceId], references: [id])
+  cannedServiceId  String?
+  
+  description      String        // Service description (e.g., "Oil Change Service - Honda Civic 2020")
+  quantity         Int           @default(1)  // Can perform service multiple times
+  
+  // PRICING - This is where the customer is billed!
+  unitPrice        Decimal       @db.Decimal(10,2)  // Price per service instance
+  subtotal         Decimal       @db.Decimal(10,2)  // unitPrice × quantity
+  
+  // Customer approval status
+  customerApproved Boolean       @default(false)
+  customerRejected Boolean       @default(false)
+  customerNotes    String?       // Customer feedback on this service
+  
+  // Timestamps
+  approvedAt       DateTime?     // When customer approved
+  rejectedAt       DateTime?     // When customer rejected
+  
+  status           ServiceStatus @default(ESTIMATED)
+  notes            String?       // Internal notes
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+  
+  // Child labor items (for tracking work, NOT for pricing)
+  laborItems       WorkOrderLabor[]
+  
+  @@index([workOrderId])
+  @@index([customerApproved])
+  @@index([status])
 }
 
 
@@ -890,6 +869,7 @@ model Invoice {
   // Metadata
   notes           String?
   terms           String?
+  pdfUrl          String?     // URL to generated PDF in Supabase Storage
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   
@@ -918,4 +898,95 @@ model InvoiceLineItem {
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+model Notification {
+  id          String    @id @default(cuid())
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  userProfileId String
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  workOrderId String?
+  
+  // Notification Details
+  type        NotificationType
+  title       String
+  message     String    @db.Text
+  priority    NotificationPriority @default(NORMAL)
+  
+  // Read/Unread Status
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  
+  // Action URL (for deep linking)
+  actionUrl   String?
+  actionText  String?
+  
+  // Metadata (JSON field for flexible data storage)
+  metadata    Json?
+  
+  // Channels used
+  sentViaEmail Boolean  @default(false)
+  sentViaPush  Boolean  @default(false)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime? // Optional expiration date
+  
+  @@index([userProfileId])
+  @@index([workOrderId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([userProfileId, isRead])
+}
+
+enum NotificationType {
+  WORK_ORDER_CREATED
+  WORK_ORDER_STATUS_CHANGED
+  WORK_ORDER_COMPLETED
+  SERVICE_APPROVAL_REQUIRED
+  SERVICE_APPROVED
+  SERVICE_REJECTED
+  PART_APPROVAL_REQUIRED
+  PART_APPROVED
+  PART_REJECTED
+  INSPECTION_COMPLETED
+  INSPECTION_ISSUE_FOUND
+  PAYMENT_RECEIVED
+  INVOICE_GENERATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLED
+  VEHICLE_READY_FOR_PICKUP
+  QC_PASSED
+  QC_FAILED
+  PROMOTIONAL
+  SYSTEM_ALERT
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationChannel {
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  CLICKED
+  READ
 }

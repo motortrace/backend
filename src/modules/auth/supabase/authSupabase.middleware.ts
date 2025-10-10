@@ -3,7 +3,7 @@ import { authSupabaseService } from './authSupabase.service';
 import { AuthenticatedRequest } from '../../../shared/types/auth.types';
 
 /**
- * ✅ JWT Token Authentication Middleware
+ *  JWT Token Authentication Middleware
  * 
  * PURPOSE: Validates JWT access tokens from Supabase Auth and attaches user info to request
  * 
@@ -65,9 +65,9 @@ export const authenticateSupabaseToken = async (
       });
     }
 
-    console.log('✅ User authenticated:', { id: user.id, email: user.email, role: user.user_metadata?.role });
+    console.log(' User authenticated:', { id: user.id, email: user.email, role: user.user_metadata?.role });
 
-    // ✅ Attach user info to req.user (from JWT token claims)
+    //  Attach user info to req.user (from JWT token claims)
     // Role is read from token, not from database - much faster!
     req.user = {
       id: user.id,

@@ -213,4 +213,25 @@ export class CustomerController {
       });
     }
   }
+
+  // Get customer statistics and metrics
+  async getCustomerStatistics(req: Request, res: Response) {
+    try {
+      const { customerId } = req.params;
+      const statistics = await this.customerService.getCustomerStatistics(customerId);
+
+      res.json({
+        success: true,
+        data: statistics,
+        message: 'Customer statistics retrieved successfully',
+      });
+    } catch (error: any) {
+      const statusCode = error.message === 'Customer not found' ? 404 : 500;
+      res.status(statusCode).json({
+        success: false,
+        error: 'Failed to get customer statistics',
+        message: error.message,
+      });
+    }
+  }
 }

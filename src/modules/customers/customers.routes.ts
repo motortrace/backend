@@ -259,4 +259,56 @@ router.get('/:customerId/work-orders', customerController.getCustomerWorkOrders.
  */
 router.get('/:customerId/appointments', customerController.getCustomerAppointments.bind(customerController));
 
+/**
+ * @swagger
+ * /customers/{customerId}/statistics:
+ *   get:
+ *     summary: Get customer statistics and analytics
+ *     description: Returns comprehensive analytics including financials, visit patterns, loyalty metrics, and predictive insights
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Customer ID
+ *     responses:
+ *       200:
+ *         description: Customer statistics and metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     customer:
+ *                       type: object
+ *                       description: Basic customer info
+ *                     financials:
+ *                       type: object
+ *                       description: Financial metrics
+ *                     visits:
+ *                       type: object
+ *                       description: Visit frequency and patterns
+ *                     vehicles:
+ *                       type: object
+ *                       description: Vehicle statistics
+ *                     appointments:
+ *                       type: object
+ *                       description: Appointment metrics
+ *                     customerProfile:
+ *                       type: object
+ *                       description: Customer loyalty and risk indicators
+ *       404:
+ *         description: Customer not found
+ */
+router.get('/:customerId/statistics', customerController.getCustomerStatistics.bind(customerController));
+
 export default router;

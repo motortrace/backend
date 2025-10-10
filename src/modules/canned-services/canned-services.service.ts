@@ -179,8 +179,8 @@ export class CannedServiceService {
                 id: true,
                 code: true,
                 name: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
+                
                 isActive: true
               }
             }
@@ -229,8 +229,8 @@ export class CannedServiceService {
                 id: true,
                 code: true,
                 name: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
+                
                 isActive: true
               }
             }
@@ -274,8 +274,8 @@ export class CannedServiceService {
                 id: true,
                 code: true,
                 name: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
+                
                 isActive: true
               }
             }
@@ -308,8 +308,8 @@ export class CannedServiceService {
                 code: true,
                 name: true,
                 description: true,
-                estimatedHours: true,
-                hourlyRate: true,
+                estimatedMinutes: true,
+                
                 category: true,
                 isActive: true
               }
@@ -378,8 +378,7 @@ export class CannedServiceService {
           id: op.laborCatalog.id,
           code: op.laborCatalog.code,
           name: op.laborCatalog.name,
-          estimatedHours: op.laborCatalog.estimatedHours,
-          hourlyRate: op.laborCatalog.hourlyRate,
+          estimatedMinutes: op.laborCatalog.estimatedMinutes,
           isActive: op.laborCatalog.isActive
         }
       })) || []
@@ -498,8 +497,8 @@ export class CannedServiceService {
                   id: true,
                   code: true,
                   name: true,
-                  estimatedHours: true,
-                  hourlyRate: true,
+                  estimatedMinutes: true,
+                  
                   isActive: true
                 }
               }
@@ -519,8 +518,8 @@ export class CannedServiceService {
                   id: true,
                   code: true,
                   name: true,
-                  estimatedHours: true,
-                  hourlyRate: true,
+                  estimatedMinutes: true,
+                  
                   isActive: true
                 }
               }

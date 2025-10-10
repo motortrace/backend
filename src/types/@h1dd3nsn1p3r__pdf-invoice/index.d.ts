@@ -33,7 +33,9 @@ declare module '@h1dd3nsn1p3r/pdf-invoice' {
     name: string;
     quantity: number;
     price: number;
+    finalPrice?: number;
     tax?: number;
+    discount?: number;
   }
 
   export interface QRInfo {

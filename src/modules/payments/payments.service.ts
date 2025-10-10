@@ -66,6 +66,27 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
+    // Verify invoice exists before accepting payment
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { workOrderId: data.workOrderId },
+    });
+
+    if (!invoice) {
+      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
+    }
+
+    // Validate payment amount doesn't exceed invoice total
+    const invoiceTotal = Number(invoice.totalAmount);
+    const alreadyPaid = Number(invoice.paidAmount || 0);
+    const remainingBalance = invoiceTotal - alreadyPaid;
+
+    if (data.amount > remainingBalance) {
+      throw new Error(
+        `Payment amount (${data.amount}) exceeds remaining balance (${remainingBalance}). ` +
+        `Invoice total: ${invoiceTotal}, Already paid: ${alreadyPaid}`
+      );
+    }
+
     // Verify service advisor exists
     const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
       where: { id: data.processedById },
@@ -125,9 +146,18 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
-    // For sandbox testing, simulate successful payment
+    // Verify invoice exists before accepting payment
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { workOrderId: data.workOrderId },
+    });
+
+    if (!invoice) {
+      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
+    }
+
+    // For sandbox testing, use invoice total instead of estimatedTotal
     // In production, this would process with Stripe
-    const amount = workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : data.amount;
+    const amount = Number(invoice.totalAmount);
     
     // Generate mock transaction ID
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -495,7 +525,10 @@ export class PaymentService {
   private async updateWorkOrderPaymentStatus(workOrderId: string): Promise<void> {
     const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
-      include: { payments: true },
+      include: { 
+        payments: true,
+        invoices: true  // Include invoices to update them too
+      },
     });
 
     if (!workOrder) return;
@@ -507,6 +540,8 @@ export class PaymentService {
       return sum + paymentAmount - refundAmount;
     }, 0);
 
+    const balanceDue = totalAmount - totalPaid;
+
     let paymentStatus: PaymentStatus;
     if (totalPaid >= totalAmount) {
       paymentStatus = PaymentStatus.PAID;
@@ -516,10 +551,46 @@ export class PaymentService {
       paymentStatus = PaymentStatus.PENDING;
     }
 
+    // Update work order payment status AND overall status if fully paid
+    const updateData: any = { 
+      paymentStatus,
+      paidAmount: totalPaid
+    };
+
+    // If fully paid, update work order status to PAID (only if currently INVOICED)
+    if (paymentStatus === PaymentStatus.PAID && workOrder.status === 'INVOICED') {
+      updateData.status = 'PAID';
+      console.log(`✅ Work order ${workOrderId} status updated to PAID`);
+    }
+
     await this.prisma.workOrder.update({
       where: { id: workOrderId },
-      data: { paymentStatus },
+      data: updateData,
     });
+
+    // Update invoice(s) payment status and amounts
+    // Note: In your system, there should be only one invoice per work order
+    if (workOrder.invoices && workOrder.invoices.length > 0) {
+      for (const invoice of workOrder.invoices) {
+        let invoiceStatus = invoice.status;
+        
+        // Update invoice status based on payment
+        if (totalPaid >= Number(invoice.totalAmount)) {
+          invoiceStatus = 'PAID' as any;
+        } else if (totalPaid > 0) {
+          invoiceStatus = 'SENT' as any; // Partially paid invoices stay as SENT
+        }
+
+        await this.prisma.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: invoiceStatus,
+            paidAmount: totalPaid,
+            balanceDue: balanceDue,
+          },
+        });
+      }
+    }
   }
 
   private async handlePaymentSuccess(data: any): Promise<PaymentGatewayResponse> {

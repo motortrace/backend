@@ -14,6 +14,71 @@ export class StorageService {
   private static readonly TEMPLATE_IMAGES_BUCKET = 'template-images';
   private static readonly WORK_ORDER_ATTACHMENTS_BUCKET = 'work-order-attachments';
   private static readonly INVOICES_BUCKET = 'invoices';
+  private static readonly ESTIMATES_BUCKET = 'estimates';
+  private static readonly INSPECTIONS_BUCKET = 'inspections';
+  /**
+   * Upload an estimate PDF to Supabase Storage
+   */
+  static async uploadEstimatePDF(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    workOrderId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_PDF_SIZE) {
+        return { success: false, error: 'PDF size exceeds 20MB limit' };
+      }
+      const fileExtension = fileName.split('.').pop() || 'pdf';
+      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+      const serviceClient = this.getServiceClient();
+      const { error } = await serviceClient.storage
+        .from(this.ESTIMATES_BUCKET)
+        .upload(uniqueFileName, file, { contentType: 'application/pdf', upsert: false });
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload PDF to storage' };
+      }
+      const { data: urlData } = serviceClient.storage
+        .from(this.ESTIMATES_BUCKET)
+        .getPublicUrl(uniqueFileName);
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Estimate PDF upload error:', error);
+      return { success: false, error: 'Internal server error during PDF upload' };
+    }
+  }
+
+  /**
+   * Upload an inspection PDF to Supabase Storage
+   */
+  static async uploadInspectionPDF(
+    file: Buffer | Uint8Array,
+    fileName: string,
+    workOrderId: string
+  ): Promise<UploadResult> {
+    try {
+      if (file.length > this.MAX_PDF_SIZE) {
+        return { success: false, error: 'PDF size exceeds 20MB limit' };
+      }
+      const fileExtension = fileName.split('.').pop() || 'pdf';
+      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+      const serviceClient = this.getServiceClient();
+      const { error } = await serviceClient.storage
+        .from(this.INSPECTIONS_BUCKET)
+        .upload(uniqueFileName, file, { contentType: 'application/pdf', upsert: false });
+      if (error) {
+        console.error('Storage upload error:', error);
+        return { success: false, error: 'Failed to upload PDF to storage' };
+      }
+      const { data: urlData } = serviceClient.storage
+        .from(this.INSPECTIONS_BUCKET)
+        .getPublicUrl(uniqueFileName);
+      return { success: true, url: urlData.publicUrl };
+    } catch (error: any) {
+      console.error('Inspection PDF upload error:', error);
+      return { success: false, error: 'Internal server error during PDF upload' };
+    }
+  }
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   private static readonly MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB for attachments
   private static readonly MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB for PDFs
@@ -420,9 +485,9 @@ export class StorageService {
    */
   static async initializeStorage(): Promise<void> {
     try {
-      console.log('🔧 Initializing storage...');
-      console.log('🔧 Supabase URL:', process.env.SUPABASE_URL || 'Not set');
-      console.log('🔧 Supabase Key:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
+      console.log(' Initializing storage...');
+      console.log(' Supabase URL:', process.env.SUPABASE_URL || 'Not set');
+      console.log(' Supabase Key:', process.env.SUPABASE_ANON_KEY ? 'Set' : 'Not set');
 
       // Check if Supabase is configured
       if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
@@ -443,7 +508,7 @@ export class StorageService {
         return;
       }
 
-      console.log('📦 Available buckets:', buckets?.map(b => b.name) || []);
+      console.log(' Available buckets:', buckets?.map(b => b.name) || []);
 
       const profileBucketExists = buckets?.some(bucket => bucket.name === this.PROFILE_IMAGES_BUCKET);
       const carBucketExists = buckets?.some(bucket => bucket.name === this.CAR_IMAGES_BUCKET);
@@ -452,7 +517,7 @@ export class StorageService {
       const invoicesBucketExists = buckets?.some(bucket => bucket.name === this.INVOICES_BUCKET);
 
       if (!profileBucketExists) {
-        console.log(`📦 Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.PROFILE_IMAGES_BUCKET}`);
         
         // Create bucket using service client
         const { error: createError } = await serviceClient.storage.createBucket(
@@ -469,14 +534,14 @@ export class StorageService {
           console.error('❌ Bucket creation failed. Please check your Supabase configuration.');
           console.error('❌ You may need to create the bucket manually in Supabase Studio');
         } else {
-          console.log(`✅ Created storage bucket: ${this.PROFILE_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.PROFILE_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.PROFILE_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.PROFILE_IMAGES_BUCKET}`);
       }
 
       if (!carBucketExists) {
-        console.log(`📦 Creating bucket: ${this.CAR_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.CAR_IMAGES_BUCKET}`);
         const { error: createCarError } = await serviceClient.storage.createBucket(
           this.CAR_IMAGES_BUCKET,
           {
@@ -488,14 +553,14 @@ export class StorageService {
         if (createCarError) {
           console.error('❌ Error creating car-images bucket:', createCarError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
       }
 
       if (!templateBucketExists) {
-        console.log(`📦 Creating bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        console.log(` Creating bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
         const { error: createTemplateError } = await serviceClient.storage.createBucket(
           this.TEMPLATE_IMAGES_BUCKET,
           {
@@ -507,14 +572,14 @@ export class StorageService {
         if (createTemplateError) {
           console.error('❌ Error creating template-images bucket:', createTemplateError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.TEMPLATE_IMAGES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.TEMPLATE_IMAGES_BUCKET}`);
       }
 
       if (!workOrderAttachmentsBucketExists) {
-        console.log(`📦 Creating bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        console.log(` Creating bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
         const { error: createAttachmentsError } = await serviceClient.storage.createBucket(
           this.WORK_ORDER_ATTACHMENTS_BUCKET,
           {
@@ -526,14 +591,14 @@ export class StorageService {
         if (createAttachmentsError) {
           console.error('❌ Error creating work-order-attachments bucket:', createAttachmentsError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+          console.log(` Created storage bucket: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.WORK_ORDER_ATTACHMENTS_BUCKET}`);
       }
 
       if (!invoicesBucketExists) {
-        console.log(`📦 Creating bucket: ${this.INVOICES_BUCKET}`);
+        console.log(` Creating bucket: ${this.INVOICES_BUCKET}`);
         const { error: createInvoicesError } = await serviceClient.storage.createBucket(
           this.INVOICES_BUCKET,
           {
@@ -545,10 +610,10 @@ export class StorageService {
         if (createInvoicesError) {
           console.error('❌ Error creating invoices bucket:', createInvoicesError);
         } else {
-          console.log(`✅ Created storage bucket: ${this.INVOICES_BUCKET}`);
+          console.log(` Created storage bucket: ${this.INVOICES_BUCKET}`);
         }
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.INVOICES_BUCKET}`);
+        console.log(` Storage bucket already exists: ${this.INVOICES_BUCKET}`);
       }
     } catch (error) {
       console.error('❌ Error initializing storage:', error);

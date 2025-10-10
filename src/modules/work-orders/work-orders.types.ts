@@ -199,8 +199,8 @@ export interface WorkOrderWithDetails {
       id: string;
       code: string;
       name: string;
-      estimatedHours: number;
-      hourlyRate: number;
+      estimatedMinutes: number;
+      skillLevel?: string;
     };
     technician?: {
       id: string;
@@ -284,11 +284,8 @@ export interface WorkOrderWithDetails {
     };
     approvedBy?: {
       id: string;
-      employeeId?: string;
-      userProfile: {
-        id: string;
-        name?: string;
-      };
+      name?: string;
+      profileImage?: string;
     };
   }[];
   attachments: {
@@ -317,7 +314,7 @@ export interface WorkOrderWithDetails {
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;
   cannedServiceId: string;
-  description?: string;
+  description: string;  // Required field
   quantity?: number;
   unitPrice?: number;
   notes?: string;
@@ -374,8 +371,7 @@ export interface IWorkOrderService {
   getWorkOrderById(id: string): Promise<any>;
   updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<any>;
   deleteWorkOrder(id: string): Promise<any>;
-  restoreWorkOrder(id: string): Promise<any>;
-  getCancelledWorkOrders(): Promise<any[]>;
+  // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
@@ -383,6 +379,7 @@ export interface IWorkOrderService {
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
   assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
   assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
+  assignTechnicianToServiceLabor(serviceId: string, technicianId: string): Promise<any>;
   updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest): Promise<any>;
   resetWorkOrderLaborSubtotal(laborId: string): Promise<any>;
   getWorkOrderStatistics(filters: { startDate?: Date; endDate?: Date }): Promise<WorkOrderStatistics>;
@@ -394,5 +391,27 @@ export interface IWorkOrderService {
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
-  generateEstimateFromLaborAndParts(workOrderId: string, serviceAdvisorId: string): Promise<any>;
+  
+  // Customer approval methods
+  approveService(serviceId: string, customerId: string, notes?: string): Promise<any>;
+  rejectService(serviceId: string, customerId: string, reason?: string): Promise<any>;
+  approvePart(partId: string, customerId: string, notes?: string): Promise<any>;
+  rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
+  getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
+  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  
+  // Part installation methods
+  assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
+  startPartInstallation(partId: string, technicianId: string): Promise<any>;
+  completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }): Promise<any>;
+  findTechnicianBySupabaseUserId(supabaseUserId: string): Promise<any>;
+  
+  // Technician active work
+  getTechnicianActiveWork(technicianId: string): Promise<any>;
+
+    // Estimate PDF and approval helpers
+    generateEstimatePDF(workOrderId: string): Promise<string>;
+    expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
+    createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
+    getWorkOrderApprovals(workOrderId: string): Promise<any>;
 }

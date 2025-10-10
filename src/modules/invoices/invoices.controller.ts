@@ -41,7 +41,7 @@ export class InvoicesController {
       startDate, 
       endDate, 
       page = 1, 
-      limit = 10 
+      limit = 10
     } = req.query;
 
     const filters: InvoiceFilters = {};

@@ -219,7 +219,7 @@ export class VehiclesController {
           imageUrl: result.url
         });
 
-        console.log('✅ Vehicle image uploaded successfully:', result.url);
+        console.log(' Vehicle image uploaded successfully:', result.url);
 
         res.json({
           success: true,
@@ -283,7 +283,7 @@ export class VehiclesController {
         imageUrl: null
       });
 
-      console.log('✅ Vehicle image deleted successfully');
+      console.log(' Vehicle image deleted successfully');
 
       res.json({
         success: true,

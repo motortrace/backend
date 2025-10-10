@@ -13,15 +13,15 @@ let server: Server;
 // Initialize storage buckets on startup
 async function initializeServices() {
   try {
-    console.log('🚀 Initializing services...');
+    console.log(' Initializing services...');
         
     // Initialize Supabase Storage
     await StorageService.initializeStorage();
-    console.log('✅ Storage service initialized');
+    console.log(' Storage service initialized');
         
     // Test database connection
     await prisma.$connect();
-    console.log('✅ Database connected');
+    console.log(' Database connected');
       
   } catch (error) {
     console.error('❌ Failed to initialize services:', error);
@@ -32,10 +32,10 @@ async function initializeServices() {
 // Start server after initializing services
 initializeServices().then(() => {
   server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    console.log(`🗄️  DB check: http://localhost:${PORT}/test-db`);
-    console.log(`📁 Storage endpoints: http://localhost:${PORT}/storage`);
+    console.log(` Server running on http://localhost:${PORT}`);
+    console.log(` Health check: http://localhost:${PORT}/health`);
+    console.log(` DB check: http://localhost:${PORT}/test-db`);
+    console.log(` Storage endpoints: http://localhost:${PORT}/storage`);
   });
 });
 

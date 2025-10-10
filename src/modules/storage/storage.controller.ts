@@ -55,7 +55,7 @@ export class StorageController {
         return;
       }
 
-      console.log('✅ Profile image uploaded successfully:', result.url);
+      console.log(' Profile image uploaded successfully:', result.url);
 
       res.json({
         success: true,
@@ -140,7 +140,7 @@ export class StorageController {
         return;
       }
 
-      console.log('✅ Profile image deleted successfully');
+      console.log(' Profile image deleted successfully');
 
       res.json({
         success: true,
