@@ -683,6 +683,140 @@ export class TechnicianService {
     return result;
   }
 
+  // Get technician performance data for last 30 days (bar chart data)
+  async getTechnicianMonthlyPerformance(): Promise<Array<{
+    technicianId: string;
+    technicianName: string;
+    employeeId: string | null;
+    totalHoursWorked: number;
+    inspectionsCompleted: number;
+    laborTasksCompleted: number;
+    partsInstalled: number;
+    totalTasks: number;
+  }>> {
+    try {
+      // Calculate date range for last 60 days (more inclusive for performance tracking)
+      const now = new Date();
+      const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+
+      // Get all technicians who had activity in last 60 days
+      const technicians = await this.prisma.technician.findMany({
+        include: {
+          userProfile: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Process and calculate hours worked and task counts
+      const result = await Promise.all(technicians.map(async (tech) => {
+        // Count inspections completed in last 60 days
+        const inspectionsCount = await this.prisma.workOrderInspection.count({
+          where: {
+            inspectorId: tech.id,
+            isCompleted: true,
+            date: {
+              gte: sixtyDaysAgo,
+              lte: now,
+            },
+          },
+        });
+
+        // Count labor tasks completed in last 60 days
+        const laborTasksCount = await this.prisma.workOrderLabor.count({
+          where: {
+            technicianId: tech.id,
+            status: 'COMPLETED',
+            OR: [
+              {
+                endTime: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+              {
+                updatedAt: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+            ],
+          },
+        });
+
+        // Count parts installed in last 60 days
+        const partsInstalledCount = await this.prisma.workOrderPart.count({
+          where: {
+            installedById: tech.id,
+            OR: [
+              {
+                installedAt: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+              {
+                updatedAt: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+            ],
+          },
+        });
+
+        // Calculate total hours from completed labor tasks
+        const laborWithTime = await this.prisma.workOrderLabor.findMany({
+          where: {
+            technicianId: tech.id,
+            status: 'COMPLETED',
+            OR: [
+              {
+                endTime: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+              {
+                updatedAt: {
+                  gte: sixtyDaysAgo,
+                  lte: now,
+                },
+              },
+            ],
+          },
+          select: {
+            actualMinutes: true,
+          },
+        });
+
+        const totalMinutes = laborWithTime.reduce((sum, labor) => sum + (labor.actualMinutes || 0), 0);
+        const totalHours = Math.round((totalMinutes / 60) * 100) / 100; // Round to 2 decimal places
+
+        return {
+          technicianId: tech.id,
+          technicianName: tech.userProfile?.name || 'Unknown',
+          employeeId: tech.employeeId,
+          totalHoursWorked: totalHours,
+          inspectionsCompleted: inspectionsCount,
+          laborTasksCompleted: laborTasksCount,
+          partsInstalled: partsInstalledCount,
+          totalTasks: inspectionsCount + laborTasksCount + partsInstalledCount,
+        };
+      }));
+
+      // Filter out technicians with no activity and sort by total hours worked
+      return result
+        .filter(tech => tech.totalTasks > 0)
+        .sort((a, b) => b.totalHoursWorked - a.totalHoursWorked);
+
+    } catch (error: any) {
+      throw new Error(`Failed to get technician monthly performance: ${error.message}`);
+    }
+  }
+
   // Search technicians
   async searchTechnicians(query: string): Promise<TechnicianResponse[]> {
     try {
@@ -810,6 +944,72 @@ export class TechnicianService {
       return uniqueWorkOrders.map(workOrder => this.formatWorkOrderResponse(workOrder));
     } catch (error: any) {
       throw new Error(`Failed to get work orders for technician: ${error.message}`);
+    }
+  }
+
+  // Get technician working status counts (working vs not working)
+  async getTechnicianWorkingStatusCounts(): Promise<{
+    totalTechnicians: number;
+    currentlyWorking: number;
+    notWorking: number;
+  }> {
+    try {
+      // Get total technicians
+      const totalTechnicians = await this.prisma.technician.count();
+
+      // Get technicians currently working (have active tasks)
+      const currentlyWorking = await this.prisma.technician.count({
+        where: {
+          OR: [
+            {
+              laborItems: {
+                some: {
+                  status: 'IN_PROGRESS',
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            },
+            {
+              inspections: {
+                some: {
+                  isCompleted: false,
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            },
+            {
+              partInstallations: {
+                some: {
+                  installedAt: null,
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      });
+
+      const notWorking = totalTechnicians - currentlyWorking;
+
+      return {
+        totalTechnicians,
+        currentlyWorking,
+        notWorking,
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get technician working status counts: ${error.message}`);
     }
   }
 

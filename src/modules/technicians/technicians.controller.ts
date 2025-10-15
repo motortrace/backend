@@ -238,6 +238,26 @@ export class TechnicianController {
     }
   }
 
+  // Get technician monthly performance data
+  async getTechnicianMonthlyPerformance(req: Request, res: Response) {
+    try {
+      const performanceData = await this.technicianService.getTechnicianMonthlyPerformance();
+      res.json({
+        success: true,
+        data: performanceData,
+        count: performanceData.length,
+        period: 'last_60_days',
+        message: 'Technician monthly performance data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get technician monthly performance',
+        message: error.message,
+      });
+    }
+  }
+
   // Search technicians
   async searchTechnicians(req: Request, res: Response) {
     try {
@@ -305,6 +325,25 @@ export class TechnicianController {
       res.status(500).json({
         success: false,
         error: 'Failed to get technician work orders',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get technician working status counts
+  async getTechnicianWorkingStatusCounts(req: Request, res: Response) {
+    try {
+      const statusCounts = await this.technicianService.getTechnicianWorkingStatusCounts();
+
+      res.json({
+        success: true,
+        data: statusCounts,
+        message: 'Technician working status counts retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get technician working status counts',
         message: error.message,
       });
     }

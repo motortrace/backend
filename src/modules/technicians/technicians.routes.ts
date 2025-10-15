@@ -39,6 +39,18 @@ router.get(
   technicianController.getWorkingTechniciansSimple.bind(technicianController)
 );
 
+// Get technician monthly performance
+router.get(
+  '/performance/monthly',
+  technicianController.getTechnicianMonthlyPerformance.bind(technicianController)
+);
+
+// Get technician working status counts
+router.get(
+  '/working-status',
+  technicianController.getTechnicianWorkingStatusCounts.bind(technicianController)
+);
+
 // Search technicians
 router.get(
   '/search',
