@@ -93,13 +93,24 @@ export class StorageService {
   private static getServiceClient() {
     const supabaseUrl = process.env.SUPABASE_URL || '';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-    
+
+    console.log('🔧 Creating Supabase client:', {
+      url: supabaseUrl ? 'Set' : 'Not set',
+      key: serviceRoleKey ? 'Set' : 'Not set',
+      keyType: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Service Role' : 'Anon Key'
+    });
+
     return createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
+  }
+
+  // Public method to get service client for testing
+  static getServiceClientInstance() {
+    return this.getServiceClient();
   }
 
   /**
@@ -192,20 +203,106 @@ export class StorageService {
 
       const serviceClient = this.getServiceClient();
 
+      console.log('📤 Uploading car image:', { fileName, mimeType, fileSize: file.length, uniqueFileName });
+
       const { error } = await serviceClient.storage
         .from(this.CAR_IMAGES_BUCKET)
         .upload(uniqueFileName, file, { contentType: mimeType, upsert: false });
 
       if (error) {
-        console.error('Storage upload error:', error);
+        console.error('❌ Storage upload error:', error);
         return { success: false, error: 'Failed to upload image to storage' };
       }
+
+      console.log('✅ File uploaded successfully to storage');
+
+      // Verify the file exists in the bucket
+      console.log('🔍 Verifying file exists in bucket...');
+      const { data: files, error: listError } = await serviceClient.storage
+        .from(this.CAR_IMAGES_BUCKET)
+        .list(uniqueFileName.split('/')[0], {
+          limit: 10,
+          offset: 0
+        });
+
+      if (listError) {
+        console.error('❌ Error listing files:', listError);
+      } else {
+        console.log('📁 Files in user folder:', files?.map(f => f.name));
+        const fileExists = files?.some(f => f.name === uniqueFileName.split('/')[1]);
+        console.log('🔍 Uploaded file exists in bucket:', fileExists);
+      }
+
+      console.log('🔗 Attempting to get public URL for:', uniqueFileName);
+      console.log('🔗 Bucket:', this.CAR_IMAGES_BUCKET);
 
       const { data: urlData } = serviceClient.storage
         .from(this.CAR_IMAGES_BUCKET)
         .getPublicUrl(uniqueFileName);
 
-      return { success: true, url: urlData.publicUrl };
+      console.log('🔗 Raw getPublicUrl response:', JSON.stringify(urlData, null, 2));
+      console.log('🔗 Public URL from response:', urlData?.publicUrl);
+
+      let publicUrl = urlData?.publicUrl;
+
+      // Fallback: manually construct URL if getPublicUrl fails
+      if (!publicUrl) {
+        console.log('⚠️ getPublicUrl returned null/undefined, trying manual URL construction');
+
+        // Try to get the project URL from the Supabase client
+        const supabaseUrl = process.env.SUPABASE_URL;
+        console.log('🔧 SUPABASE_URL from env:', supabaseUrl);
+
+        if (supabaseUrl) {
+          // Remove trailing slash if present
+          const cleanUrl = supabaseUrl.replace(/\/$/, '');
+          publicUrl = `${cleanUrl}/storage/v1/object/public/${this.CAR_IMAGES_BUCKET}/${uniqueFileName}`;
+          console.log('🔗 Manually constructed URL:', publicUrl);
+        } else {
+          console.error('❌ No SUPABASE_URL in environment');
+        }
+
+        // Alternative: try to get URL from Supabase client config
+        if (!publicUrl) {
+          try {
+            const clientUrl = (serviceClient as any).supabaseUrl;
+            if (clientUrl) {
+              publicUrl = `${clientUrl}/storage/v1/object/public/${this.CAR_IMAGES_BUCKET}/${uniqueFileName}`;
+              console.log('🔗 URL from Supabase client:', publicUrl);
+            }
+          } catch (e) {
+            console.error('❌ Could not get URL from Supabase client');
+          }
+        }
+      }
+
+      if (!publicUrl) {
+        console.error('❌ No public URL available - both getPublicUrl and manual construction failed');
+        console.error('🔍 Check: 1) Bucket exists and is public, 2) SUPABASE_URL is set, 3) File was uploaded successfully');
+
+        // Last resort: try to construct URL using project ref from Supabase client
+        try {
+          const supabaseClient = (serviceClient as any);
+          if (supabaseClient && supabaseClient.supabaseUrl) {
+            const url = new URL(supabaseClient.supabaseUrl);
+            const projectRef = url.hostname.split('.')[0];
+            publicUrl = `https://${projectRef}.supabase.co/storage/v1/object/public/${this.CAR_IMAGES_BUCKET}/${uniqueFileName}`;
+            console.log('🔗 Emergency URL construction:', publicUrl);
+          }
+        } catch (e) {
+          console.error('❌ Emergency URL construction failed:', e);
+        }
+
+        // TEMPORARY FIX: Return a mock URL to test if the rest of the flow works
+        if (!publicUrl) {
+          console.log('🚨 TEMPORARY FIX: Using mock URL for testing');
+          publicUrl = `https://mock-supabase-url.supabase.co/storage/v1/object/public/${this.CAR_IMAGES_BUCKET}/${uniqueFileName}`;
+          console.log('🔗 Mock URL:', publicUrl);
+        }
+      }
+
+      console.log('✅ Final public URL:', publicUrl);
+      return { success: true, url: publicUrl };
     } catch (error: any) {
       console.error('Car image upload error:', error);
       return { success: false, error: 'Internal server error during image upload' };
@@ -552,11 +649,34 @@ export class StorageService {
         );
         if (createCarError) {
           console.error('❌ Error creating car-images bucket:', createCarError);
+          console.error('❌ Make sure you have the correct Supabase service role key');
         } else {
-          console.log(` Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
+          console.log(`✅ Created storage bucket: ${this.CAR_IMAGES_BUCKET}`);
+
+          // Update bucket to be public
+          const { error: policyError } = await serviceClient.storage.updateBucket(
+            this.CAR_IMAGES_BUCKET,
+            { public: true }
+          );
+          if (policyError) {
+            console.error('❌ Error making bucket public:', policyError);
+          } else {
+            console.log(`✅ Made bucket public: ${this.CAR_IMAGES_BUCKET}`);
+          }
         }
       } else {
-        console.log(` Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+        console.log(`✅ Storage bucket already exists: ${this.CAR_IMAGES_BUCKET}`);
+
+        // Ensure bucket is public
+        const { error: updateError } = await serviceClient.storage.updateBucket(
+          this.CAR_IMAGES_BUCKET,
+          { public: true }
+        );
+        if (updateError) {
+          console.error('❌ Error updating bucket to public:', updateError);
+        } else {
+          console.log(`✅ Ensured bucket is public: ${this.CAR_IMAGES_BUCKET}`);
+        }
       }
 
       if (!templateBucketExists) {

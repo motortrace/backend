@@ -22,6 +22,9 @@ import storageRoutes from './modules/storage/storage.routes';
 import serviceAdvisorRoutes from './modules/service-advisors/service-advisors.routes';
 import technicianRoutes from './modules/technicians/technicians.routes';
 import invoicesRoutes from './modules/invoices/invoices.routes';
+import { mileageTrackingRouter } from './modules/mileage-tracking';
+import { serviceRecommendationsRouter } from './modules/service-recommendations';
+import { carExpensesRouter } from './modules/car-expenses';
 
 
 const app = express();
@@ -70,6 +73,9 @@ app.use('/storage', storageRoutes);
 app.use('/service-advisors', serviceAdvisorRoutes);
 app.use('/technicians', technicianRoutes);
 app.use('/invoices', invoicesRoutes);
+app.use('/mileage-tracking', mileageTrackingRouter);
+app.use('/service-recommendations', serviceRecommendationsRouter);
+app.use('/car-expenses', carExpensesRouter);
 
 // Health check
 app.get('/health', (req, res) => {

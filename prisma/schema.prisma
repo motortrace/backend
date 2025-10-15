@@ -32,6 +32,8 @@ model UserProfile {
   uploadedInspectionAttachments WorkOrderInspectionAttachment[] @relation("UploadedInspectionAttachments")
   notifications  Notification[]
   workOrderApprovals WorkOrderApproval[] @relation("WorkOrderApprovals")
+  mileageEntries MileageEntry[]
+  carExpenses    CarExpense[]
 }
 
 model ServiceAdvisor {
@@ -40,6 +42,7 @@ model ServiceAdvisor {
   userProfileId  String        @unique
   employeeId     String?       @unique
   department     String?
+  mobile         String?       // Mobile phone number for service advisor
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -123,12 +126,20 @@ model Vehicle {
   year         Int?
   vin          String?       @unique
   licensePlate String?
+  color        String?       // Vehicle color
   imageUrl     String?       // URL to vehicle image stored in Supabase Storage
+  status       VehicleStatus @default(ACTIVE) // Vehicle status for tracking condition
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   workOrders   WorkOrder[]
   appointments Appointment[]
+  mileageEntries MileageEntry[]
+  vehicleMileage VehicleMileage[]
+  serviceRecommendations ServiceRecommendation[]
+  serviceHistory VehicleServiceHistory[]
+  vehicleProfile VehicleProfile?
+  expenses      CarExpense[]
 }
 
 model WorkOrder {
@@ -206,6 +217,7 @@ model WorkOrder {
   partsUsed       WorkOrderPart[]
   invoices        Invoice[]
   notifications   Notification[]
+  serviceHistory  VehicleServiceHistory[]
 }
 
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
@@ -818,7 +830,7 @@ model WorkOrderService {
 model InventoryCategory {
   id String @id @default(cuid())
   name String @unique
-  
+
   // Relations
   inventoryItems InventoryItem[]
   cannedServices CannedServicePartsCategory[] // Services that use parts from this category
@@ -989,4 +1001,316 @@ enum NotificationDeliveryStatus {
   BOUNCED
   CLICKED
   READ
+}
+
+// Service Recommendations - Rule-Based System
+model ServiceRule {
+  id          String   @id @default(cuid())
+  code        String   @unique // Unique identifier for the rule
+  name        String   // Human readable name
+  description String?  // Detailed description
+
+  // Rule Configuration
+  ruleType    ServiceRuleType // MILEAGE, TIME, CONDITION, DEPENDENCY
+  priority    ServicePriority @default(MEDIUM)
+  severity    ServiceSeverity @default(MEDIUM)
+
+  // Trigger Conditions
+  mileageInterval Int?     // Mileage threshold (e.g., 5000 for oil change)
+  timeIntervalMonths Int?  // Time threshold in months
+  timeIntervalDays Int?    // Time threshold in days
+
+  // Service Details
+  serviceType String      // Type of service (oil_change, brake_inspection, etc.)
+  serviceName String      // Display name
+  category    String      // Maintenance, Repair, Inspection, etc.
+
+  // Dependencies and Conflicts
+  dependsOn   String[]    // Rule codes this depends on
+  conflictsWith String[]  // Rule codes this conflicts with
+  canBundle  Boolean     @default(false) // Can be bundled with other services
+
+  // Vehicle Constraints
+  applicableVehicleTypes String[] // sedan, suv, truck, hybrid, electric
+  applicableDrivingConditions String[] // normal, severe, offroad
+
+  // Dynamic thresholds based on conditions
+  severeConditionMultiplier Decimal? @db.Decimal(3,2) // Multiplier for severe conditions
+  offroadMultiplier Decimal? @db.Decimal(3,2) // Multiplier for offroad use
+
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  recommendations ServiceRecommendation[]
+}
+
+model ServiceRecommendation {
+  id          String   @id @default(cuid())
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+
+  rule        ServiceRule @relation(fields: [ruleId], references: [id])
+  ruleId      String
+
+  // Recommendation Details
+  status      RecommendationStatus @default(PENDING)
+  priority    ServicePriority
+  severity    ServiceSeverity
+
+  // Trigger Data
+  triggeredAt DateTime @default(now())
+  currentMileage Int?
+  dueMileage Int?     // Calculated due mileage
+  dueDate     DateTime? // Calculated due date
+
+  // Last Service Reference
+  lastServiceDate DateTime?
+  lastServiceMileage Int?
+
+  // Recommendation Metadata
+  reason      String   // Why this recommendation was triggered
+  estimatedCost Decimal? @db.Decimal(8,2)
+  estimatedDuration Int? // Duration in minutes
+
+  // User Actions
+  dismissedAt DateTime?
+  dismissedReason String?
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([vehicleId, status])
+  @@index([ruleId, status])
+  @@index([dueDate])
+  @@index([dueMileage])
+}
+
+model VehicleServiceHistory {
+  id          String   @id @default(cuid())
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+
+  serviceType String   // Type of service performed
+  serviceName String   // Human readable name
+  serviceDate DateTime // When service was performed
+  serviceMileage Int   // Mileage at time of service
+
+  // Service Details
+  provider    String?  // Who performed the service
+  cost        Decimal? @db.Decimal(8,2)
+  notes       String?
+
+  // Link to work order if applicable
+  workOrderId String?
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([vehicleId, serviceType, serviceDate])
+  @@index([vehicleId, serviceMileage])
+}
+
+model VehicleProfile {
+  id          String   @id @default(cuid())
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String   @unique
+
+  // Driving Profile
+  drivingCondition DrivingCondition @default(NORMAL)
+  averageDailyMileage Int? // Estimated daily mileage
+  primaryUse        String? // personal, commercial, taxi, etc.
+
+  // Vehicle Specifics
+  engineType        String? // gasoline, diesel, electric, hybrid
+  transmissionType  String? // manual, automatic, cvt
+  fuelType          String? // gasoline, diesel, electric
+
+  // Maintenance Preferences
+  preferredServiceInterval ServiceInterval @default(STANDARD) // standard, severe, extended
+  notificationPreferences String[] // email, push, sms
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Enums for Service Rules
+enum ServiceRuleType {
+  MILEAGE_BASED
+  TIME_BASED
+  CONDITION_BASED
+  DEPENDENCY_BASED
+  LIFECYCLE_BASED
+}
+
+enum ServicePriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFORMATIONAL
+}
+
+enum ServiceSeverity {
+  CRITICAL  // Safety or engine protection
+  HIGH      // Major component
+  MEDIUM    // Standard maintenance
+  LOW       // Optional/optimization
+}
+
+enum RecommendationStatus {
+  PENDING
+  SCHEDULED
+  DISMISSED
+  COMPLETED
+  OVERDUE
+}
+
+enum DrivingCondition {
+  NORMAL
+  SEVERE     // Dusty, stop-and-go, extreme temperatures
+  OFFROAD    // Rough terrain, heavy loads
+  COMMERCIAL // High mileage, continuous use
+}
+
+enum ServiceInterval {
+  STANDARD  // Manufacturer recommended
+  SEVERE    // Reduced intervals for harsh conditions
+  EXTENDED  // Extended intervals for optimal conditions
+}
+
+enum VehicleStatus {
+  ACTIVE      // Vehicle is in active use
+  MAINTENANCE // Currently undergoing maintenance
+  INACTIVE    // Temporarily not in use
+  ISSUES      // Has known issues requiring attention
+}
+
+// Mileage Tracking - Tracks vehicle mileage over time
+model MileageEntry {
+  id          String   @id @default(cuid())
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+  mileage     Int      // Current mileage reading in km
+  fuelUsed    Decimal? @db.Decimal(6,2) // Fuel consumed since last entry (liters)
+  distance    Int?     // Distance traveled since last entry (km)
+  efficiency  Decimal? @db.Decimal(4,2) // Fuel efficiency (km/L)
+  latitude    Decimal? @db.Decimal(10,8) // GPS latitude
+  longitude   Decimal? @db.Decimal(11,8) // GPS longitude
+  locationName String? // Human readable location name
+  notes       String?  // Additional notes
+  recordedAt  DateTime @default(now()) // When this entry was recorded
+  recordedBy  UserProfile? @relation(fields: [recordedById], references: [id])
+  recordedById String?
+
+  // Relations
+  vehicleMileage VehicleMileage[] // Link to vehicle mileage summary
+
+  @@index([vehicleId, recordedAt])
+}
+
+model VehicleMileage {
+  id            String   @id @default(cuid())
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId     String   @unique
+  currentMileage Int     @default(0) // Latest mileage reading
+  totalDistance Int      @default(0) // Total distance traveled
+  totalFuelUsed Decimal  @db.Decimal(10,2) @default(0) // Total fuel consumed
+  averageEfficiency Decimal? @db.Decimal(4,2) // Average fuel efficiency
+  lastUpdated   DateTime @default(now())
+  lastLocationLat Decimal? @db.Decimal(10,8)
+  lastLocationLng Decimal? @db.Decimal(11,8)
+  lastLocationName String?
+
+  // Relations
+  entries MileageEntry[]
+
+  @@index([vehicleId])
+}
+
+// Car Expenses - Track all car-related expenses
+model CarExpense {
+  id          String      @id @default(cuid())
+  vehicle     Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+
+  // Expense Details
+  category    ExpenseCategory
+  description String
+  amount      Decimal     @db.Decimal(10,2)
+  date        DateTime    // When the expense occurred
+
+  // Additional Info
+  provider    String?     // Who provided the service/product
+  receiptUrl  String?     // URL to receipt image/document
+  notes       String?     // Additional notes
+
+  // Metadata
+  createdBy   UserProfile? @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([vehicleId, date])
+  @@index([vehicleId, category])
+}
+
+enum ExpenseCategory {
+  MAINTENANCE    // Oil changes, filters, belts, etc.
+  REPAIR         // Engine repairs, brake work, etc.
+  FUEL           // Gasoline, diesel, electricity
+  INSURANCE      // Insurance premiums
+  REGISTRATION   // License plate registration/renewal
+  TIRES          // Tire purchase/replacement
+  PARTS          // Spare parts and accessories
+  WASHING        // Car washing/detailing
+  PARKING        // Parking fees
+  TOLLS          // Toll road fees
+  FINES          // Traffic fines/violations
+  OTHER          // Miscellaneous expenses
+}
+
+
+// User Session Management - Tracks active user sessions
+model UserSession {
+ id          String   @id @default(cuid())
+ userId      String   // Supabase user ID
+ sessionId   String   @unique // Unique session identifier
+ deviceInfo  String?  // Device/browser information
+ ipAddress   String?  // IP address
+ userAgent   String?  // User agent string
+ location    String?  // Geographic location (city, country)
+ isActive    Boolean  @default(true)
+ lastActivity DateTime @default(now())
+ createdAt   DateTime @default(now())
+ expiresAt   DateTime? // Session expiration time
+
+ @@index([userId, isActive])
+ @@index([sessionId])
+ @@index([expiresAt])
+}
+
+// Login Activity - Tracks all login attempts and successful logins
+model LoginActivity {
+ id          String   @id @default(cuid())
+ userId      String   // Supabase user ID
+ action      LoginAction // LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT
+ deviceInfo  String?  // Device/browser information
+ ipAddress   String?  // IP address
+ userAgent   String?  // User agent string
+ location    String?  // Geographic location
+ reason      String?  // Failure reason for failed logins
+ createdAt   DateTime @default(now())
+
+ @@index([userId, createdAt])
+ @@index([action])
+}
+
+enum LoginAction {
+ LOGIN_SUCCESS
+ LOGIN_FAILED
+ LOGOUT
 }
