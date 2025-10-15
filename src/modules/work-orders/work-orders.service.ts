@@ -8,6 +8,7 @@ import {
   CreatePaymentRequest,
   WorkOrderStatistics,
   WorkOrderCreationStats,
+  GeneralStats,
 } from './work-orders.types';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../notifications/notifications.service';
@@ -2017,6 +2018,21 @@ export class WorkOrderService {
       averageDaily,
       peakDaily,
       dailyBreakdown,
+    };
+  }
+
+  // Get general statistics (customers, vehicles, technicians)
+  async getGeneralStats(): Promise<GeneralStats> {
+    const [totalCustomers, totalVehicles, totalTechnicians] = await Promise.all([
+      this.prisma.customer.count(),
+      this.prisma.vehicle.count(),
+      this.prisma.technician.count(),
+    ]);
+
+    return {
+      totalCustomers,
+      totalVehicles,
+      totalTechnicians,
     };
   }
 

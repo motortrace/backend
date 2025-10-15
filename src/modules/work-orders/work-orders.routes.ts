@@ -74,6 +74,7 @@ router.get('/technician/:technicianId/active-work', authenticateSupabaseToken, r
 // Work Order Statistics Routes
 router.get('/statistics/overview', authenticateSupabaseToken, requireManager, workOrderController.getWorkOrderStatistics.bind(workOrderController));
 router.get('/statistics/creation', authenticateSupabaseToken, requireManager, workOrderController.getWorkOrderCreationStats.bind(workOrderController));
+router.get('/statistics/general', authenticateSupabaseToken, requireManager, workOrderController.getGeneralStats.bind(workOrderController));
 
 // Work Order Search Routes
 router.post('/search', workOrderController.searchWorkOrders.bind(workOrderController));

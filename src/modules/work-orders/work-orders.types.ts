@@ -373,6 +373,12 @@ export interface WorkOrderCreationStats {
   }[];
 }
 
+export interface GeneralStats {
+  totalCustomers: number;
+  totalVehicles: number;
+  totalTechnicians: number;
+}
+
 // Service Interface (for Dependency Injection)
 export interface IWorkOrderService {
   getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
@@ -425,4 +431,5 @@ export interface IWorkOrderService {
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
+    getGeneralStats(): Promise<GeneralStats>;
 }
