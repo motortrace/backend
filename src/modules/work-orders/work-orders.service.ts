@@ -795,9 +795,19 @@ export class WorkOrderService {
 
 
 
-    // Determine initial status: AWAITING_APPROVAL if services are added, otherwise PENDING
+    // Determine initial status:
+    // - APPROVED if services are added and no appointmentId (walk-in)
+    // - AWAITING_APPROVAL if services are added and appointmentId exists
+    // - PENDING otherwise
     const hasServices = cannedServiceIds && cannedServiceIds.length > 0;
-    const initialStatus = hasServices ? WorkOrderStatus.AWAITING_APPROVAL : WorkOrderStatus.PENDING;
+    let initialStatus: WorkOrderStatus = WorkOrderStatus.PENDING;
+    if (hasServices) {
+      if (!workOrderData.appointmentId) {
+        initialStatus = WorkOrderStatus.APPROVED as WorkOrderStatus;
+      } else {
+        initialStatus = WorkOrderStatus.AWAITING_APPROVAL as WorkOrderStatus;
+      }
+    }
 
     // Create work order with services
     const workOrder = await this.prisma.workOrder.create({
@@ -1308,14 +1318,35 @@ export class WorkOrderService {
       throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
     }
 
+    // Check if parent work order is walk-in (no appointment)
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: data.workOrderId },
+      select: { appointmentId: true, status: true },
+    });
+
+    let serviceData: any = {
+      ...data,
+      quantity: data.quantity || 1,
+      unitPrice: data.unitPrice || Number(cannedService.price),
+      subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
+    };
+
+    // If walk-in, auto-approve service
+    if (workOrder && !workOrder.appointmentId) {
+      serviceData.customerApproved = true;
+      serviceData.approvedAt = new Date();
+      // Also update work order status if needed
+      if (workOrder.status !== WorkOrderStatus.APPROVED) {
+        await this.prisma.workOrder.update({
+          where: { id: data.workOrderId },
+          data: { status: WorkOrderStatus.APPROVED },
+        });
+      }
+    }
+
     // Create the work order service (this is what the customer pays for)
     const service = await this.prisma.workOrderService.create({
-      data: {
-        ...data,
-        quantity: data.quantity || 1,
-        unitPrice: data.unitPrice || Number(cannedService.price),
-        subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
-      },
+      data: serviceData,
     });
 
     // Automatically create labor entries for this service (for tracking work, not billing)
