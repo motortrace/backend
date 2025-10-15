@@ -363,6 +363,16 @@ export interface WorkOrderStatistics {
   }[];
 }
 
+export interface WorkOrderCreationStats {
+  totalWorkOrders: number;
+  averageDaily: number;
+  peakDaily: number;
+  dailyBreakdown: {
+    date: string;
+    count: number;
+  }[];
+}
+
 // Service Interface (for Dependency Injection)
 export interface IWorkOrderService {
   getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
@@ -414,4 +424,5 @@ export interface IWorkOrderService {
     expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
+    getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
 }

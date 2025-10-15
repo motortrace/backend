@@ -7,6 +7,7 @@ import {
   UpdateWorkOrderLaborRequest,
   CreatePaymentRequest,
   WorkOrderStatistics,
+  WorkOrderCreationStats,
 } from './work-orders.types';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../notifications/notifications.service';
@@ -1958,6 +1959,65 @@ export class WorkOrderService {
     };
 
     return statistics;
+  }
+
+  // Get work order creation statistics for the last 7 days
+  async getWorkOrderCreationStats(): Promise<WorkOrderCreationStats> {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Get all work orders created in the last 7 days
+    const workOrders = await this.prisma.workOrder.findMany({
+      where: {
+        createdAt: {
+          gte: sevenDaysAgo,
+        },
+      },
+      select: {
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Group by date
+    const dailyCounts: { [date: string]: number } = {};
+    workOrders.forEach(workOrder => {
+      const date = workOrder.createdAt.toISOString().split('T')[0]; // YYYY-MM-DD format
+      dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+    });
+
+    // Calculate statistics
+    const totalWorkOrders = workOrders.length;
+    const averageDaily = Math.round((totalWorkOrders / 7) * 100) / 100; // Round to 2 decimal places
+    const peakDaily = Math.max(...Object.values(dailyCounts), 0);
+
+    // Create daily breakdown array
+    const dailyBreakdown = Object.entries(dailyCounts).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    // Fill in missing dates with 0
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(sevenDaysAgo);
+      date.setDate(date.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      if (!dailyCounts[dateStr]) {
+        dailyBreakdown.push({ date: dateStr, count: 0 });
+      }
+    }
+
+    // Sort by date
+    dailyBreakdown.sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      totalWorkOrders,
+      averageDaily,
+      peakDaily,
+      dailyBreakdown,
+    };
   }
 
   // Search work orders

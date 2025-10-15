@@ -430,6 +430,23 @@ export class WorkOrderController {
     }
   }
 
+  // Work Order Creation Statistics
+  async getWorkOrderCreationStats(req: Request, res: Response) {
+    try {
+      const stats = await this.workOrderService.getWorkOrderCreationStats();
+
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order Search
   async searchWorkOrders(req: Request, res: Response) {
     try {
