@@ -199,6 +199,45 @@ export class TechnicianController {
     }
   }
 
+  // Get currently working technicians
+  async getCurrentlyWorkingTechnicians(req: Request, res: Response) {
+    try {
+      const workingTechnicians = await this.technicianService.getCurrentlyWorkingTechnicians();
+
+      res.json({
+        success: true,
+        data: workingTechnicians,
+        count: workingTechnicians.length,
+        message: 'Currently working technicians retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get currently working technicians',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get simplified currently working technicians endpoint
+  async getWorkingTechniciansSimple(req: Request, res: Response) {
+    try {
+      const simpleTechnicians = await this.technicianService.getWorkingTechniciansSimple();
+      res.json({
+        success: true,
+        data: simpleTechnicians,
+        count: simpleTechnicians.length,
+        message: 'Simple currently working technicians retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get simple currently working technicians',
+        message: error.message,
+      });
+    }
+  }
+
   // Search technicians
   async searchTechnicians(req: Request, res: Response) {
     try {

@@ -27,6 +27,18 @@ router.get(
   technicianController.getTechnicianStats.bind(technicianController)
 );
 
+// Get currently working technicians
+router.get(
+  '/working',
+  technicianController.getCurrentlyWorkingTechnicians.bind(technicianController)
+);
+
+// Get simple currently working technicians
+router.get(
+  '/working-simple',
+  technicianController.getWorkingTechniciansSimple.bind(technicianController)
+);
+
 // Search technicians
 router.get(
   '/search',

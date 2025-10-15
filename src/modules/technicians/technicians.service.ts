@@ -357,6 +357,332 @@ export class TechnicianService {
     }
   }
 
+  // Get currently working technicians with detailed stats
+  async getCurrentlyWorkingTechnicians(): Promise<Array<{
+    technician: TechnicianResponse;
+    currentWork: {
+      activeLaborItems: Array<{
+        id: string;
+        description: string;
+        workOrderNumber: string;
+        startTime: Date | null;
+        estimatedMinutes: number | null;
+        actualMinutes: number | null;
+        timeWorked: number | null; // minutes since start
+        status: string;
+      }>;
+      activeInspections: Array<{
+        id: string;
+        workOrderNumber: string;
+        templateName: string | null;
+        date: Date;
+        isCompleted: boolean;
+        timeSinceStarted: number; // minutes since inspection started
+      }>;
+      activeParts: Array<{
+        id: string;
+        description: string | null;
+        workOrderNumber: string;
+        installedAt: Date | null;
+        timeSinceInstallation: number | null; // minutes since installation started
+      }>;
+    };
+    workSummary: {
+      totalActiveTasks: number;
+      totalTimeWorkedToday: number; // minutes
+      currentWorkOrderIds: string[];
+    };
+  }>> {
+    try {
+      // Get technicians with active work
+      const techniciansWithWork = await this.prisma.technician.findMany({
+        include: {
+          userProfile: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              profileImage: true,
+              role: true,
+            },
+          },
+          // Active labor items (in progress)
+          laborItems: {
+            where: {
+              status: 'IN_PROGRESS',
+              workOrder: {
+                status: {
+                  in: ['IN_PROGRESS', 'APPROVED']
+                }
+              }
+            },
+            include: {
+              workOrder: {
+                select: {
+                  workOrderNumber: true,
+                }
+              }
+            },
+            orderBy: { startTime: 'desc' }
+          },
+          // Active inspections (not completed)
+          inspections: {
+            where: {
+              isCompleted: false,
+              workOrder: {
+                status: {
+                  in: ['IN_PROGRESS', 'APPROVED']
+                }
+              }
+            },
+            include: {
+              template: {
+                select: {
+                  name: true,
+                }
+              },
+              workOrder: {
+                select: {
+                  workOrderNumber: true,
+                }
+              }
+            },
+            orderBy: { date: 'desc' }
+          },
+          // Parts being installed (no installedAt date)
+          partInstallations: {
+            where: {
+              installedAt: null,
+              workOrder: {
+                status: {
+                  in: ['IN_PROGRESS', 'APPROVED']
+                }
+              }
+            },
+            include: {
+              workOrder: {
+                select: {
+                  workOrderNumber: true,
+                }
+              }
+            },
+            orderBy: { createdAt: 'desc' }
+          },
+          _count: {
+            select: {
+              inspections: true,
+              qcChecks: true,
+              laborItems: true,
+              partInstallations: true,
+            },
+          },
+        },
+      });
+
+      // Filter to only technicians with active work
+      const activeTechnicians = techniciansWithWork.filter(tech =>
+        tech.laborItems.length > 0 ||
+        tech.inspections.length > 0 ||
+        tech.partInstallations.length > 0
+      );
+
+      // Process each technician's current work
+      const result = await Promise.all(activeTechnicians.map(async (tech) => {
+        const now = new Date();
+
+        // Process active labor items
+        const activeLaborItems = tech.laborItems.map(labor => {
+          const timeWorked = labor.startTime
+            ? Math.floor((now.getTime() - labor.startTime.getTime()) / (1000 * 60))
+            : null;
+
+          return {
+            id: labor.id,
+            description: labor.description,
+            workOrderNumber: labor.workOrder.workOrderNumber,
+            startTime: labor.startTime,
+            estimatedMinutes: labor.estimatedMinutes,
+            actualMinutes: labor.actualMinutes,
+            timeWorked,
+            status: labor.status,
+          };
+        });
+
+        // Process active inspections
+        const activeInspections = tech.inspections.map(inspection => {
+          const timeSinceStarted = Math.floor((now.getTime() - inspection.date.getTime()) / (1000 * 60));
+
+          return {
+            id: inspection.id,
+            workOrderNumber: inspection.workOrder.workOrderNumber,
+            templateName: inspection.template?.name || null,
+            date: inspection.date,
+            isCompleted: inspection.isCompleted,
+            timeSinceStarted,
+          };
+        });
+
+        // Process active parts
+        const activeParts = tech.partInstallations.map(part => {
+          const timeSinceInstallation = part.createdAt
+            ? Math.floor((now.getTime() - part.createdAt.getTime()) / (1000 * 60))
+            : null;
+
+          return {
+            id: part.id,
+            description: part.description,
+            workOrderNumber: part.workOrder.workOrderNumber,
+            installedAt: part.installedAt,
+            timeSinceInstallation,
+          };
+        });
+
+        // Calculate work summary
+        const totalActiveTasks = activeLaborItems.length + activeInspections.length + activeParts.length;
+
+        // Get today's work time (simplified - sum of current active work times)
+        const totalTimeWorkedToday = activeLaborItems.reduce((sum, labor) =>
+          sum + (labor.timeWorked || 0), 0
+        ) + activeInspections.reduce((sum, inspection) =>
+          sum + inspection.timeSinceStarted, 0
+        ) + activeParts.reduce((sum, part) =>
+          sum + (part.timeSinceInstallation || 0), 0
+        );
+
+        // Get unique work order IDs
+        const currentWorkOrderIds = [
+          ...new Set([
+            ...activeLaborItems.map(l => l.workOrderNumber),
+            ...activeInspections.map(i => i.workOrderNumber),
+            ...activeParts.map(p => p.workOrderNumber),
+          ])
+        ];
+
+        return {
+          technician: this.formatTechnicianResponse(tech),
+          currentWork: {
+            activeLaborItems,
+            activeInspections,
+            activeParts,
+          },
+          workSummary: {
+            totalActiveTasks,
+            totalTimeWorkedToday,
+            currentWorkOrderIds,
+          },
+        };
+      }));
+
+      return result;
+    } catch (error: any) {
+      throw new Error(`Failed to get currently working technicians: ${error.message}`);
+    }
+  }
+
+  // Get simplified currently working technicians endpoint
+  async getWorkingTechniciansSimple(): Promise<Array<{
+    technicianName: string;
+    technicianImage: string | null;
+    workOrderNumber: string;
+    taskType: 'Labor' | 'Part';
+    taskDescription: string;
+    timeWorkedMinutes: number;
+    expectedMinutes: number | null;
+  }>> {
+    const now = new Date();
+    // Get all technicians with active labor or part tasks
+    const technicians = await this.prisma.technician.findMany({
+      include: {
+        userProfile: {
+          select: {
+            name: true,
+            profileImage: true,
+          },
+        },
+        laborItems: {
+          where: {
+            status: 'IN_PROGRESS',
+            workOrder: {
+              status: {
+                in: ['IN_PROGRESS', 'APPROVED']
+              }
+            }
+          },
+          include: {
+            workOrder: {
+              select: {
+                workOrderNumber: true,
+              }
+            }
+          },
+        },
+        partInstallations: {
+          where: {
+            installedAt: null,
+            workOrder: {
+              status: {
+                in: ['IN_PROGRESS', 'APPROVED']
+              }
+            }
+          },
+          include: {
+            workOrder: {
+              select: {
+                workOrderNumber: true,
+              }
+            }
+          },
+        },
+      },
+    });
+
+    // Flatten to simple array
+    const result: Array<{
+      technicianName: string;
+      technicianImage: string | null;
+      workOrderNumber: string;
+      taskType: 'Labor' | 'Part';
+      taskDescription: string;
+      timeWorkedMinutes: number;
+      expectedMinutes: number | null;
+    }> = [];
+
+    technicians.forEach(tech => {
+      // Active labor items
+      tech.laborItems.forEach(labor => {
+        const timeWorked = labor.startTime
+          ? Math.floor((now.getTime() - labor.startTime.getTime()) / (1000 * 60))
+          : 0;
+        result.push({
+          technicianName: tech.userProfile?.name || 'Unknown',
+          technicianImage: tech.userProfile?.profileImage || null,
+          workOrderNumber: labor.workOrder.workOrderNumber,
+          taskType: 'Labor',
+          taskDescription: labor.description,
+          timeWorkedMinutes: timeWorked,
+          expectedMinutes: labor.estimatedMinutes || null,
+        });
+      });
+      // Active part installations
+      tech.partInstallations.forEach(part => {
+        const timeWorked = part.createdAt
+          ? Math.floor((now.getTime() - part.createdAt.getTime()) / (1000 * 60))
+          : 0;
+        result.push({
+          technicianName: tech.userProfile?.name || 'Unknown',
+          technicianImage: tech.userProfile?.profileImage || null,
+          workOrderNumber: part.workOrder.workOrderNumber,
+          taskType: 'Part',
+          taskDescription: part.description || '',
+          timeWorkedMinutes: timeWorked,
+          expectedMinutes: null,
+        });
+      });
+    });
+
+    return result;
+  }
+
   // Search technicians
   async searchTechnicians(query: string): Promise<TechnicianResponse[]> {
     try {
