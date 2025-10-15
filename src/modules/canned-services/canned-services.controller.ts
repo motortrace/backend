@@ -322,5 +322,65 @@ export class CannedServiceController {
       });
     }
   }
+
+  // Analytics: Get service popularity data
+  async getServicePopularity(req: Request, res: Response): Promise<void> {
+    try {
+      const popularityData = await this.cannedServiceService.getServicePopularity();
+
+      res.status(200).json({
+        success: true,
+        data: popularityData,
+        count: popularityData.length,
+        message: 'Service popularity data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve service popularity data',
+      });
+    }
+  }
+
+  // Analytics: Get revenue by service data
+  async getRevenueByService(req: Request, res: Response): Promise<void> {
+    try {
+      const revenueData = await this.cannedServiceService.getRevenueByService();
+
+      res.status(200).json({
+        success: true,
+        data: revenueData,
+        count: revenueData.length,
+        message: 'Revenue by service data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve revenue by service data',
+      });
+    }
+  }
+
+  // Analytics: Get service categories data
+  async getServiceCategories(req: Request, res: Response): Promise<void> {
+    try {
+      const categoriesData = await this.cannedServiceService.getServiceCategories();
+
+      res.status(200).json({
+        success: true,
+        data: categoriesData,
+        count: categoriesData.length,
+        message: 'Service categories data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve service categories data',
+      });
+    }
+  }
 }
 

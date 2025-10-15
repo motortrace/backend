@@ -83,4 +83,20 @@ router.delete(
   cannedServiceController.deleteCannedService.bind(cannedServiceController)
 );
 
+// Analytics endpoints
+router.get(
+  '/analytics/popularity',
+  cannedServiceController.getServicePopularity.bind(cannedServiceController)
+);
+
+router.get(
+  '/analytics/revenue',
+  cannedServiceController.getRevenueByService.bind(cannedServiceController)
+);
+
+router.get(
+  '/analytics/categories',
+  cannedServiceController.getServiceCategories.bind(cannedServiceController)
+);
+
 export default router;

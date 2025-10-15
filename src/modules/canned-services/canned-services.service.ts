@@ -704,5 +704,177 @@ export class CannedServiceService {
 
     return result.count;
   }
+
+  // Analytics: Get service popularity (booking counts)
+  async getServicePopularity(): Promise<Array<{
+    serviceId: string;
+    serviceName: string;
+    serviceCode: string;
+    bookingCount: number;
+  }>> {
+    const result = await this.prisma.appointmentCannedService.groupBy({
+      by: ['cannedServiceId'],
+      _count: {
+        cannedServiceId: true,
+      },
+      orderBy: {
+        _count: {
+          cannedServiceId: 'desc',
+        },
+      },
+    });
+
+    // Get service details for each result
+    const servicesWithDetails = await Promise.all(
+      result.map(async (item) => {
+        const service = await this.prisma.cannedService.findUnique({
+          where: { id: item.cannedServiceId },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        });
+
+        return {
+          serviceId: item.cannedServiceId,
+          serviceName: service?.name || 'Unknown Service',
+          serviceCode: service?.code || 'Unknown',
+          bookingCount: item._count.cannedServiceId,
+        };
+      })
+    );
+
+    return servicesWithDetails;
+  }
+
+  // Analytics: Get revenue by service
+  async getRevenueByService(): Promise<Array<{
+    serviceId: string;
+    serviceName: string;
+    serviceCode: string;
+    totalRevenue: number;
+    bookingCount: number;
+    averageRevenue: number;
+  }>> {
+    // Get revenue data from work order services
+    const revenueData = await this.prisma.workOrderService.groupBy({
+      by: ['cannedServiceId'],
+      where: {
+        cannedServiceId: {
+          not: null,
+        },
+        workOrder: {
+          paymentStatus: {
+            in: ['PAID', 'COMPLETED'],
+          },
+        },
+      },
+      _sum: {
+        subtotal: true,
+      },
+      _count: {
+        cannedServiceId: true,
+      },
+      orderBy: {
+        _sum: {
+          subtotal: 'desc',
+        },
+      },
+    });
+
+    // Get service details for each result
+    const servicesWithRevenue = await Promise.all(
+      revenueData.map(async (item) => {
+        const service = await this.prisma.cannedService.findUnique({
+          where: { id: item.cannedServiceId! },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        });
+
+        const totalRevenue = Number(item._sum.subtotal) || 0;
+        const bookingCount = item._count.cannedServiceId;
+
+        return {
+          serviceId: item.cannedServiceId!,
+          serviceName: service?.name || 'Unknown Service',
+          serviceCode: service?.code || 'Unknown',
+          totalRevenue,
+          bookingCount,
+          averageRevenue: bookingCount > 0 ? totalRevenue / bookingCount : 0,
+        };
+      })
+    );
+
+    return servicesWithRevenue;
+  }
+
+  // Analytics: Get service categories distribution
+  async getServiceCategories(): Promise<Array<{
+    category: string;
+    serviceCount: number;
+    totalRevenue: number;
+  }>> {
+    // Get all services with categories
+    const services = await this.prisma.cannedService.findMany({
+      where: {
+        category: {
+          not: null,
+        },
+        isAvailable: true,
+        isArchived: false,
+      },
+      select: {
+        id: true,
+        category: true,
+      },
+    });
+
+    // Group by category and count
+    const categoryMap = new Map<string, { serviceIds: string[]; count: number }>();
+
+    services.forEach(service => {
+      if (service.category) {
+        const existing = categoryMap.get(service.category) || { serviceIds: [], count: 0 };
+        existing.serviceIds.push(service.id);
+        existing.count += 1;
+        categoryMap.set(service.category, existing);
+      }
+    });
+
+    // Calculate revenue for each category
+    const categoriesWithRevenue = await Promise.all(
+      Array.from(categoryMap.entries()).map(async ([category, data]) => {
+        // Calculate total revenue from work orders for services in this category
+        const revenueResult = await this.prisma.workOrderService.aggregate({
+          where: {
+            cannedServiceId: {
+              in: data.serviceIds,
+            },
+            workOrder: {
+              paymentStatus: {
+                in: ['PAID', 'COMPLETED'],
+              },
+            },
+          },
+          _sum: {
+            subtotal: true,
+          },
+        });
+
+        return {
+          category,
+          serviceCount: data.count,
+          totalRevenue: Number(revenueResult._sum.subtotal) || 0,
+        };
+      })
+    );
+
+    // Sort by service count descending
+    return categoriesWithRevenue.sort((a, b) => b.serviceCount - a.serviceCount);
+  }
 }
 
