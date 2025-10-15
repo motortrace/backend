@@ -27,6 +27,30 @@ router.get(
   technicianController.getTechnicianStats.bind(technicianController)
 );
 
+// Get currently working technicians
+router.get(
+  '/working',
+  technicianController.getCurrentlyWorkingTechnicians.bind(technicianController)
+);
+
+// Get simple currently working technicians
+router.get(
+  '/working-simple',
+  technicianController.getWorkingTechniciansSimple.bind(technicianController)
+);
+
+// Get technician monthly performance
+router.get(
+  '/performance/monthly',
+  technicianController.getTechnicianMonthlyPerformance.bind(technicianController)
+);
+
+// Get technician working status counts
+router.get(
+  '/working-status',
+  technicianController.getTechnicianWorkingStatusCounts.bind(technicianController)
+);
+
 // Search technicians
 router.get(
   '/search',
@@ -44,6 +68,13 @@ router.get(
   '/:id/work-orders',
   validateRequest(technicianIdSchema, 'params'),
   technicianController.getWorkOrdersByTechnician.bind(technicianController)
+);
+
+// Get detailed technician information
+router.get(
+  '/:id/details',
+  validateRequest(technicianIdSchema, 'params'),
+  technicianController.getTechnicianDetailedInfo.bind(technicianController)
 );
 
 // Create technician

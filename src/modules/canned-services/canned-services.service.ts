@@ -74,6 +74,14 @@ export class CannedServiceService {
         duration: data.duration,
         price: data.price,
         isAvailable: data.isAvailable ?? true,
+        variantLabel: data.variantLabel,
+        vehicleType: data.vehicleType,
+        hasOptionalParts: data.hasOptionalParts ?? false,
+        hasOptionalLabor: data.hasOptionalLabor ?? false,
+        category: data.category,
+        minVehicleAge: data.minVehicleAge,
+        maxVehicleMileage: data.maxVehicleMileage,
+        isArchived: data.isArchived ?? false,
         laborOperations: {
           create: laborOperations.map(op => ({
             laborCatalogId: op.laborCatalogId,
@@ -82,16 +90,62 @@ export class CannedServiceService {
           }))
         }
       },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        duration: true,
+        price: true,
+        isAvailable: true,
+        variantLabel: true,
+        vehicleType: true,
+        hasOptionalParts: true,
+        hasOptionalLabor: true,
+        category: true,
+        minVehicleAge: true,
+        maxVehicleMileage: true,
+        isArchived: true,
+        createdAt: true,
+        updatedAt: true,
         laborOperations: {
           include: {
             laborCatalog: true
+          }
+        },
+        partsCategories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         }
       }
     });
 
-    return cannedService;
+    // Transform the data to be more user-friendly
+    return {
+      ...cannedService,
+      description: cannedService.description || undefined, // Convert null to undefined
+      laborOperations: cannedService.laborOperations.map((op: any) => ({
+        id: op.id,
+        sequence: op.sequence,
+        notes: op.notes || undefined, // Convert null to undefined
+        labor: op.laborCatalog
+      })),
+      partsCategories: cannedService.partsCategories.map((pc: any) => ({
+        id: pc.id,
+        isRequired: pc.isRequired,
+        notes: pc.notes || undefined, // Convert null to undefined
+        category: pc.category
+      })),
+      hasOptionalParts: cannedService.hasOptionalParts,
+      hasOptionalLabor: cannedService.hasOptionalLabor,
+      isArchived: cannedService.isArchived
+    };
   }
 
   // Simak's method to get all canned services with optional filters
@@ -153,6 +207,15 @@ export class CannedServiceService {
 
     if (filters.isAvailable !== undefined) {
       where.isAvailable = filters.isAvailable;
+      where.isArchived = false; // Don't show archived services by default
+    }
+
+    if (filters.category) {
+      where.category = filters.category;
+    }
+
+    if (filters.vehicleType) {
+      where.vehicleType = filters.vehicleType;
     }
 
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
@@ -166,6 +229,7 @@ export class CannedServiceService {
         { name: { contains: filters.search, mode: 'insensitive' } },
         { description: { contains: filters.search, mode: 'insensitive' } },
         { code: { contains: filters.search, mode: 'insensitive' } },
+        { variantLabel: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -299,7 +363,24 @@ export class CannedServiceService {
   async getCannedServiceDetails(id: string): Promise<CannedServiceDetails | null> {
     const cannedService = await this.prisma.cannedService.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        duration: true,
+        price: true,
+        isAvailable: true,
+        variantLabel: true,
+        vehicleType: true,
+        hasOptionalParts: true,
+        hasOptionalLabor: true,
+        category: true,
+        minVehicleAge: true,
+        maxVehicleMileage: true,
+        isArchived: true,
+        createdAt: true,
+        updatedAt: true,
         laborOperations: {
           include: {
             laborCatalog: {
@@ -340,6 +421,11 @@ export class CannedServiceService {
     return {
       ...cannedService,
       description: cannedService.description || undefined, // Convert null to undefined
+      variantLabel: cannedService.variantLabel || undefined, // Convert null to undefined
+      vehicleType: cannedService.vehicleType || undefined, // Convert null to undefined
+      category: cannedService.category || undefined, // Convert null to undefined
+      minVehicleAge: cannedService.minVehicleAge || undefined, // Convert null to undefined
+      maxVehicleMileage: cannedService.maxVehicleMileage || undefined, // Convert null to undefined
       laborOperations: cannedService.laborOperations.map((op: any) => ({
         id: op.id,
         sequence: op.sequence,
@@ -351,7 +437,10 @@ export class CannedServiceService {
         isRequired: pc.isRequired,
         notes: pc.notes || undefined, // Convert null to undefined
         category: pc.category
-      }))
+      })),
+      hasOptionalParts: cannedService.hasOptionalParts,
+      hasOptionalLabor: cannedService.hasOptionalLabor,
+      isArchived: cannedService.isArchived
     };
   }
 
@@ -614,6 +703,178 @@ export class CannedServiceService {
     });
 
     return result.count;
+  }
+
+  // Analytics: Get service popularity (booking counts)
+  async getServicePopularity(): Promise<Array<{
+    serviceId: string;
+    serviceName: string;
+    serviceCode: string;
+    bookingCount: number;
+  }>> {
+    const result = await this.prisma.appointmentCannedService.groupBy({
+      by: ['cannedServiceId'],
+      _count: {
+        cannedServiceId: true,
+      },
+      orderBy: {
+        _count: {
+          cannedServiceId: 'desc',
+        },
+      },
+    });
+
+    // Get service details for each result
+    const servicesWithDetails = await Promise.all(
+      result.map(async (item) => {
+        const service = await this.prisma.cannedService.findUnique({
+          where: { id: item.cannedServiceId },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        });
+
+        return {
+          serviceId: item.cannedServiceId,
+          serviceName: service?.name || 'Unknown Service',
+          serviceCode: service?.code || 'Unknown',
+          bookingCount: item._count.cannedServiceId,
+        };
+      })
+    );
+
+    return servicesWithDetails;
+  }
+
+  // Analytics: Get revenue by service
+  async getRevenueByService(): Promise<Array<{
+    serviceId: string;
+    serviceName: string;
+    serviceCode: string;
+    totalRevenue: number;
+    bookingCount: number;
+    averageRevenue: number;
+  }>> {
+    // Get revenue data from work order services
+    const revenueData = await this.prisma.workOrderService.groupBy({
+      by: ['cannedServiceId'],
+      where: {
+        cannedServiceId: {
+          not: null,
+        },
+        workOrder: {
+          paymentStatus: {
+            in: ['PAID', 'COMPLETED'],
+          },
+        },
+      },
+      _sum: {
+        subtotal: true,
+      },
+      _count: {
+        cannedServiceId: true,
+      },
+      orderBy: {
+        _sum: {
+          subtotal: 'desc',
+        },
+      },
+    });
+
+    // Get service details for each result
+    const servicesWithRevenue = await Promise.all(
+      revenueData.map(async (item) => {
+        const service = await this.prisma.cannedService.findUnique({
+          where: { id: item.cannedServiceId! },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        });
+
+        const totalRevenue = Number(item._sum.subtotal) || 0;
+        const bookingCount = item._count.cannedServiceId;
+
+        return {
+          serviceId: item.cannedServiceId!,
+          serviceName: service?.name || 'Unknown Service',
+          serviceCode: service?.code || 'Unknown',
+          totalRevenue,
+          bookingCount,
+          averageRevenue: bookingCount > 0 ? totalRevenue / bookingCount : 0,
+        };
+      })
+    );
+
+    return servicesWithRevenue;
+  }
+
+  // Analytics: Get service categories distribution
+  async getServiceCategories(): Promise<Array<{
+    category: string;
+    serviceCount: number;
+    totalRevenue: number;
+  }>> {
+    // Get all services with categories
+    const services = await this.prisma.cannedService.findMany({
+      where: {
+        category: {
+          not: null,
+        },
+        isAvailable: true,
+        isArchived: false,
+      },
+      select: {
+        id: true,
+        category: true,
+      },
+    });
+
+    // Group by category and count
+    const categoryMap = new Map<string, { serviceIds: string[]; count: number }>();
+
+    services.forEach(service => {
+      if (service.category) {
+        const existing = categoryMap.get(service.category) || { serviceIds: [], count: 0 };
+        existing.serviceIds.push(service.id);
+        existing.count += 1;
+        categoryMap.set(service.category, existing);
+      }
+    });
+
+    // Calculate revenue for each category
+    const categoriesWithRevenue = await Promise.all(
+      Array.from(categoryMap.entries()).map(async ([category, data]) => {
+        // Calculate total revenue from work orders for services in this category
+        const revenueResult = await this.prisma.workOrderService.aggregate({
+          where: {
+            cannedServiceId: {
+              in: data.serviceIds,
+            },
+            workOrder: {
+              paymentStatus: {
+                in: ['PAID', 'COMPLETED'],
+              },
+            },
+          },
+          _sum: {
+            subtotal: true,
+          },
+        });
+
+        return {
+          category,
+          serviceCount: data.count,
+          totalRevenue: Number(revenueResult._sum.subtotal) || 0,
+        };
+      })
+    );
+
+    // Sort by service count descending
+    return categoriesWithRevenue.sort((a, b) => b.serviceCount - a.serviceCount);
   }
 }
 

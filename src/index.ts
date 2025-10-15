@@ -5,7 +5,7 @@ import prisma from './infrastructure/database/prisma';
 import { StorageService } from './modules/storage/storage.service';
 import { Server } from 'http';
 
-const PORT = config.port || 3000;
+const PORT = parseInt(config.port) || 3000;
 
 // Declare server variable in the outer scope with proper typing
 let server: Server;

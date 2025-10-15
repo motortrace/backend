@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { StorageController } from './storage.controller';
+import { getUploadConfig, initializeStorage, testStorage } from './storage.controller';
 import { authenticateSupabaseToken } from '../../modules/auth/supabase/authSupabase.middleware';
 
 const router = Router();
@@ -31,5 +32,8 @@ router.post(
 
 // Delete profile image (authenticated)
 router.delete('/profile-image', authenticateSupabaseToken, storageController.deleteProfileImage.bind(storageController));
+
+// Test storage functionality (public for debugging)
+router.get('/test', testStorage);
 
 export default router;

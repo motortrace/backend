@@ -42,6 +42,49 @@ export interface TechnicianResponse {
   partInstallationsCount?: number;
 }
 
+export interface TechnicianDetailedResponse extends TechnicianResponse {
+  stats: {
+    totalTasksCompleted: number;
+    totalHoursWorked: number;
+    totalRevenueGenerated: number;
+    averageTaskTime: number; // minutes per task
+    efficiencyRating: number; // tasks per hour
+    currentWorkingStatus: boolean;
+    activeTasksCount: number;
+    last30DaysTasks: number;
+    last30DaysHours: number;
+    last30DaysRevenue: number;
+  };
+  currentWork: {
+    activeLaborItems: Array<{
+      id: string;
+      description: string;
+      workOrderNumber: string;
+      startTime: Date | null;
+      estimatedMinutes: number | null;
+      actualMinutes: number | null;
+      timeWorked: number | null;
+      status: string;
+    }>;
+    activeInspections: Array<{
+      id: string;
+      workOrderNumber: string;
+      templateName: string | null;
+      date: Date;
+      isCompleted: boolean;
+      timeSinceStarted: number;
+    }>;
+    activeParts: Array<{
+      id: string;
+      description: string | null;
+      workOrderNumber: string;
+      installedAt: Date | null;
+      timeSinceInstallation: number | null;
+    }>;
+  };
+  recentWorkOrders: WorkOrderResponse[];
+}
+
 export interface TechnicianStats {
   totalTechnicians: number;
   techniciansBySpecialization: Array<{

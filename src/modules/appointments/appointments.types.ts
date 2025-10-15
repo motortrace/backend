@@ -104,6 +104,7 @@ export interface AppointmentWithServices {
     email?: string;
     phone?: string;
     profileImage?: string | null;
+    userProfileId?: string;
   };
   vehicle: {
     id: string;

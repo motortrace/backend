@@ -1,14 +1,8 @@
 import Joi from 'joi';
 
-// Simak's interface
-// export interface CreateCannedServiceRequest {
-//   code: string;
-//   name: string;
-//   description?: string;
-//   duration: number; // in minutes
-//   price: number;
-//   isAvailable?: boolean;
-// }
+// Enum types from Prisma schema
+type ServiceVariantLabel = 'FULL_SYNTHETIC' | 'SYNTHETIC_BLEND' | 'CONVENTIONAL' | 'HIGH_MILEAGE' | 'DIESEL' | 'ELECTRIC' | 'HYBRID' | 'SUV' | 'TRUCK' | 'PERFORMANCE' | 'COMMERCIAL';
+type VehicleType = 'SEDAN' | 'SUV' | 'TRUCK' | 'VAN' | 'HATCHBACK' | 'COUPE' | 'CONVERTIBLE' | 'WAGON' | 'MOTORCYCLE' | 'COMMERCIAL' | 'ELECTRIC' | 'HYBRID' | 'DIESEL' | 'GASOLINE';
 
 // Jabirs updated interface
 export interface CreateCannedServiceRequest {
@@ -18,22 +12,20 @@ export interface CreateCannedServiceRequest {
   duration: number;
   price: number;
   isAvailable?: boolean;
+  variantLabel?: ServiceVariantLabel;
+  vehicleType?: VehicleType;
+  hasOptionalParts?: boolean;
+  hasOptionalLabor?: boolean;
+  category?: string;
+  minVehicleAge?: number;
+  maxVehicleMileage?: number;
+  isArchived?: boolean;
   laborOperations?: Array<{
     laborCatalogId: string;
     sequence: number;
     notes?: string;
   }>;
 }
-
-// Simaks interface
-// export interface UpdateCannedServiceRequest {
-//   code?: string;
-//   name?: string;
-//   description?: string;
-//   duration?: number;
-//   price?: number;
-//   isAvailable?: boolean;
-// }
 
 // Jabirs updated interface
 export interface UpdateCannedServiceRequest {
@@ -43,6 +35,14 @@ export interface UpdateCannedServiceRequest {
   duration?: number;
   price?: number;
   isAvailable?: boolean;
+  variantLabel?: ServiceVariantLabel;
+  vehicleType?: VehicleType;
+  hasOptionalParts?: boolean;
+  hasOptionalLabor?: boolean;
+  category?: string;
+  minVehicleAge?: number;
+  maxVehicleMileage?: number;
+  isArchived?: boolean;
   laborOperations?: Array<{
     laborCatalogId: string;
     sequence: number;
@@ -55,6 +55,8 @@ export interface CannedServiceFilters {
   minPrice?: number;
   maxPrice?: number;
   search?: string;
+  category?: string;
+  vehicleType?: VehicleType;
 }
 
 // Detailed response interfaces for canned service with labor and parts
@@ -92,6 +94,14 @@ export interface CannedServiceDetails {
   duration: number;
   price: number | any; // Allow Prisma Decimal type
   isAvailable: boolean;
+  variantLabel?: ServiceVariantLabel;
+  vehicleType?: VehicleType;
+  hasOptionalParts: boolean;
+  hasOptionalLabor: boolean;
+  category?: string;
+  minVehicleAge?: number;
+  maxVehicleMileage?: number;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
   laborOperations: CannedServiceLaborDetail[];
@@ -107,6 +117,14 @@ export interface CannedServiceResponse {
   duration: number;
   price: number | any;
   isAvailable: boolean;
+  variantLabel?: ServiceVariantLabel;
+  vehicleType?: VehicleType;
+  hasOptionalParts: boolean;
+  hasOptionalLabor: boolean;
+  category?: string;
+  minVehicleAge?: number;
+  maxVehicleMileage?: number;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
   serviceIds: string[]; // For frontend compatibility
@@ -145,6 +163,20 @@ export const createCannedServiceSchema = Joi.object({
   duration: Joi.number().required().min(1).max(480),
   price: Joi.number().required().min(0).precision(2),
   isAvailable: Joi.boolean().optional().default(true),
+  variantLabel: Joi.string().optional().valid(
+    'FULL_SYNTHETIC', 'SYNTHETIC_BLEND', 'CONVENTIONAL', 'HIGH_MILEAGE', 'DIESEL',
+    'ELECTRIC', 'HYBRID', 'SUV', 'TRUCK', 'PERFORMANCE', 'COMMERCIAL'
+  ),
+  vehicleType: Joi.string().optional().valid(
+    'SEDAN', 'SUV', 'TRUCK', 'VAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE',
+    'WAGON', 'MOTORCYCLE', 'COMMERCIAL', 'ELECTRIC', 'HYBRID', 'DIESEL', 'GASOLINE'
+  ),
+  hasOptionalParts: Joi.boolean().optional().default(false),
+  hasOptionalLabor: Joi.boolean().optional().default(false),
+  category: Joi.string().optional().max(50),
+  minVehicleAge: Joi.number().optional().min(0).max(50),
+  maxVehicleMileage: Joi.number().optional().min(0),
+  isArchived: Joi.boolean().optional().default(false),
   laborOperations: Joi.array().items(
     Joi.object({
       laborCatalogId: Joi.string().required(),
@@ -172,6 +204,20 @@ export const updateCannedServiceSchema = Joi.object({
   duration: Joi.number().optional().min(1).max(480),
   price: Joi.number().optional().min(0).precision(2),
   isAvailable: Joi.boolean().optional(),
+  variantLabel: Joi.string().optional().valid(
+    'FULL_SYNTHETIC', 'SYNTHETIC_BLEND', 'CONVENTIONAL', 'HIGH_MILEAGE', 'DIESEL',
+    'ELECTRIC', 'HYBRID', 'SUV', 'TRUCK', 'PERFORMANCE', 'COMMERCIAL'
+  ),
+  vehicleType: Joi.string().optional().valid(
+    'SEDAN', 'SUV', 'TRUCK', 'VAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE',
+    'WAGON', 'MOTORCYCLE', 'COMMERCIAL', 'ELECTRIC', 'HYBRID', 'DIESEL', 'GASOLINE'
+  ),
+  hasOptionalParts: Joi.boolean().optional(),
+  hasOptionalLabor: Joi.boolean().optional(),
+  category: Joi.string().optional().max(50),
+  minVehicleAge: Joi.number().optional().min(0).max(50),
+  maxVehicleMileage: Joi.number().optional().min(0),
+  isArchived: Joi.boolean().optional(),
   laborOperations: Joi.array().items(
     Joi.object({
       laborCatalogId: Joi.string().required(),
@@ -184,6 +230,10 @@ export const updateCannedServiceSchema = Joi.object({
 export const cannedServiceFiltersSchema = Joi.object({
   isAvailable: Joi.boolean().optional(),
   category: Joi.string().optional(),
+  vehicleType: Joi.string().optional().valid(
+    'SEDAN', 'SUV', 'TRUCK', 'VAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE',
+    'WAGON', 'MOTORCYCLE', 'COMMERCIAL', 'ELECTRIC', 'HYBRID', 'DIESEL', 'GASOLINE'
+  ),
   minPrice: Joi.number().optional().min(0),
   maxPrice: Joi.number().optional().min(0),
   search: Joi.string().optional().min(1),

@@ -20,23 +20,28 @@ export class AppointmentService implements IAppointmentsService {
 
   // Create a new appointment with ShopMonkey-style booking logic
   async createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices> {
-    const { cannedServiceIds, serviceNotes = [], ...appointmentData } = data;
+    const { cannedServiceIds = [], serviceNotes = [], ...appointmentData } = data;
 
     // Convert string dates to Date objects
     const startTime = new Date(appointmentData.startTime);
     const endTime = appointmentData.endTime ? new Date(appointmentData.endTime) : undefined;
     const requestedAt = new Date(appointmentData.requestedAt);
 
-    // Validate that all canned services exist and are available
-    const cannedServices = await this.prisma.cannedService.findMany({
-      where: {
-        id: { in: cannedServiceIds },
-        isAvailable: true,
-      },
-    });
+    let cannedServices: any[] = [];
 
-    if (cannedServices.length !== cannedServiceIds.length) {
-      throw new Error('One or more selected services are not available');
+    // Only validate canned services if they are provided
+    if (cannedServiceIds.length > 0) {
+      // Validate that all canned services exist and are available
+      cannedServices = await this.prisma.cannedService.findMany({
+        where: {
+          id: { in: cannedServiceIds },
+          isAvailable: true,
+        },
+      });
+
+      if (cannedServices.length !== cannedServiceIds.length) {
+        throw new Error('One or more selected services are not available');
+      }
     }
 
     // ShopMonkey Booking Logic: Check daily limit first
@@ -95,14 +100,16 @@ export class AppointmentService implements IAppointmentsService {
         endTime: endTime,
         notes: appointmentData.notes,
         status: AppointmentStatus.PENDING, // All appointments start as unassigned
-        cannedServices: {
-          create: cannedServiceIds.map((serviceId, index) => ({
-            cannedServiceId: serviceId,
-            quantity: 1,
-            price: cannedServices.find(s => s.id === serviceId)?.price || 0,
-            notes: serviceNotes[index],
-          })),
-        },
+        ...(cannedServiceIds.length > 0 && {
+          cannedServices: {
+            create: cannedServiceIds.map((serviceId, index) => ({
+              cannedServiceId: serviceId,
+              quantity: 1,
+              price: cannedServices.find(s => s.id === serviceId)?.price || 0,
+              notes: serviceNotes[index],
+            })),
+          },
+        }),
       },
       include: {
         cannedServices: {
@@ -647,6 +654,7 @@ export class AppointmentService implements IAppointmentsService {
         email: appointment.customer.email,
         phone: appointment.customer.phone,
         profileImage: appointment.customer.userProfile?.profileImage || null,
+        userProfileId: appointment.customer.userProfileId,
       },
       vehicle: {
         id: appointment.vehicle.id,
