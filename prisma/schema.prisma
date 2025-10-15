@@ -220,6 +220,41 @@ model WorkOrder {
   serviceHistory  VehicleServiceHistory[]
 }
 
+// ============================================================================
+// ENUMS FOR CANNED SERVICES
+// ============================================================================
+
+enum ServiceVariantLabel {
+  FULL_SYNTHETIC    // Premium synthetic oil
+  SYNTHETIC_BLEND   // Mixed synthetic/conventional oil
+  CONVENTIONAL      // Standard mineral oil
+  HIGH_MILEAGE      // Oil formulated for high mileage vehicles
+  DIESEL            // Diesel-specific oil
+  ELECTRIC          // For electric vehicles
+  HYBRID            // Hybrid vehicle specific
+  SUV               // SUV-specific service variant
+  TRUCK             // Truck-specific service variant
+  PERFORMANCE       // Performance vehicle variant
+  COMMERCIAL        // Commercial vehicle variant
+}
+
+enum VehicleType {
+  SEDAN
+  SUV
+  TRUCK
+  VAN
+  HATCHBACK
+  COUPE
+  CONVERTIBLE
+  WAGON
+  MOTORCYCLE
+  COMMERCIAL
+  ELECTRIC
+  HYBRID
+  DIESEL
+  GASOLINE
+}
+
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
 model CannedService {
   id          String         @id @default(cuid())
@@ -232,10 +267,20 @@ model CannedService {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
+  // New fields for improved service categorization and filtering
+  variantLabel ServiceVariantLabel?  // e.g., "FULL_SYNTHETIC", "SUV", "HYBRID"
+  vehicleType  VehicleType?          // Optional: which vehicle this applies to
+  hasOptionalParts Boolean    @default(false)
+  hasOptionalLabor Boolean    @default(false)
+  category     String?        // e.g., "Maintenance", "Repair", "Inspection"
+  minVehicleAge Int?          // e.g., service only for cars newer than X years
+  maxVehicleMileage Int?      // optional threshold
+  isArchived   Boolean        @default(false) // keep record but hide from booking UI
+
   // Relations to actual work orders
   appointmentServices AppointmentCannedService[]
   services     WorkOrderService[]
-  
+
   // Junction table relationships
   laborOperations CannedServiceLabor[]
   partsCategories CannedServicePartsCategory[]
