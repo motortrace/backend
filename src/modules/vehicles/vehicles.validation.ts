@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Create vehicle schema
 export const createVehicleSchema = z.object({
-  customerId: z.string().cuid(),
+  customerId: z.string().min(1, 'Customer ID is required'),
   make: z.string().min(1, 'Make is required').max(100),
   model: z.string().min(1, 'Model is required').max(100),
   year: z.number().int().min(1900).max(new Date().getFullYear() + 1).optional(),
@@ -48,9 +48,10 @@ export const validateRequest = (schema: z.ZodSchema, source: 'body' | 'params' |
       schema.parse(data);
       next();
     } catch (error: any) {
+      // Always include error details if available
       res.status(400).json({
         error: 'Validation failed',
-        details: error.errors,
+        details: error.errors || error.message || error,
       });
     }
   };

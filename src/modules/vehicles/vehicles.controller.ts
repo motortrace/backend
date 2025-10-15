@@ -30,16 +30,23 @@ export class VehiclesController {
     try {
       const vehicleData: CreateVehicleRequest = req.body;
       const vehicle = await this.vehiclesService.createVehicle(vehicleData);
-      
       res.status(201).json({
         message: 'Vehicle created successfully',
         data: vehicle,
       });
     } catch (error: any) {
-      res.status(400).json({
-        error: 'Failed to create vehicle',
-        message: error.message,
-      });
+      // If validation error details are present, show them
+      if (error.errors) {
+        res.status(400).json({
+          error: 'Validation failed',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'Failed to create vehicle',
+          message: error.message,
+        });
+      }
     }
   }
 
