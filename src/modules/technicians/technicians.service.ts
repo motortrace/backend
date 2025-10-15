@@ -1,4 +1,4 @@
-import { CreateTechnicianDto, UpdateTechnicianDto, TechnicianFilters, TechnicianResponse, TechnicianStats, WorkOrderResponse } from './technicians.types';
+import { CreateTechnicianDto, UpdateTechnicianDto, TechnicianFilters, TechnicianResponse, TechnicianStats, WorkOrderResponse, TechnicianDetailedResponse } from './technicians.types';
 import { PrismaClient } from '@prisma/client';
 
 export class TechnicianService {
@@ -1010,6 +1010,298 @@ export class TechnicianService {
       };
     } catch (error: any) {
       throw new Error(`Failed to get technician working status counts: ${error.message}`);
+    }
+  }
+
+  // Get detailed technician information with comprehensive stats
+  async getTechnicianDetailedInfo(id: string): Promise<TechnicianDetailedResponse | null> {
+    try {
+      // Get basic technician info
+      const technician = await this.prisma.technician.findUnique({
+        where: { id },
+        include: {
+          userProfile: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              profileImage: true,
+              role: true,
+            },
+          },
+          _count: {
+            select: {
+              inspections: true,
+              qcChecks: true,
+              laborItems: true,
+              partInstallations: true,
+            },
+          },
+        },
+      });
+
+      if (!technician) {
+        return null;
+      }
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+      // Get all completed labor items for hours calculation
+      const allLaborItems = await this.prisma.workOrderLabor.findMany({
+        where: {
+          technicianId: id,
+          status: 'COMPLETED',
+        },
+        select: {
+          actualMinutes: true,
+          createdAt: true,
+        },
+      });
+
+      // Get labor items from last 30 days
+      const recentLaborItems = allLaborItems.filter(item => item.createdAt >= thirtyDaysAgo);
+
+      // Calculate total hours worked
+      const totalMinutes = allLaborItems.reduce((sum, labor) => sum + (labor.actualMinutes || 0), 0);
+      const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+
+      // Calculate last 30 days hours
+      const recentMinutes = recentLaborItems.reduce((sum, labor) => sum + (labor.actualMinutes || 0), 0);
+      const last30DaysHours = Math.round((recentMinutes / 60) * 100) / 100;
+
+      // Count total tasks completed
+      const totalTasksCompleted = await this.prisma.$queryRaw<number>`
+        SELECT COUNT(*)::int as count FROM (
+          SELECT id FROM "WorkOrderInspection" WHERE "inspectorId" = ${id} AND "isCompleted" = true
+          UNION ALL
+          SELECT id FROM "WorkOrderLabor" WHERE "technicianId" = ${id} AND status = 'COMPLETED'
+          UNION ALL
+          SELECT id FROM "WorkOrderPart" WHERE "installedById" = ${id} AND "installedAt" IS NOT NULL
+        ) as tasks
+      `;
+
+      // Count tasks from last 30 days
+      const last30DaysTasks = await this.prisma.$queryRaw<number>`
+        SELECT COUNT(*)::int as count FROM (
+          SELECT id FROM "WorkOrderInspection" WHERE "inspectorId" = ${id} AND "isCompleted" = true AND date >= ${thirtyDaysAgo}
+          UNION ALL
+          SELECT id FROM "WorkOrderLabor" WHERE "technicianId" = ${id} AND status = 'COMPLETED' AND "updatedAt" >= ${thirtyDaysAgo}
+          UNION ALL
+          SELECT id FROM "WorkOrderPart" WHERE "installedById" = ${id} AND "installedAt" >= ${thirtyDaysAgo}
+        ) as tasks
+      `;
+
+      // Calculate total revenue generated (from work orders where technician worked)
+      const revenueResult = await this.prisma.$queryRaw<{ total: number }[]>`
+        SELECT COALESCE(SUM(wo."totalAmount"), 0) as total
+        FROM "WorkOrder" wo
+        WHERE wo.id IN (
+          SELECT DISTINCT wol."workOrderId" FROM "WorkOrderLabor" wol WHERE wol."technicianId" = ${id}
+          UNION
+          SELECT DISTINCT woi."workOrderId" FROM "WorkOrderInspection" woi WHERE woi."inspectorId" = ${id}
+          UNION
+          SELECT DISTINCT wop."workOrderId" FROM "WorkOrderPart" wop WHERE wop."installedById" = ${id}
+        )
+        AND wo.status = 'COMPLETED'
+      `;
+
+      const totalRevenueGenerated = Number(revenueResult[0]?.total || 0);
+
+      // Calculate last 30 days revenue
+      const recentRevenueResult = await this.prisma.$queryRaw<{ total: number }[]>`
+        SELECT COALESCE(SUM(wo."totalAmount"), 0) as total
+        FROM "WorkOrder" wo
+        WHERE wo.id IN (
+          SELECT DISTINCT wol."workOrderId" FROM "WorkOrderLabor" wol WHERE wol."technicianId" = ${id}
+          UNION
+          SELECT DISTINCT woi."workOrderId" FROM "WorkOrderInspection" woi WHERE woi."inspectorId" = ${id}
+          UNION
+          SELECT DISTINCT wop."workOrderId" FROM "WorkOrderPart" wop WHERE wop."installedById" = ${id}
+        )
+        AND wo.status = 'COMPLETED'
+        AND wo."closedAt" >= ${thirtyDaysAgo}
+      `;
+
+      const last30DaysRevenue = Number(recentRevenueResult[0]?.total || 0);
+
+      // Calculate average task time and efficiency
+      const averageTaskTime = totalTasksCompleted > 0 ? Math.round(totalMinutes / totalTasksCompleted) : 0;
+      const efficiencyRating = totalHours > 0 ? Math.round((totalTasksCompleted / totalHours) * 100) / 100 : 0;
+
+      // Check current working status
+      const currentWorkingStatus = await this.prisma.technician.count({
+        where: {
+          id,
+          OR: [
+            {
+              laborItems: {
+                some: {
+                  status: 'IN_PROGRESS',
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            },
+            {
+              inspections: {
+                some: {
+                  isCompleted: false,
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            },
+            {
+              partInstallations: {
+                some: {
+                  installedAt: null,
+                  workOrder: {
+                    status: {
+                      in: ['IN_PROGRESS', 'APPROVED']
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }) > 0;
+
+      // Get active tasks count
+      const activeTasksCount = await this.prisma.$queryRaw<number>`
+        SELECT COUNT(*)::int as count FROM (
+          SELECT id FROM "WorkOrderLabor" WHERE "technicianId" = ${id} AND status = 'IN_PROGRESS'
+          UNION ALL
+          SELECT id FROM "WorkOrderInspection" WHERE "inspectorId" = ${id} AND "isCompleted" = false
+          UNION ALL
+          SELECT id FROM "WorkOrderPart" WHERE "installedById" = ${id} AND "installedAt" IS NULL
+        ) as active_tasks
+      `;
+
+      // Get current work details
+      const activeLaborItems = await this.prisma.workOrderLabor.findMany({
+        where: {
+          technicianId: id,
+          status: 'IN_PROGRESS',
+          workOrder: {
+            status: {
+              in: ['IN_PROGRESS', 'APPROVED']
+            }
+          }
+        },
+        include: {
+          workOrder: {
+            select: {
+              workOrderNumber: true,
+            }
+          }
+        },
+        orderBy: { startTime: 'desc' }
+      });
+
+      const activeInspections = await this.prisma.workOrderInspection.findMany({
+        where: {
+          inspectorId: id,
+          isCompleted: false,
+          workOrder: {
+            status: {
+              in: ['IN_PROGRESS', 'APPROVED']
+            }
+          }
+        },
+        include: {
+          template: {
+            select: {
+              name: true,
+            }
+          },
+          workOrder: {
+            select: {
+              workOrderNumber: true,
+            }
+          }
+        },
+        orderBy: { date: 'desc' }
+      });
+
+      const activeParts = await this.prisma.workOrderPart.findMany({
+        where: {
+          installedById: id,
+          installedAt: null,
+          workOrder: {
+            status: {
+              in: ['IN_PROGRESS', 'APPROVED']
+            }
+          }
+        },
+        include: {
+          workOrder: {
+            select: {
+              workOrderNumber: true,
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Process current work
+      const currentWork = {
+        activeLaborItems: activeLaborItems.map(labor => ({
+          id: labor.id,
+          description: labor.description,
+          workOrderNumber: labor.workOrder.workOrderNumber,
+          startTime: labor.startTime,
+          estimatedMinutes: labor.estimatedMinutes,
+          actualMinutes: labor.actualMinutes,
+          timeWorked: labor.startTime ? Math.floor((now.getTime() - labor.startTime.getTime()) / (1000 * 60)) : null,
+          status: labor.status,
+        })),
+        activeInspections: activeInspections.map(inspection => ({
+          id: inspection.id,
+          workOrderNumber: inspection.workOrder.workOrderNumber,
+          templateName: inspection.template?.name || null,
+          date: inspection.date,
+          isCompleted: inspection.isCompleted,
+          timeSinceStarted: Math.floor((now.getTime() - inspection.date.getTime()) / (1000 * 60)),
+        })),
+        activeParts: activeParts.map(part => ({
+          id: part.id,
+          description: part.description,
+          workOrderNumber: part.workOrder.workOrderNumber,
+          installedAt: part.installedAt,
+          timeSinceInstallation: part.createdAt ? Math.floor((now.getTime() - part.createdAt.getTime()) / (1000 * 60)) : null,
+        })),
+      };
+
+      // Get recent work orders (last 10)
+      const recentWorkOrders = await this.getWorkOrdersByTechnician(id, { limit: 10, offset: 0 });
+
+      return {
+        ...this.formatTechnicianResponse(technician),
+        stats: {
+          totalTasksCompleted,
+          totalHoursWorked: totalHours,
+          totalRevenueGenerated,
+          averageTaskTime,
+          efficiencyRating,
+          currentWorkingStatus,
+          activeTasksCount,
+          last30DaysTasks,
+          last30DaysHours,
+          last30DaysRevenue,
+        },
+        currentWork,
+        recentWorkOrders,
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get detailed technician info: ${error.message}`);
     }
   }
 

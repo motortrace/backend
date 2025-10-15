@@ -348,5 +348,32 @@ export class TechnicianController {
       });
     }
   }
+
+  // Get detailed technician information
+  async getTechnicianDetailedInfo(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const detailedInfo = await this.technicianService.getTechnicianDetailedInfo(id);
+
+      if (!detailedInfo) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        data: detailedInfo,
+        message: 'Detailed technician information retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get detailed technician information',
+        message: error.message,
+      });
+    }
+  }
 }
 

@@ -70,6 +70,13 @@ router.get(
   technicianController.getWorkOrdersByTechnician.bind(technicianController)
 );
 
+// Get detailed technician information
+router.get(
+  '/:id/details',
+  validateRequest(technicianIdSchema, 'params'),
+  technicianController.getTechnicianDetailedInfo.bind(technicianController)
+);
+
 // Create technician
 router.post(
   '/',
