@@ -53,6 +53,29 @@ export class AuthSupabaseController {
       // Debug: Log what the service returned
       console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
       
+      // Get user role and customerId for mobile users
+      const userRole = (data.user as any)?.user_metadata?.role || 'customer';
+      let customerId = null;
+      
+      if (userRole === 'customer') {
+        try {
+          // Fetch customer data from database
+          const userProfile = await this.prisma.userProfile.findUnique({
+            where: { supabaseUserId: data.user?.id },
+            include: {
+              customer: true
+            }
+          });
+          
+          if (userProfile?.customer) {
+            customerId = userProfile.customer.id;
+          }
+        } catch (dbError) {
+          console.warn('Could not fetch customer data:', dbError);
+          // Continue without customerId - user might not have completed onboarding yet
+        }
+      }
+      
       // Return user data with flattened metadata used by mobile app
       res.status(200).json({ 
         message: 'Login successful', 
@@ -60,7 +83,8 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: (data.user as any)?.user_metadata?.role || 'customer',
+            role: userRole,
+            customerId: customerId, // Include customerId for mobile async storage
             isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true
           },
           access_token: data.session?.access_token,
@@ -486,6 +510,27 @@ export class AuthSupabaseController {
         hasSession: !!data.session 
       });
 
+      // Get customerId for mobile users if role is customer
+      let customerId = null;
+      if (role === 'customer') {
+        try {
+          // Fetch customer data from database
+          const userProfile = await this.prisma.userProfile.findUnique({
+            where: { supabaseUserId: data.user?.id },
+            include: {
+              customer: true
+            }
+          });
+          
+          if (userProfile?.customer) {
+            customerId = userProfile.customer.id;
+          }
+        } catch (dbError) {
+          console.warn('Could not fetch customer data:', dbError);
+          // Continue without customerId - user might not have completed onboarding yet
+        }
+      }
+
       res.json({
         message: 'Google authentication successful',
         data: {
@@ -493,6 +538,7 @@ export class AuthSupabaseController {
             id: data.user?.id,
             email: data.user?.email,
             role: data.user?.user_metadata?.role || role,
+            customerId: customerId, // Include customerId for mobile async storage
             isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false
           },
           access_token: data.session?.access_token,

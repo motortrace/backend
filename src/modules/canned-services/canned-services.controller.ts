@@ -127,7 +127,7 @@ export class CannedServiceController {
         res.status(404).json({
           success: false,
           error: 'Canned service not found',
-          message: 'The requested canned service code does not exist',
+          message: 'The requested canned service does not exist',
         });
         return;
       }
