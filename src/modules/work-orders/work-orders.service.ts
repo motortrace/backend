@@ -1118,6 +1118,7 @@ export class WorkOrderService {
             year: true,
             licensePlate: true,
             vin: true,
+            imageUrl: true,
           },
         },
         appointment: {
@@ -1166,6 +1167,7 @@ export class WorkOrderService {
                   select: {
                     id: true,
                     name: true,
+                    profileImage: true,
                   },
                 },
               },
@@ -1242,7 +1244,28 @@ export class WorkOrderService {
       },
     });
 
-    return workOrder ? this.transformWorkOrderForFrontend(workOrder) : null;
+    if (workOrder) {
+      // Check if work order has inspections and generate inspection PDF URL if it does
+      let inspectionPdfUrl: string | undefined;
+      if (workOrder.inspections && workOrder.inspections.length > 0) {
+        try {
+          inspectionPdfUrl = await this.generateInspectionPDF(workOrder.id);
+        } catch (error) {
+          console.warn('Failed to generate inspection PDF URL:', error);
+          // Continue without inspection PDF - don't fail the work order retrieval
+        }
+      }
+
+      // Add inspectionPdfUrl to the work order object before transformation
+      const workOrderWithPdf = {
+        ...workOrder,
+        inspectionPdfUrl,
+      };
+
+      return this.transformWorkOrderForFrontend(workOrderWithPdf);
+    }
+
+    return null;
   }
 
   // Update work order
@@ -2113,6 +2136,7 @@ export class WorkOrderService {
               select: {
                 id: true,
                 name: true,
+                profileImage: true,
               },
             },
           },

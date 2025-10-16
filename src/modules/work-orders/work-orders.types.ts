@@ -119,6 +119,7 @@ export interface WorkOrderWithDetails {
   servicePackageId?: string;
   customerSignature?: string;
   customerFeedback?: string;
+  inspectionPdfUrl?: string;
   
   // Relations
   customer: {

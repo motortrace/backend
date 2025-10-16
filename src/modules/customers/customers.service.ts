@@ -96,6 +96,7 @@ export class CustomerService implements ICustomerService {
                     select: {
                       name: true,
                       phone: true,
+                      profileImage: true,
                     },
                   },
                 },
@@ -460,6 +461,7 @@ export class CustomerService implements ICustomerService {
               vin: true,
               licensePlate: true,
               color: true,
+              imageUrl: true,
             },
           },
           serviceAdvisor: {
@@ -469,6 +471,7 @@ export class CustomerService implements ICustomerService {
                 select: {
                   name: true,
                   phone: true,
+                  profileImage: true,
                 },
               },
             },
