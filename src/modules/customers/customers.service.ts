@@ -450,6 +450,30 @@ export class CustomerService implements ICustomerService {
     try {
       const workOrders = await this.prisma.workOrder.findMany({
         where: { customerId },
+        include: {
+          vehicle: {
+            select: {
+              id: true,
+              make: true,
+              model: true,
+              year: true,
+              vin: true,
+              licensePlate: true,
+              color: true,
+            },
+          },
+          serviceAdvisor: {
+            select: {
+              id: true,
+              userProfile: {
+                select: {
+                  name: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
 
