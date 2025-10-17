@@ -1074,5 +1074,121 @@ export class WorkOrderController {
       });
     }
   }
+
+  async approveWorkOrderApproval(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+      const { notes } = req.body;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Check if user is a customer or manager
+      let customerId: string | null = null;
+
+      // Try to find customer profile first
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (customer) {
+        // User is a customer
+        customerId = customer.id;
+      } else if (req.user?.role === 'manager') {
+        // Manager can approve on behalf of customers
+        customerId = null;
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+        });
+      }
+
+      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, customerId, notes);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async rejectWorkOrderApproval(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+      const { reason } = req.body;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Check if user is a customer or manager
+      let customerId: string | null = null;
+
+      // Try to find customer profile first
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (customer) {
+        // User is a customer
+        customerId = customer.id;
+      } else if (req.user?.role === 'manager') {
+        // Manager can approve on behalf of customers
+        customerId = null;
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+        });
+      }
+
+      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, customerId, reason);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 

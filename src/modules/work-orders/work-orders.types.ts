@@ -308,6 +308,26 @@ export interface WorkOrderWithDetails {
       };
     };
   }[];
+  approvals: {
+    id: string;
+    workOrderId: string;
+    status: ApprovalStatus;
+    requestedAt: Date;
+    approvedAt?: Date;
+    approvedById?: string;
+    method?: ApprovalMethod;
+    notes?: string;
+    customerSignature?: string;
+    pdfUrl?: string;
+    inspectionPdfUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    approvedBy?: {
+      id: string;
+      name?: string;
+      profileImage?: string;
+    };
+  }[];
 }
 
 
@@ -431,6 +451,8 @@ export interface IWorkOrderService {
     expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
+    approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string): Promise<any>;
+    rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
     getGeneralStats(): Promise<GeneralStats>;
 }

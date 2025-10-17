@@ -18,17 +18,32 @@ import { NotificationEventType, NotificationChannel, NotificationPriority } from
 type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
   include: {
     customer: { select: { id: true; name: true; email: true; phone: true } };
-    vehicle: { select: { id: true; make: true; model: true; year: true; licensePlate: true; vin: true } };
+    vehicle: { select: { id: true; make: true; model: true; year: true; licensePlate: true; vin: true; imageUrl: true } };
     appointment: { select: { id: true; requestedAt: true; startTime: true; endTime: true } };
-    serviceAdvisor: { select: { id: true; employeeId: true; department: true; userProfile: { select: { id: true; name: true; phone: true } } } };
+    serviceAdvisor: { select: { id: true; employeeId: true; department: true; userProfile: { select: { id: true; name: true; phone: true; profileImage: true } } } };
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
-    inspections: { include: { inspector: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedMinutes: true } }; technician: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
-    payments: { include: { processedBy: { select: { id: true; employeeId: true; userProfile: { select: { id: true; name: true } } } } } };
+    inspections: { include: { inspector: { select: { id: true; userProfile: { select: { id: true; name: true; profileImage: true } } } } } };
+    laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedMinutes: true } }; technician: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
+    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
+    payments: { include: { processedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
     attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
-  };
+    approvals: {
+      include: {
+        approvedBy: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    };
+  },
 }>;
+
 
 export class WorkOrderService {
   private notificationService: NotificationService;
@@ -97,6 +112,121 @@ export class WorkOrderService {
           createdAt: 'desc',
         },
       });
+    }
+
+  // Approve WorkOrderApproval entry and auto-approve all services and parts
+  async approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string) {
+      // Get the WorkOrderApproval entry
+      const approval = await this.prisma.workOrderApproval.findUnique({
+        where: { id: approvalId },
+        include: { workOrder: true },
+      });
+
+      if (!approval) {
+        throw new Error('WorkOrderApproval entry not found');
+      }
+
+      if (approval.status !== ApprovalStatus.PENDING) {
+        throw new Error('WorkOrderApproval entry is not in PENDING status');
+      }
+
+      const workOrderId = approval.workOrderId;
+
+      // If customerId is provided (not a manager approval), validate that the customer owns this work order
+      if (customerId) {
+        if (approval.workOrder.customerId !== customerId) {
+          throw new Error('Unauthorized: You can only approve work order approvals for your own work orders');
+        }
+      }
+
+      // Update WorkOrderApproval status
+      await this.prisma.workOrderApproval.update({
+        where: { id: approvalId },
+        data: {
+          status: ApprovalStatus.APPROVED,
+          approvedAt: new Date(),
+          approvedById: customerId || undefined, // Allow null for manager approvals
+          method: ApprovalMethod.APP,
+          notes,
+        },
+      });
+
+      // Auto-approve all WorkOrderService entries
+      await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          customerApproved: false,
+          customerRejected: false,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          customerApproved: true,
+          customerRejected: false,
+          approvedAt: new Date(),
+          status: ServiceStatus.PENDING, // Ready to start work
+        },
+      });
+
+      // Auto-approve all WorkOrderPart entries
+      await this.prisma.workOrderPart.updateMany({
+        where: {
+          workOrderId,
+          customerApproved: false,
+          customerRejected: false,
+        },
+        data: {
+          customerApproved: true,
+          customerRejected: false,
+          approvedAt: new Date(),
+        },
+      });
+
+      // Recalculate work order totals
+      await this.updateWorkOrderTotals(workOrderId);
+
+      // Auto-update work order status (should become APPROVED)
+      await this.autoUpdateWorkOrderStatus(workOrderId);
+
+      return { message: 'WorkOrderApproval approved and all services/parts auto-approved successfully' };
+    }
+
+  // Reject WorkOrderApproval entry
+  async rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string) {
+      // Get the WorkOrderApproval entry
+      const approval = await this.prisma.workOrderApproval.findUnique({
+        where: { id: approvalId },
+        include: { workOrder: true },
+      });
+
+      if (!approval) {
+        throw new Error('WorkOrderApproval entry not found');
+      }
+
+      if (approval.status !== ApprovalStatus.PENDING) {
+        throw new Error('WorkOrderApproval entry is not in PENDING status');
+      }
+
+      const workOrderId = approval.workOrderId;
+
+      // If customerId is provided (not a manager approval), validate that the customer owns this work order
+      if (customerId) {
+        if (approval.workOrder.customerId !== customerId) {
+          throw new Error('Unauthorized: You can only reject work order approvals for your own work orders');
+        }
+      }
+
+      // Update WorkOrderApproval status
+      await this.prisma.workOrderApproval.update({
+        where: { id: approvalId },
+        data: {
+          status: ApprovalStatus.DECLINED,
+          approvedAt: new Date(),
+          approvedById: customerId || undefined, // Allow null for manager approvals
+          notes: reason,
+        },
+      });
+
+      return { message: 'WorkOrderApproval rejected' };
     }
 
   // Generate PDF estimate for a work order
@@ -1239,6 +1369,20 @@ export class WorkOrderService {
         attachments: {
           include: {
             uploadedBy: { select: { id: true, name: true } },
+          },
+        },
+        approvals: {
+          include: {
+            approvedBy: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
           },
         },
       },
