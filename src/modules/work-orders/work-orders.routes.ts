@@ -1,9 +1,9 @@
 import { Router } from 'express';
+import prisma from '../../infrastructure/database/prisma';
+import { authenticateSupabaseToken, requireManager, requireServiceAdvisor, requireTechnician } from '../auth/supabase/authSupabase.middleware';
 import { WorkOrderController } from './work-orders.controller';
 import { WorkOrderService } from './work-orders.service';
-import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
 import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, validateRequest } from './work-orders.validation';
-import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
 
@@ -26,7 +26,7 @@ router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvis
 // Labor Assignment Routes
 router.put('/services/:serviceId/assign-technician-to-labor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToServiceLabor.bind(workOrderController));
 router.put('/labor/:laborId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignTechnicianToLaborSchema, 'body'), workOrderController.assignTechnicianToLabor.bind(workOrderController));
-router.put('/labor/:laborId', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateWorkOrderLaborSchema, 'body'), workOrderController.updateWorkOrderLabor.bind(workOrderController));
+router.put('/labor/:laborId', authenticateSupabaseToken, requireTechnician, validateRequest(updateWorkOrderLaborSchema, 'body'), workOrderController.updateWorkOrderLabor.bind(workOrderController));
 router.put('/labor/:laborId/reset-subtotal', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.resetWorkOrderLaborSubtotal.bind(workOrderController));
 
 
