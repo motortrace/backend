@@ -3,7 +3,30 @@ import { PrismaClient, AppointmentStatus, DayOfWeek } from '@prisma/client';
 import { CreateAppointmentRequest, UpdateAppointmentRequest, AppointmentSlotRequest, TimeBlockAvailabilityRequest, DailyCapacityRequest, ShopOperatingHoursRequest, ShopCapacitySettingsRequest } from '../../../modules/appointments/appointments.types';
 
 // Mock Prisma Client
-jest.mock('@prisma/client');
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    cannedService: {
+      findMany: jest.fn(),
+    },
+    appointment: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
+    shopCapacitySettings: {
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
+    },
+    shopOperatingHours: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+    },
+  })),
+}));
 
 describe('AppointmentService', () => {
   let appointmentService: AppointmentService;

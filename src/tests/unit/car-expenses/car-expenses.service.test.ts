@@ -3,7 +3,24 @@ import { PrismaClient } from '@prisma/client';
 import { CreateCarExpenseRequest, UpdateCarExpenseRequest, CarExpenseFilters, ExpenseCategory } from '../../../modules/car-expenses/car-expenses.types';
 
 // Mock Prisma Client
-jest.mock('@prisma/client');
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    vehicle: {
+      findUnique: jest.fn(),
+    },
+    carExpense: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+      aggregate: jest.fn(),
+      groupBy: jest.fn(),
+    },
+  })),
+}));
 
 describe('CarExpensesService', () => {
   let carExpensesService: CarExpensesService;

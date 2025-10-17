@@ -3,7 +3,31 @@ import { PrismaClient } from '@prisma/client';
 import { CreateVehicleRequest, UpdateVehicleRequest, VehicleFilters } from '../../../modules/vehicles/vehicles.types';
 
 // Mock Prisma Client
-jest.mock('@prisma/client');
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    customer: {
+      findUnique: jest.fn(),
+    },
+    vehicle: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+      groupBy: jest.fn(),
+    },
+    vehicleMileage: {
+      findUnique: jest.fn(),
+    },
+    serviceRecommendation: {
+      findMany: jest.fn(),
+    },
+    workOrder: {
+      findMany: jest.fn(),
+    },
+  })),
+}));
 
 describe('VehiclesService', () => {
   let vehiclesService: VehiclesService;

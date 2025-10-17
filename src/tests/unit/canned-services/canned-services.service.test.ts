@@ -3,7 +3,36 @@ import { PrismaClient } from '@prisma/client';
 import { CreateCannedServiceRequest, UpdateCannedServiceRequest, CannedServiceFilters } from '../../../modules/canned-services/canned-services.types';
 
 // Mock Prisma Client
-jest.mock('@prisma/client');
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    cannedService: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+    },
+    laborCatalog: {
+      findMany: jest.fn(),
+    },
+    cannedServiceLabor: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
+    workOrderService: {
+      findFirst: jest.fn(),
+    },
+    appointmentCannedService: {
+      findFirst: jest.fn(),
+      groupBy: jest.fn(),
+    },
+    workOrder: {
+      aggregate: jest.fn(),
+    },
+  })),
+}));
 
 describe('CannedServiceService', () => {
   let cannedService: CannedServiceService;
@@ -325,7 +354,7 @@ describe('CannedServiceService', () => {
         duration: 60,
         price: 50.00,
         isAvailable: true,
-        variantLabel: 'Standard',
+        variantLabel: 'FULL_SYNTHETIC',
         vehicleType: 'SEDAN',
         hasOptionalParts: false,
         hasOptionalLabor: false,

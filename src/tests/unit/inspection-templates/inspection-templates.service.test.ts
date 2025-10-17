@@ -3,7 +3,42 @@ import { PrismaClient, ChecklistStatus } from '@prisma/client';
 import { CreateInspectionTemplateRequest, UpdateInspectionTemplateRequest, AssignTemplateToWorkOrderRequest, CreateInspectionFromTemplateRequest, CreateChecklistItemRequest, UpdateChecklistItemRequest, InspectionTemplateFilters, WorkOrderInspectionFilters } from '../../../modules/inspection-templates/inspection-templates.types';
 
 // Mock Prisma Client
-jest.mock('@prisma/client');
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    inspectionTemplate: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
+    },
+    workOrderInspection: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      count: jest.fn(),
+    },
+    inspectionChecklistItem: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    workOrderInspectionAttachment: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
+    },
+    workOrder: {
+      findUnique: jest.fn(),
+    },
+    technician: {
+      findUnique: jest.fn(),
+    },
+  })),
+}));
 
 describe('InspectionTemplatesService', () => {
   let inspectionTemplatesService: InspectionTemplatesService;
