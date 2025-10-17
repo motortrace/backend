@@ -414,6 +414,7 @@ export interface IWorkOrderService {
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
+  updateWorkOrderWorkflowStep(id: string, workflowStep: WorkflowStep): Promise<any>;
   assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
   assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
   assignTechnicianToServiceLabor(serviceId: string, technicianId: string): Promise<any>;

@@ -308,6 +308,25 @@ export class WorkOrderController {
     }
   }
 
+  async updateWorkOrderWorkflowStep(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { workflowStep } = req.body;
+
+      const workOrder = await this.workOrderService.updateWorkOrderWorkflowStep(id, workflowStep);
+
+      res.json({
+        success: true,
+        message: 'Workflow step updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async assignServiceAdvisor(req: Request, res: Response) {
     try {
       const { id } = req.params;

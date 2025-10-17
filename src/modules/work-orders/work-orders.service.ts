@@ -1722,6 +1722,26 @@ export class WorkOrderService {
     return workOrder;
   }
 
+  // Update work order workflow step only
+  async updateWorkOrderWorkflowStep(id: string, workflowStep: WorkflowStep) {
+    // Verify work order exists
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
+      where: { id },
+    });
+
+    if (!existingWorkOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Update only the workflow step
+    const workOrder = await this.prisma.workOrder.update({
+      where: { id },
+      data: { workflowStep },
+    });
+
+    return workOrder;
+  }
+
   // Assign service advisor to work order
   async assignServiceAdvisor(id: string, advisorId: string) {
     const workOrder = await this.prisma.workOrder.update({
