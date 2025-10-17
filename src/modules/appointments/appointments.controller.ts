@@ -216,6 +216,23 @@ export class AppointmentController {
     }
   }
 
+  // Get appointments for calendar view
+  async getCalendarAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getCalendarAppointments();
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async assignAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -304,4 +321,4 @@ export class AppointmentController {
       });
     }
   }
-} 
+}

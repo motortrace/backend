@@ -30,6 +30,9 @@ router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appo
 // Confirmed appointments without active work orders
 router.get('/confirmed-without-work-orders', appointmentController.getConfirmedAppointmentsWithoutWorkOrders.bind(appointmentController));
 
+// Calendar appointments (PENDING and CONFIRMED)
+router.get('/calendar', appointmentController.getCalendarAppointments.bind(appointmentController));
+
 // Available Slots Routes
 router.get('/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));
 
@@ -53,4 +56,4 @@ router.get('/shop/operating-hours', appointmentController.getOperatingHours.bind
 router.put('/shop/capacity-settings', validateShopCapacitySettings, appointmentController.updateCapacitySettings.bind(appointmentController));
 router.get('/shop/capacity-settings', appointmentController.getCapacitySettings.bind(appointmentController));
 
-export default router; 
+export default router;

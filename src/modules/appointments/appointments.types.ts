@@ -111,13 +111,30 @@ export interface AppointmentWithServices {
     make: string;
     model: string;
     year?: number;
-    licensePlate?: string;
+    licensePlate?: string | null;
   };
 
   assignedTo?: {
     id: string;
     supabaseUserId: string;
     profileImage?: string | null;
+  };
+}
+
+export interface CalendarAppointment {
+  id: string;
+  title: string;
+  startTime: Date;
+  status: AppointmentStatus;
+  priority: AppointmentPriority;
+  customer: {
+    id: string;
+    name: string;
+  };
+  vehicle: {
+    make: string;
+    model: string;
+    licensePlate?: string | null;
   };
 }
 
@@ -134,6 +151,7 @@ export interface IAppointmentsService {
   checkDailyCapacity(request: DailyCapacityRequest): Promise<DailyCapacity>;
   getUnassignedAppointments(): Promise<any>;
   getConfirmedAppointmentsWithoutWorkOrders(): Promise<any>;
+  getCalendarAppointments(): Promise<CalendarAppointment[]>;
   updateOperatingHours(data: ShopOperatingHoursRequest): Promise<any>;
   getOperatingHours(): Promise<any>;
   updateCapacitySettings(data: ShopCapacitySettingsRequest): Promise<any>;

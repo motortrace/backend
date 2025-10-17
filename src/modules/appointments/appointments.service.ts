@@ -12,6 +12,7 @@ import {
   DailyCapacityRequest,
   DailyCapacity,
   IAppointmentsService,
+  CalendarAppointment,
 } from './appointments.types';
 import { PrismaClient } from '@prisma/client';
 
@@ -557,6 +558,52 @@ export class AppointmentService implements IAppointmentsService {
     return appointments.map(appointment => this.formatAppointmentWithServices(appointment));
   }
 
+  // Get appointments for calendar view (PENDING and CONFIRMED)
+  async getCalendarAppointments(): Promise<CalendarAppointment[]> {
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        status: {
+          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]
+        }
+      },
+      include: {
+        cannedServices: {
+          include: {
+            cannedService: true,
+          },
+        },
+        customer: true,
+        vehicle: true,
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    return appointments.map(appointment => {
+      // Create title: "Customer Name – Service Name"
+      const serviceName = appointment.cannedServices.length > 0 
+        ? appointment.cannedServices[0].cannedService.name 
+        : 'Appointment';
+      const title = `${appointment.customer.name} – ${serviceName}`;
+
+      return {
+        id: appointment.id,
+        title,
+        startTime: appointment.startTime!,
+        status: appointment.status,
+        priority: appointment.priority,
+        customer: {
+          id: appointment.customer.id,
+          name: appointment.customer.name,
+        },
+        vehicle: {
+          make: appointment.vehicle.make,
+          model: appointment.vehicle.model,
+          licensePlate: appointment.vehicle.licensePlate,
+        },
+      };
+    });
+  }
+
   // Assign appointment to service advisor
   async assignAppointment(appointmentId: string, assignedToId: string): Promise<AppointmentWithServices> {
     const appointment = await this.prisma.appointment.update({
@@ -748,4 +795,4 @@ export class AppointmentService implements IAppointmentsService {
 
     return suggestions;
   }
-} 
+}
