@@ -558,12 +558,12 @@ export class AppointmentService implements IAppointmentsService {
     return appointments.map(appointment => this.formatAppointmentWithServices(appointment));
   }
 
-  // Get appointments for calendar view (PENDING and CONFIRMED)
+  // Get appointments for calendar view (PENDING, CONFIRMED, and COMPLETED)
   async getCalendarAppointments(): Promise<CalendarAppointment[]> {
     const appointments = await this.prisma.appointment.findMany({
       where: {
         status: {
-          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]
+          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED]
         }
       },
       include: {
