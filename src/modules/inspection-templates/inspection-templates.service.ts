@@ -1,24 +1,19 @@
-import { ChecklistStatus } from '@prisma/client';
+import { ChecklistStatus, PrismaClient } from '@prisma/client';
 import {
-  InspectionTemplate,
-  InspectionTemplateItem,
-  WorkOrderInspectionWithTemplate,
-  InspectionChecklistItem,
-  CreateInspectionTemplateRequest,
-  UpdateInspectionTemplateRequest,
   AssignTemplateToWorkOrderRequest,
-  CreateInspectionFromTemplateRequest,
   CreateChecklistItemRequest,
-  UpdateChecklistItemRequest,
+  CreateInspectionFromTemplateRequest,
+  CreateInspectionTemplateRequest,
   InspectionTemplateFilters,
-  WorkOrderInspectionFilters,
   InspectionTemplateResponse,
   InspectionTemplatesResponse,
+  TemplateAssignmentResponse,
+  UpdateChecklistItemRequest,
+  UpdateInspectionTemplateRequest,
+  WorkOrderInspectionFilters,
   WorkOrderInspectionResponse,
-  WorkOrderInspectionsResponse,
-  TemplateAssignmentResponse
+  WorkOrderInspectionsResponse
 } from './inspection-templates.types';
-import { PrismaClient } from '@prisma/client';
 
 export class InspectionTemplatesService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -487,7 +482,16 @@ export class InspectionTemplatesService {
           workOrder: {
             select: {
               id: true,
-              workOrderNumber: true
+              workOrderNumber: true,
+              vehicle: {
+                select: {
+                  id: true,
+                  make: true,
+                  model: true,
+                  year: true,
+                  licensePlate: true
+                }
+              }
             }
           },
           tireChecks: {
@@ -581,10 +585,19 @@ export class InspectionTemplatesService {
               }
             },
             workOrder: {
-              select: {
-                id: true,
-                workOrderNumber: true
-              }
+                select: {
+                  id: true,
+                  workOrderNumber: true,
+                  vehicle: {
+                    select: {
+                      id: true,
+                      make: true,
+                      model: true,
+                      year: true,
+                      licensePlate: true
+                    }
+                  }
+                }
             },
             tireChecks: {
               orderBy: { position: 'asc' }
@@ -652,10 +665,19 @@ export class InspectionTemplatesService {
             }
           },
           workOrder: {
-            select: {
-              id: true,
-              workOrderNumber: true
-            }
+              select: {
+                id: true,
+                workOrderNumber: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    make: true,
+                    model: true,
+                    year: true,
+                    licensePlate: true
+                  }
+                }
+              }
           },
           tireChecks: {
             orderBy: { position: 'asc' }
@@ -716,7 +738,16 @@ export class InspectionTemplatesService {
               workOrder: {
                 select: {
                   id: true,
-                  workOrderNumber: true
+                  workOrderNumber: true,
+                  vehicle: {
+                    select: {
+                      id: true,
+                      make: true,
+                      model: true,
+                      year: true,
+                      licensePlate: true
+                    }
+                  }
                 }
               },
               tireChecks: {
