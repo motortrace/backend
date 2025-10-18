@@ -260,7 +260,7 @@ enum VehicleType {
 // Renamed from ServiceCatalog to CannedService for ShopMonkey-style terminology
 model CannedService {
   id          String         @id @default(cuid())
-  code        String         @unique
+  code        String
   name        String
   description String?
   duration    Int            // Estimated labor time in minutes
@@ -286,6 +286,7 @@ model CannedService {
   // Junction table relationships
   laborOperations CannedServiceLabor[]
   partsCategories CannedServicePartsCategory[]
+  serviceInspections ServiceInspection[]
 }
 
 // Junction table for CannedService to LaborCatalog (many-to-many)
@@ -516,6 +517,7 @@ model InspectionTemplate {
   // Relations
   templateItems InspectionTemplateItem[]
   workOrderInspections WorkOrderInspection[] // Which inspections used this template
+  serviceInspections ServiceInspection[]
 }
 
 model InspectionTemplateItem {
@@ -535,6 +537,17 @@ model InspectionTemplateItem {
   checklistResults InspectionChecklistItem[] // Actual inspection results using this template item
 
   @@unique([templateId, name]) // Prevent duplicate items within same template
+}
+
+model ServiceInspection {
+  id                  String             @id @default(cuid())
+  cannedServiceId     String
+  inspectionTemplateId String
+  createdAt           DateTime           @default(now())
+
+  // Relations
+  cannedService       CannedService      @relation(fields: [cannedServiceId], references: [id])
+  inspectionTemplate  InspectionTemplate @relation(fields: [inspectionTemplateId], references: [id])
 }
 
 // Updated WorkOrderInspection to link to templates
