@@ -13,7 +13,8 @@ import {
   ApprovalMethod,
   ChecklistStatus,
   TirePosition,
-  AttachmentCategory
+  AttachmentCategory,
+  MiscChargeCategory
 } from '@prisma/client';
 
 export interface CreateWorkOrderRequest {
@@ -362,6 +363,23 @@ export interface CreatePaymentRequest {
   processedById?: string;
 }
 
+export interface CreateWorkOrderMiscChargeRequest {
+  workOrderId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  category: MiscChargeCategory;
+  notes?: string;
+}
+
+export interface UpdateWorkOrderMiscChargeRequest {
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  category?: MiscChargeCategory;
+  notes?: string;
+}
+
 export interface WorkOrderStatistics {
   totalWorkOrders: number;
   pendingWorkOrders: number;
@@ -430,13 +448,11 @@ export interface IWorkOrderService {
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
   
-  // Customer approval methods
-  approveService(serviceId: string, customerId: string, notes?: string): Promise<any>;
-  rejectService(serviceId: string, customerId: string, reason?: string): Promise<any>;
-  approvePart(partId: string, customerId: string, notes?: string): Promise<any>;
-  rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
-  getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
-  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  // Misc charges methods
+  createWorkOrderMiscCharge(data: CreateWorkOrderMiscChargeRequest): Promise<any>;
+  getWorkOrderMiscCharges(workOrderId: string): Promise<any>;
+  updateWorkOrderMiscCharge(id: string, data: UpdateWorkOrderMiscChargeRequest): Promise<any>;
+  deleteWorkOrderMiscCharge(id: string): Promise<any>;
   
   // Part installation methods
   assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
@@ -449,6 +465,7 @@ export interface IWorkOrderService {
 
     // Estimate PDF and approval helpers
     generateEstimatePDF(workOrderId: string): Promise<string>;
+    lockServicesForEstimate(workOrderId: string): Promise<void>;
     expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;

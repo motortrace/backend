@@ -53,6 +53,21 @@ export class WorkOrderService {
     this.notificationService = new NotificationService(prisma);
   }
 
+    // Lock services for estimate generation (change PENDING/REJECTED to ESTIMATED)
+    async lockServicesForEstimate(workOrderId: string) {
+      await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          status: {
+            in: [ServiceStatus.PENDING, ServiceStatus.REJECTED],
+          },
+        },
+        data: {
+          status: ServiceStatus.ESTIMATED,
+        },
+      });
+    }
+
     // Expire previous WorkOrderApproval entries for a work order and status
     async expirePreviousApprovals(workOrderId: string, status: ApprovalStatus) {
       await this.prisma.workOrderApproval.updateMany({
@@ -152,33 +167,14 @@ export class WorkOrderService {
         },
       });
 
-      // Auto-approve all WorkOrderService entries
+      // Update all WorkOrderService entries to APPROVED (customer approved, ready to assign)
       await this.prisma.workOrderService.updateMany({
         where: {
           workOrderId,
-          customerApproved: false,
-          customerRejected: false,
           status: ServiceStatus.ESTIMATED,
         },
         data: {
-          customerApproved: true,
-          customerRejected: false,
-          approvedAt: new Date(),
-          status: ServiceStatus.PENDING, // Ready to start work
-        },
-      });
-
-      // Auto-approve all WorkOrderPart entries
-      await this.prisma.workOrderPart.updateMany({
-        where: {
-          workOrderId,
-          customerApproved: false,
-          customerRejected: false,
-        },
-        data: {
-          customerApproved: true,
-          customerRejected: false,
-          approvedAt: new Date(),
+          status: ServiceStatus.APPROVED,
         },
       });
 
@@ -188,7 +184,7 @@ export class WorkOrderService {
       // Auto-update work order status (should become APPROVED)
       await this.autoUpdateWorkOrderStatus(workOrderId);
 
-      return { message: 'WorkOrderApproval approved and all services/parts auto-approved successfully' };
+      return { message: 'Work order approved successfully' };
     }
 
   // Reject WorkOrderApproval entry
@@ -224,6 +220,17 @@ export class WorkOrderService {
           approvedAt: new Date(),
           approvedById: customerId || undefined, // Allow null for manager approvals
           notes: reason,
+        },
+      });
+
+      // Change all ESTIMATED services back to REJECTED (allows editing/deleting again)
+      await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          status: ServiceStatus.REJECTED,
         },
       });
 
@@ -1911,9 +1918,9 @@ export class WorkOrderService {
   // Labor is for tracking work only, not for billing
 
   // Helper method to update work order totals
-  // NOTE: Only services and parts are billable. Labor is for tracking only.
+  // NOTE: Services, parts, and misc charges are billable. Labor is for tracking only.
   private async updateWorkOrderTotals(workOrderId: string) {
-    const [partItems, serviceItems] = await Promise.all([
+    const [partItems, serviceItems, miscCharges] = await Promise.all([
       this.prisma.workOrderPart.findMany({
         where: { workOrderId },
         select: { subtotal: true },
@@ -1922,11 +1929,16 @@ export class WorkOrderService {
         where: { workOrderId },
         select: { subtotal: true },
       }),
+      this.prisma.workOrderMiscCharge.findMany({
+        where: { workOrderId },
+        select: { subtotal: true },
+      }),
     ]);
 
     const subtotalParts = partItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const subtotalServices = serviceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    const subtotal = subtotalParts + subtotalServices;
+    const subtotalMisc = miscCharges.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const subtotal = subtotalParts + subtotalServices + subtotalMisc;
 
     // Get existing tax and discount amounts
     const existingWorkOrder = await this.prisma.workOrder.findUnique({
@@ -1943,10 +1955,122 @@ export class WorkOrderService {
       data: {
         subtotalServices,
         subtotalParts,
+        subtotalMisc,
         subtotal,
         totalAmount,
       },
     });
+  }
+
+  // Misc Charge CRUD Methods
+
+  // Create misc charge
+  async createWorkOrderMiscCharge(data: any) {
+    // Support both 'amount' and 'unitPrice' field names for backwards compatibility
+    const unitPrice = data.unitPrice ?? data.amount;
+    
+    // Validation
+    if (!data.description || data.description.trim().length === 0) {
+      throw new Error('Description is required');
+    }
+
+    if (!data.quantity || data.quantity <= 0) {
+      throw new Error('Quantity must be greater than zero');
+    }
+
+    if (unitPrice === undefined || unitPrice === null) {
+      throw new Error('Unit price (unitPrice or amount) is required');
+    }
+
+    if (unitPrice < 0) {
+      throw new Error('Unit price cannot be negative');
+    }
+
+    const miscCharge = await this.prisma.workOrderMiscCharge.create({
+      data: {
+        workOrderId: data.workOrderId,
+        description: data.description,
+        quantity: data.quantity,
+        unitPrice: unitPrice,
+        subtotal: data.quantity * unitPrice,
+        category: data.category || 'OTHER',
+        notes: data.notes,
+      },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(data.workOrderId);
+
+    return miscCharge;
+  }
+
+  // Get misc charges for a work order
+  async getWorkOrderMiscCharges(workOrderId: string) {
+    return await this.prisma.workOrderMiscCharge.findMany({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Update misc charge
+  async updateWorkOrderMiscCharge(id: string, data: any) {
+    // Validation
+    if (data.quantity !== undefined && data.quantity <= 0) {
+      throw new Error('Quantity must be greater than zero');
+    }
+
+    if (data.unitPrice !== undefined && data.unitPrice < 0) {
+      throw new Error('Unit price cannot be negative');
+    }
+
+    if (data.description !== undefined && data.description.trim().length === 0) {
+      throw new Error('Description cannot be empty');
+    }
+
+    // Get existing misc charge to calculate new subtotal
+    const existing = await this.prisma.workOrderMiscCharge.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new Error('Misc charge not found');
+    }
+
+    const quantity = data.quantity !== undefined ? data.quantity : existing.quantity;
+    const unitPrice = data.unitPrice !== undefined ? data.unitPrice : Number(existing.unitPrice);
+
+    const miscCharge = await this.prisma.workOrderMiscCharge.update({
+      where: { id },
+      data: {
+        ...data,
+        subtotal: quantity * unitPrice,
+      },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(miscCharge.workOrderId);
+
+    return miscCharge;
+  }
+
+  // Delete misc charge
+  async deleteWorkOrderMiscCharge(id: string) {
+    const miscCharge = await this.prisma.workOrderMiscCharge.findUnique({
+      where: { id },
+    });
+
+    if (!miscCharge) {
+      throw new Error('Misc charge not found');
+    }
+
+    await this.prisma.workOrderMiscCharge.delete({
+      where: { id },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(miscCharge.workOrderId);
+
+    return { message: 'Misc charge deleted successfully' };
   }
 
   /**
@@ -1957,8 +2081,8 @@ export class WorkOrderService {
     const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
-        services: { select: { customerApproved: true, customerRejected: true, status: true } },
-        partsUsed: { select: { customerApproved: true, customerRejected: true, installedAt: true } },
+        services: { select: { status: true } },
+        partsUsed: { select: { installedAt: true } },
       },
     });
 
@@ -1985,13 +2109,13 @@ export class WorkOrderService {
       return;
     }
 
-    // Check if all non-rejected services are approved
-    const nonRejectedServices = workOrder.services.filter(s => !s.customerRejected);
-    const allServicesApproved = nonRejectedServices.every(s => s.customerApproved);
+    // Check bulk approval status via WorkOrderApproval
+    const latestApproval = await this.prisma.workOrderApproval.findFirst({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // Check if all non-rejected parts are approved
-    const nonRejectedParts = workOrder.partsUsed.filter(p => !p.customerRejected);
-    const allPartsApproved = nonRejectedParts.every(p => p.customerApproved);
+    const isApproved = latestApproval?.status === ApprovalStatus.APPROVED;
 
     // Check if any work has started
     const anyServiceInProgress = workOrder.services.some(s => 
@@ -2001,12 +2125,12 @@ export class WorkOrderService {
     const workStarted = anyServiceInProgress || anyPartInstalled;
 
     // Check if all work is completed
-    const allServicesCompleted = nonRejectedServices.every(s => 
+    const allServicesCompleted = workOrder.services.every(s => 
       s.status === ServiceStatus.COMPLETED || s.status === ServiceStatus.CANCELLED
     );
-    const allPartsInstalled = nonRejectedParts.every(p => p.installedAt !== null);
-    const allWorkCompleted = (nonRejectedServices.length === 0 || allServicesCompleted) && 
-                             (nonRejectedParts.length === 0 || allPartsInstalled);
+    const allPartsInstalled = workOrder.partsUsed.every(p => p.installedAt !== null);
+    const allWorkCompleted = (workOrder.services.length === 0 || allServicesCompleted) && 
+                             (workOrder.partsUsed.length === 0 || allPartsInstalled);
 
     // Determine new status
     let newStatus: WorkOrderStatus | null = null;
@@ -2015,9 +2139,9 @@ export class WorkOrderService {
       newStatus = WorkOrderStatus.COMPLETED;
     } else if (workStarted && workOrder.status === WorkOrderStatus.APPROVED) {
       newStatus = WorkOrderStatus.IN_PROGRESS;
-    } else if (allServicesApproved && allPartsApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
+    } else if (isApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
       newStatus = WorkOrderStatus.APPROVED;
-    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING) {
+    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING && !latestApproval) {
       newStatus = WorkOrderStatus.AWAITING_APPROVAL;
     }
 
@@ -2481,199 +2605,6 @@ export class WorkOrderService {
     });
 
     return qc;
-  }
-
-  // Customer Approval Methods
-
-  // Approve a service (and all its labor items)
-  async approveService(serviceId: string, customerId: string, notes?: string) {
-    const service = await this.prisma.workOrderService.findUnique({
-      where: { id: serviceId },
-      include: { workOrder: true },
-    });
-
-    if (!service) {
-      throw new Error('Service not found');
-    }
-
-    // Verify customer owns this work order
-    if (service.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This service does not belong to your work order');
-    }
-
-    // Update service approval
-    await this.prisma.workOrderService.update({
-      where: { id: serviceId },
-      data: {
-        customerApproved: true,
-        customerRejected: false,
-        approvedAt: new Date(),
-        customerNotes: notes,
-        status: ServiceStatus.PENDING, // Ready to start work
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(service.workOrderId);
-
-    // Auto-update work order status if all items approved
-    await this.autoUpdateWorkOrderStatus(service.workOrderId);
-
-    return { message: 'Service approved successfully' };
-  }
-
-  // Reject a service
-  async rejectService(serviceId: string, customerId: string, reason?: string) {
-    const service = await this.prisma.workOrderService.findUnique({
-      where: { id: serviceId },
-      include: { workOrder: true },
-    });
-
-    if (!service) {
-      throw new Error('Service not found');
-    }
-
-    // Verify customer owns this work order
-    if (service.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This service does not belong to your work order');
-    }
-
-    // Update service rejection
-    await this.prisma.workOrderService.update({
-      where: { id: serviceId },
-      data: {
-        customerApproved: false,
-        customerRejected: true,
-        rejectedAt: new Date(),
-        customerNotes: reason,
-        status: ServiceStatus.CANCELLED,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(service.workOrderId);
-
-    return { message: 'Service rejected' };
-  }
-
-  // Approve a part
-  async approvePart(partId: string, customerId: string, notes?: string) {
-    const part = await this.prisma.workOrderPart.findUnique({
-      where: { id: partId },
-      include: { workOrder: true },
-    });
-
-    if (!part) {
-      throw new Error('Part not found');
-    }
-
-    // Verify customer owns this work order
-    if (part.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This part does not belong to your work order');
-    }
-
-    // Update part approval
-    await this.prisma.workOrderPart.update({
-      where: { id: partId },
-      data: {
-        customerApproved: true,
-        customerRejected: false,
-        approvedAt: new Date(),
-        customerNotes: notes,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(part.workOrderId);
-
-    // Auto-update work order status if all items approved
-    await this.autoUpdateWorkOrderStatus(part.workOrderId);
-
-    return { message: 'Part approved successfully' };
-  }
-
-  // Reject a part
-  async rejectPart(partId: string, customerId: string, reason?: string) {
-    const part = await this.prisma.workOrderPart.findUnique({
-      where: { id: partId },
-      include: { workOrder: true },
-    });
-
-    if (!part) {
-      throw new Error('Part not found');
-    }
-
-    // Verify customer owns this work order
-    if (part.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This part does not belong to your work order');
-    }
-
-    // Update part rejection
-    await this.prisma.workOrderPart.update({
-      where: { id: partId },
-      data: {
-        customerApproved: false,
-        customerRejected: true,
-        rejectedAt: new Date(),
-        customerNotes: reason,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(part.workOrderId);
-
-    return { message: 'Part rejected' };
-  }
-
-  // Get pending items (services and parts) awaiting customer approval
-  async getPendingApprovals(workOrderId: string, customerId: string) {
-    const workOrder = await this.prisma.workOrder.findUnique({
-      where: { id: workOrderId },
-    });
-
-    if (!workOrder) {
-      throw new Error('Work order not found');
-    }
-
-    // Verify customer owns this work order
-    if (workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This work order does not belong to you');
-    }
-
-    const [services, parts] = await Promise.all([
-      this.prisma.workOrderService.findMany({
-        where: {
-          workOrderId,
-          customerApproved: false,
-          customerRejected: false,
-          status: ServiceStatus.ESTIMATED,
-        },
-        include: {
-          cannedService: true,
-          laborItems: {
-            include: {
-              laborCatalog: true,
-            },
-          },
-        },
-      }),
-      this.prisma.workOrderPart.findMany({
-        where: {
-          workOrderId,
-          customerApproved: false,
-          customerRejected: false,
-        },
-        include: {
-          part: true,
-        },
-      }),
-    ]);
-
-    return {
-      services,
-      parts,
-      totalPending: services.length + parts.length,
-    };
   }
 
   // Part Installation Management

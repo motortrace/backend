@@ -52,12 +52,11 @@ router.get('/:workOrderId/inspections', workOrderController.getWorkOrderInspecti
 router.post('/:workOrderId/qc', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderQC.bind(workOrderController));
 router.get('/:workOrderId/qc', workOrderController.getWorkOrderQC.bind(workOrderController));
 
-// Customer Approval Routes (authenticated customers only)
-router.post('/services/:serviceId/approve', authenticateSupabaseToken, workOrderController.approveService.bind(workOrderController));
-router.post('/services/:serviceId/reject', authenticateSupabaseToken, workOrderController.rejectService.bind(workOrderController));
-router.post('/parts/:partId/approve', authenticateSupabaseToken, workOrderController.approvePart.bind(workOrderController));
-router.post('/parts/:partId/reject', authenticateSupabaseToken, workOrderController.rejectPart.bind(workOrderController));
-router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrderController.getPendingApprovals.bind(workOrderController));
+// Misc Charges Routes
+router.post('/:workOrderId/misc-charges', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrderMiscCharge.bind(workOrderController));
+router.get('/:workOrderId/misc-charges', workOrderController.getWorkOrderMiscCharges.bind(workOrderController));
+router.put('/misc-charges/:miscChargeId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderMiscCharge.bind(workOrderController));
+router.delete('/misc-charges/:miscChargeId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderMiscCharge.bind(workOrderController));
 
 // Part Installation Routes (technician workflows)
 

@@ -38,6 +38,9 @@ export class WorkOrderController {
           return res.status(404).json({ success: false, error: 'User profile not found' });
         }
 
+        // Change all PENDING and REJECTED services to ESTIMATED (locks them from editing)
+        await this.workOrderService.lockServicesForEstimate(workOrderId);
+
         // Generate estimate PDF
         const pdfUrl = await this.workOrderService.generateEstimatePDF(workOrderId);
 
@@ -680,243 +683,74 @@ export class WorkOrderController {
     }
   }
 
-  // Customer Approval Endpoints
+  // Misc Charges Endpoints
 
-  async approveService(req: any, res: Response) {
-    try {
-      const { serviceId } = req.params;
-      const { notes } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find UserProfile then Customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.approveService(serviceId, customer.id, notes);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async rejectService(req: any, res: Response) {
-    try {
-      const { serviceId } = req.params;
-      const { reason } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.rejectService(serviceId, customer.id, reason);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async approvePart(req: any, res: Response) {
-    try {
-      const { partId } = req.params;
-      const { notes } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.approvePart(partId, customer.id, notes);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async rejectPart(req: any, res: Response) {
-    try {
-      const { partId } = req.params;
-      const { reason } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.rejectPart(partId, customer.id, reason);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async getPendingApprovals(req: any, res: Response) {
+  async createWorkOrderMiscCharge(req: Request, res: Response) {
     try {
       const { workOrderId } = req.params;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
+      const data = req.body;
+      data.workOrderId = workOrderId;
 
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
+      const miscCharge = await this.workOrderService.createWorkOrderMiscCharge(data);
 
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
+      res.status(201).json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge created successfully',
       });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.getPendingApprovals(workOrderId, customer.id);
+  async getWorkOrderMiscCharges(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const miscCharges = await this.workOrderService.getWorkOrderMiscCharges(workOrderId);
 
       res.json({
         success: true,
-        data: result,
+        data: miscCharges,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const data = req.body;
+
+      const miscCharge = await this.workOrderService.updateWorkOrderMiscCharge(miscChargeId, data);
+
+      res.json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const result = await this.workOrderService.deleteWorkOrderMiscCharge(miscChargeId);
+
+      res.json({
+        success: true,
+        message: result.message,
       });
     } catch (error: any) {
       res.status(400).json({

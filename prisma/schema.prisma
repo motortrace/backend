@@ -175,7 +175,8 @@ model WorkOrder {
   // Pricing breakdown
   subtotalServices Decimal?      @db.Decimal(10,2)  // Sum of WorkOrderService.subtotal
   subtotalParts   Decimal?       @db.Decimal(10,2)  // Sum of WorkOrderPart.subtotal
-  subtotal        Decimal?       @db.Decimal(10,2)  // subtotalServices + subtotalParts
+  subtotalMisc    Decimal?       @db.Decimal(10,2)  // Sum of WorkOrderMiscCharge.subtotal
+  subtotal        Decimal?       @db.Decimal(10,2)  // subtotalServices + subtotalParts + subtotalMisc
   
   // Discount (applied at work order level only)
   discountAmount  Decimal?       @db.Decimal(10,2)
@@ -216,6 +217,7 @@ model WorkOrder {
   services        WorkOrderService[]
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
+  miscCharges     WorkOrderMiscCharge[]
   invoices        Invoice[]
   notifications   Notification[]
   serviceHistory  VehicleServiceHistory[]
@@ -677,15 +679,6 @@ model WorkOrderPart {
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
   
-  // Customer approval status
-  customerApproved Boolean       @default(false)
-  customerRejected Boolean       @default(false)
-  customerNotes    String?       // Customer feedback on this part
-  
-  // Timestamps
-  approvedAt       DateTime?     // When customer approved
-  rejectedAt       DateTime?     // When customer rejected
-  
   source           PartSource    @default(INVENTORY)
   supplierName     String?       // Supplier name if not from inventory
   supplierInvoice  String?       // Supplier invoice number
@@ -698,7 +691,35 @@ model WorkOrderPart {
   updatedAt        DateTime      @updatedAt
   
   @@index([workOrderId])
-  @@index([customerApproved])
+}
+
+// Miscellaneous Charges - Custom charges not covered by services or parts
+model WorkOrderMiscCharge {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrderId      String
+  description      String        // "Diagnostic Fee", "Towing Charge", etc.
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2)
+  subtotal         Decimal       @db.Decimal(10,2)  // quantity * unitPrice
+  category         MiscChargeCategory @default(OTHER)
+  notes            String?       // Internal notes
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  
+  @@index([workOrderId])
+  @@index([category])
+}
+
+enum MiscChargeCategory {
+  DIAGNOSTIC       // Diagnostic fees
+  LABOR            // Custom labor charges
+  TOWING           // Towing/transport fees
+  STORAGE          // Vehicle storage fees
+  DISPOSAL         // Waste disposal fees
+  ENVIRONMENTAL    // Environmental fees
+  ADMIN            // Admin/documentation fees
+  OTHER            // Miscellaneous
 }
 
 
@@ -841,8 +862,10 @@ enum PaymentStatus {
 }
 
 enum ServiceStatus {
-  ESTIMATED       // In estimate, awaiting customer approval
-  PENDING         // Approved, waiting to start
+  PENDING         // Draft - can be edited/deleted
+  ESTIMATED       // In estimate, awaiting customer approval (cannot be deleted)
+  APPROVED        // Customer approved, ready to assign
+  REJECTED        // Customer rejected, can be edited/deleted
   IN_PROGRESS     // Work in progress
   COMPLETED       // Work completed
   CANCELLED       // Cancelled
@@ -864,16 +887,7 @@ model WorkOrderService {
   unitPrice        Decimal       @db.Decimal(10,2)  // Price per service instance
   subtotal         Decimal       @db.Decimal(10,2)  // unitPrice × quantity
   
-  // Customer approval status
-  customerApproved Boolean       @default(false)
-  customerRejected Boolean       @default(false)
-  customerNotes    String?       // Customer feedback on this service
-  
-  // Timestamps
-  approvedAt       DateTime?     // When customer approved
-  rejectedAt       DateTime?     // When customer rejected
-  
-  status           ServiceStatus @default(ESTIMATED)
+  status           ServiceStatus @default(PENDING)
   notes            String?       // Internal notes
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -882,7 +896,6 @@ model WorkOrderService {
   laborItems       WorkOrderLabor[]
   
   @@index([workOrderId])
-  @@index([customerApproved])
   @@index([status])
 }
 
