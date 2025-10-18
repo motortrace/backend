@@ -53,27 +53,31 @@ export class AuthSupabaseController {
       // Debug: Log what the service returned
       console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
       
-      // Get user role and customerId for mobile users
-      const userRole = (data.user as any)?.user_metadata?.role || 'customer';
+      // Resolve user role and customerId from the database-backed UserProfile where possible.
       let customerId = null;
-      
-      if (userRole === 'customer') {
-        try {
-          // Fetch customer data from database
-          const userProfile = await this.prisma.userProfile.findUnique({
-            where: { supabaseUserId: data.user?.id },
-            include: {
-              customer: true
-            }
-          });
-          
-          if (userProfile?.customer) {
-            customerId = userProfile.customer.id;
-          }
-        } catch (dbError) {
-          console.warn('Could not fetch customer data:', dbError);
-          // Continue without customerId - user might not have completed onboarding yet
+      let resolvedRole = 'customer';
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+
+        if (userProfile) {
+          // Prisma enum is uppercase (e.g. CUSTOMER) so convert to lowercase/underscore
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          // Fallback to token metadata
+          resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+          isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
         }
+      } catch (dbError) {
+        console.warn('Could not fetch user profile during signIn:', dbError);
+        resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+        isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
       }
       
       // Return user data with flattened metadata used by mobile app
@@ -83,9 +87,9 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: userRole,
+            role: resolvedRole,
             customerId: customerId, // Include customerId for mobile async storage
-            isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,
@@ -510,25 +514,28 @@ export class AuthSupabaseController {
         hasSession: !!data.session 
       });
 
-      // Get customerId for mobile users if role is customer
+      // Try to resolve role and customerId from the UserProfile table
       let customerId = null;
-      if (role === 'customer') {
-        try {
-          // Fetch customer data from database
-          const userProfile = await this.prisma.userProfile.findUnique({
-            where: { supabaseUserId: data.user?.id },
-            include: {
-              customer: true
-            }
-          });
-          
-          if (userProfile?.customer) {
-            customerId = userProfile.customer.id;
-          }
-        } catch (dbError) {
-          console.warn('Could not fetch customer data:', dbError);
-          // Continue without customerId - user might not have completed onboarding yet
+      let resolvedRole = role;
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+        if (userProfile) {
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          resolvedRole = data.user?.user_metadata?.role || role;
+          isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
         }
+      } catch (err) {
+        console.warn('Could not fetch user profile for Google auth response:', err);
+        resolvedRole = data.user?.user_metadata?.role || role;
+        isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
       }
 
       res.json({
@@ -537,9 +544,9 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: data.user?.user_metadata?.role || role,
+            role: resolvedRole,
             customerId: customerId, // Include customerId for mobile async storage
-            isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,

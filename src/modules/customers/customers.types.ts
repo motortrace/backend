@@ -94,6 +94,7 @@ export interface ICustomerService {
   getCustomerWorkOrders(customerId: string): Promise<any>;
   getCustomerAppointments(customerId: string): Promise<any>;
   getCustomerStatistics(customerId: string): Promise<CustomerStatistics>;
+  getCustomerServiceHistory(customerId: string): Promise<any>;
 }
 
 export interface CustomerStatistics {

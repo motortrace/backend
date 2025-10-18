@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { WorkOrderController } from './work-orders.controller';
 import { WorkOrderService } from './work-orders.service';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
-import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, validateRequest } from './work-orders.validation';
+import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, updateWorkflowStepSchema, validateRequest } from './work-orders.validation';
 import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
@@ -21,6 +21,7 @@ router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, workOrderCo
 
 // Work Order Status Management Routes
 router.put('/:id/status', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderStatus.bind(workOrderController));
+router.put('/:id/workflow-step', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateWorkflowStepSchema, 'body'), workOrderController.updateWorkOrderWorkflowStep.bind(workOrderController));
 router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignServiceAdvisorSchema, 'body'), workOrderController.assignServiceAdvisor.bind(workOrderController));
 
 // Labor Assignment Routes

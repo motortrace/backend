@@ -26,7 +26,7 @@ import { mileageTrackingRouter } from './modules/mileage-tracking';
 import { serviceRecommendationsRouter } from './modules/service-recommendations';
 import { carExpensesRouter } from './modules/car-expenses';
 import notificationsRoutes from './modules/notifications/notifications.routes';
-
+import { messageRoutes } from './modules/messages';
 
 const app = express();
 
@@ -78,6 +78,7 @@ app.use('/mileage-tracking', mileageTrackingRouter);
 app.use('/service-recommendations', serviceRecommendationsRouter);
 app.use('/car-expenses', carExpensesRouter);
 app.use('/notifications', notificationsRoutes);
+app.use('/messages', messageRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

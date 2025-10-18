@@ -13,7 +13,7 @@ export class CannedServiceService {
   // Create a new canned service
   async createCannedService(data: CreateCannedServiceRequest): Promise<CannedService> {
     // Check if code already exists
-    const existingService = await this.prisma.cannedService.findUnique({
+    const existingService = await this.prisma.cannedService.findFirst({
       where: { code: data.code },
     });
 
@@ -41,7 +41,7 @@ export class CannedServiceService {
     laborOperations: Array<{ laborCatalogId: string; sequence: number; notes?: string }>
   ): Promise<any> {
     // Check if code already exists
-    const existingService = await this.prisma.cannedService.findUnique({
+    const existingService = await this.prisma.cannedService.findFirst({
       where: { code: data.code },
     });
 
@@ -328,7 +328,7 @@ export class CannedServiceService {
 
   // Jabir's updated method to get a canned service by code
   async getCannedServiceByCode(code: string): Promise<any> {
-    const cannedService = await this.prisma.cannedService.findUnique({
+    const cannedService = await this.prisma.cannedService.findFirst({
       where: { code },
       include: {
         laborOperations: {

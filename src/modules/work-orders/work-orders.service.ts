@@ -1,4 +1,4 @@
-import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, Prisma } from '@prisma/client';
+import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, AppointmentStatus, Prisma } from '@prisma/client';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
@@ -10,6 +10,7 @@ import {
   WorkOrderCreationStats,
   GeneralStats,
 } from './work-orders.types';
+import { CalendarAppointment } from '../appointments/appointments.types';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../notifications/notifications.service';
 import { NotificationEventType, NotificationChannel, NotificationPriority } from '../notifications/notifications.types';
@@ -966,6 +967,14 @@ export class WorkOrderService {
       },
     });
 
+    // If work order was created from an appointment, mark the appointment as COMPLETED
+    if (workOrderData.appointmentId) {
+      await this.prisma.appointment.update({
+        where: { id: workOrderData.appointmentId },
+        data: { status: AppointmentStatus.COMPLETED },
+      });
+    }
+
     return workOrder.id;
   }
 
@@ -1718,6 +1727,26 @@ export class WorkOrderService {
         console.error('Failed to send notification:', notificationError);
       }
     }
+
+    return workOrder;
+  }
+
+  // Update work order workflow step only
+  async updateWorkOrderWorkflowStep(id: string, workflowStep: WorkflowStep) {
+    // Verify work order exists
+    const existingWorkOrder = await this.prisma.workOrder.findUnique({
+      where: { id },
+    });
+
+    if (!existingWorkOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Update only the workflow step
+    const workOrder = await this.prisma.workOrder.update({
+      where: { id },
+      data: { workflowStep },
+    });
 
     return workOrder;
   }
@@ -2924,6 +2953,61 @@ export class WorkOrderService {
     await this.prisma.workOrder.update({
       where: { id: workOrderId },
       data: { paymentStatus },
+    });
+  }
+
+  // Get appointments for calendar view (PENDING, CONFIRMED, and COMPLETED)
+  async getCalendarAppointments(): Promise<CalendarAppointment[]> {
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        status: {
+          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED]
+        }
+      },
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+            status: true,
+          },
+        },
+        customer: true,
+        vehicle: true,
+        cannedServices: {
+          include: {
+            cannedService: true,
+          },
+        },
+      },
+      orderBy: {
+        requestedAt: 'asc',
+      },
+    });
+
+    return appointments.map(appointment => {
+      // Create title: "Customer Name – Service Name"
+      const serviceName = appointment.cannedServices.length > 0 
+        ? appointment.cannedServices[0].cannedService.name 
+        : 'Appointment';
+      const title = `${appointment.customer.name} – ${serviceName}`;
+
+      return {
+        id: appointment.id,
+        title,
+        startTime: appointment.startTime!,
+        status: appointment.status,
+        priority: appointment.priority,
+        customer: {
+          id: appointment.customer.id,
+          name: appointment.customer.name,
+        },
+        vehicle: {
+          make: appointment.vehicle.make,
+          model: appointment.vehicle.model,
+          licensePlate: appointment.vehicle.licensePlate,
+        },
+      };
     });
   }
 }
