@@ -233,6 +233,33 @@ export class AppointmentController {
     }
   }
 
+  // Get service advisors availability for a specific date/time
+  async getAdvisorsAvailability(req: Request, res: Response) {
+    try {
+      const dateTime = new Date(req.query.dateTime as string);
+
+      if (!dateTime || isNaN(dateTime.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid dateTime parameter. Please provide a valid ISO date string.',
+        });
+      }
+
+      const availability = await this.appointmentService.getAdvisorsAvailability(dateTime);
+
+      res.json({
+        success: true,
+        data: availability,
+        message: 'Advisor availability retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async assignAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;

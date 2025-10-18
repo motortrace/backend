@@ -234,4 +234,24 @@ export class CustomerController {
       });
     }
   }
+
+  // Get customer service history (past services and inspections)
+  async getCustomerServiceHistory(req: Request, res: Response) {
+    try {
+      const { customerId } = req.params;
+      const serviceHistory = await this.customerService.getCustomerServiceHistory(customerId);
+
+      res.json({
+        success: true,
+        data: serviceHistory,
+        message: 'Customer service history retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get customer service history',
+        message: error.message,
+      });
+    }
+  }
 }

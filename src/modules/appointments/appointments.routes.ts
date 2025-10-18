@@ -9,6 +9,7 @@ import {
   validateShopOperatingHours,
   validateShopCapacitySettings,
   validateTimeBlockAvailability,
+  validateAdvisorAvailability,
 } from './appointments.validation';
 
 import prisma from '../../infrastructure/database/prisma';
@@ -32,6 +33,9 @@ router.get('/confirmed-without-work-orders', appointmentController.getConfirmedA
 
 // Calendar appointments (PENDING and CONFIRMED)
 router.get('/calendar', appointmentController.getCalendarAppointments.bind(appointmentController));
+
+// Advisor availability for scheduling
+router.get('/advisors/availability', validateAdvisorAvailability, appointmentController.getAdvisorsAvailability.bind(appointmentController));
 
 // Available Slots Routes
 router.get('/slots/available', validateAppointmentSlotRequest, appointmentController.getAvailableSlots.bind(appointmentController));

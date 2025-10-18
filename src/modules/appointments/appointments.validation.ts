@@ -32,6 +32,11 @@ export const timeBlockAvailabilitySchema = Joi.object({
   timeBlock: Joi.string().pattern(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).required(), // Format: "08:00", "08:30", etc.
 });
 
+// New schema for advisor availability check
+export const advisorAvailabilitySchema = Joi.object({
+  dateTime: Joi.date().required(),
+});
+
 export const assignAppointmentSchema = Joi.object({
   assignedToId: Joi.string().required(),
 });
@@ -100,6 +105,22 @@ export const validateTimeBlockAvailability = (req: any, res: any, next: any) => 
   };
   
   const { error } = timeBlockAvailabilitySchema.validate(timeBlockRequest);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+// New validation for advisor availability
+export const validateAdvisorAvailability = (req: any, res: any, next: any) => {
+  const advisorRequest = {
+    dateTime: new Date(req.query.dateTime as string),
+  };
+  
+  const { error } = advisorAvailabilitySchema.validate(advisorRequest);
   if (error) {
     return res.status(400).json({
       success: false,
