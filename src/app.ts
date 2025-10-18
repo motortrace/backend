@@ -34,7 +34,8 @@ app.use(cors({
     'http://localhost:5173', 
     'http://localhost:3000',
     'http://10.0.2.2:3000', // Android emulator localhost
-    'http://127.0.0.1:3000'  // Alternative localhost
+    'http://127.0.0.1:3000',  // Alternative localhost
+    'https://192.168.98.149:3000'
   ],
   credentials: true
 }));
