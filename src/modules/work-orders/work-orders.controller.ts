@@ -653,6 +653,23 @@ export class WorkOrderController {
     }
   }
 
+  async deleteWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      await this.workOrderService.deleteWorkOrderInspection(inspectionId);
+
+      res.json({
+        success: true,
+        message: 'Work order inspection deleted successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order QC
   async createWorkOrderQC(req: Request, res: Response) {
     try {

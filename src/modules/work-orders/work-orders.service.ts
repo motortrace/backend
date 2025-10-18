@@ -2577,6 +2577,25 @@ export class WorkOrderService {
     return inspections;
   }
 
+  // Delete work order inspection
+  async deleteWorkOrderInspection(inspectionId: string) {
+    // Check if inspection exists
+    const inspection = await this.prisma.workOrderInspection.findUnique({
+      where: { id: inspectionId },
+    });
+
+    if (!inspection) {
+      throw new Error(`Work order inspection with ID '${inspectionId}' not found`);
+    }
+
+    // Delete the inspection (cascade will handle checklist items, tire checks, and attachments)
+    await this.prisma.workOrderInspection.delete({
+      where: { id: inspectionId },
+    });
+
+    return { message: 'Inspection deleted successfully' };
+  }
+
   // Create work order QC
   async createWorkOrderQC(workOrderId: string, data: {
     passed: boolean;

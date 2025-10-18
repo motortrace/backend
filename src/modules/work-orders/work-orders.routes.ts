@@ -48,6 +48,7 @@ router.get('/:workOrderId/attachments', workOrderController.getWorkOrderAttachme
 // Work Order Inspections Routes
 router.post('/:workOrderId/inspections', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderInspection.bind(workOrderController));
 router.get('/:workOrderId/inspections', workOrderController.getWorkOrderInspections.bind(workOrderController));
+router.delete('/inspections/:inspectionId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderInspection.bind(workOrderController));
 
 // Work Order QC Routes
 router.post('/:workOrderId/qc', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderQC.bind(workOrderController));
