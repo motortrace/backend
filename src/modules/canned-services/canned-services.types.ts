@@ -252,3 +252,12 @@ export const validateRequest = (schema: Joi.ObjectSchema, location: 'body' | 'qu
     next();
   };
 };
+
+// Inspection Template Recommendation interface for work order services
+export interface InspectionTemplateRecommendation {
+  id: string;
+  image: string | null;
+  name: string;
+  itemCount: number;
+  category: string | null;
+}
