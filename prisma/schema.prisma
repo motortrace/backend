@@ -931,6 +931,7 @@ enum LineItemType {
   SERVICE
   LABOR
   PART
+  MISC
   DISCOUNT
   TAX
   OTHER
@@ -951,6 +952,7 @@ model Invoice {
   subtotalServices Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderService subtotals
   subtotalLabor    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderLabor subtotals  
   subtotalParts    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderPart subtotals
+  subtotalMisc     Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderMiscCharge subtotals
   subtotal         Decimal     @db.Decimal(10,2) @default(0) // Total before tax/discount
   taxAmount        Decimal     @db.Decimal(10,2) @default(0)
   discountAmount   Decimal     @db.Decimal(10,2) @default(0)

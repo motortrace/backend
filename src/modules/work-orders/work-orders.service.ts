@@ -253,7 +253,8 @@ export class WorkOrderService {
         },
         partsUsed: {
           include: { part: true }
-        }
+        },
+        miscCharges: true
       }
     });
 
@@ -299,6 +300,17 @@ export class WorkOrderService {
       ]);
     });
 
+    // Add misc charges
+    workOrder.miscCharges.forEach(misc => {
+      tableBody.push([
+        { text: 'Misc', style: 'tableCell' },
+        { text: misc.description, style: 'tableCell' },
+        { text: misc.quantity?.toString() || '1', style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(Number(misc.unitPrice)), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(Number(misc.subtotal)), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
     // Add labor (for reference, not billed)
     workOrder.laborItems.forEach(labor => {
       tableBody.push([
@@ -322,7 +334,8 @@ export class WorkOrderService {
     // Calculate totals
     const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
-    const subtotal = subtotalServices + subtotalParts;
+    const subtotalMisc = workOrder.miscCharges.reduce((sum, m) => sum + Number(m.subtotal), 0);
+    const subtotal = subtotalServices + subtotalParts + subtotalMisc;
     let discountAmount = 0;
     if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
       if (workOrder.discountType === 'PERCENTAGE') {
@@ -365,7 +378,6 @@ export class WorkOrderService {
                 { text: 'ESTIMATE', style: 'invoiceTitle', fontSize: 24, bold: true, alignment: 'right' },
                 { text: `#${workOrder.workOrderNumber}`, style: 'invoiceNumber', fontSize: 14, alignment: 'right' },
                 { text: `Date: ${formatDate(workOrder.createdAt)}`, style: 'invoiceInfo', alignment: 'right' },
-                { text: `Status: ${workOrder.status}`, style: 'invoiceInfo', alignment: 'right' },
               ],
             },
           ],
