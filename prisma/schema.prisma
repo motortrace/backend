@@ -564,6 +564,7 @@ model WorkOrderInspection {
   date         DateTime            @default(now())
   notes        String?             // Overall inspection summary
   isCompleted  Boolean             @default(false) // NEW: Track completion status
+  status       InspectionStatus    @default(PENDING) // Inspection status
   
   // Relations
   checklistItems InspectionChecklistItem[]
@@ -595,6 +596,14 @@ enum ChecklistStatus {
   GREEN    // Good condition
   YELLOW   // Needs attention
   RED      // Critical issue
+}
+
+enum InspectionStatus {
+  PENDING    // Inspection not yet started
+  ONGOING    // Inspection in progress
+  PAUSED     // Inspection temporarily paused
+  COMPLETED  // Inspection finished
+  CANCELLED  // Inspection cancelled
 }
 
 model TireInspection {

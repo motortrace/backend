@@ -216,6 +216,20 @@ export const checklistItemIdSchema = Joi.object({
   })
 });
 
+// Status transition validation schemas
+export const cancelInspectionSchema = Joi.object({
+  reason: Joi.string().optional().max(1000).messages({
+    'string.max': 'Cancellation reason cannot exceed 1000 characters'
+  })
+});
+
+export const inspectionIdParamSchema = Joi.object({
+  id: Joi.string().required().messages({
+    'string.empty': 'Inspection ID is required',
+    'any.required': 'Inspection ID is required'
+  })
+});
+
 // Validation helper functions
 export const validateCreateInspectionTemplate = (data: any) => {
   return createInspectionTemplateSchema.validate(data, { abortEarly: false });
@@ -243,4 +257,12 @@ export const validateInspectionTemplateFilters = (data: any) => {
 
 export const validateWorkOrderInspectionFilters = (data: any) => {
   return workOrderInspectionFiltersSchema.validate(data, { abortEarly: false });
+};
+
+export const validateCancelInspection = (data: any) => {
+  return cancelInspectionSchema.validate(data, { abortEarly: false });
+};
+
+export const validateInspectionIdParam = (data: any) => {
+  return inspectionIdParamSchema.validate(data, { abortEarly: false });
 };

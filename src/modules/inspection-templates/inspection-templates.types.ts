@@ -143,6 +143,10 @@ export interface UpdateChecklistItemRequest {
   requiresFollowUp?: boolean;
 }
 
+export interface CancelInspectionRequest {
+  reason?: string;
+}
+
 // Query types
 export interface InspectionTemplateFilters {
   category?: string;
@@ -208,6 +212,13 @@ export interface TemplateAssignmentResponse {
     template: InspectionTemplate;
     checklistItems: InspectionChecklistItem[];
   };
+  message?: string;
+  error?: string;
+}
+
+// Deletion response
+export interface DeleteInspectionResponse {
+  success: boolean;
   message?: string;
   error?: string;
 }

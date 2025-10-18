@@ -445,6 +445,7 @@ export interface IWorkOrderService {
   getWorkOrderAttachments(workOrderId: string, category?: string): Promise<any>;
   createWorkOrderInspection(workOrderId: string, inspectorId: string, notes?: string): Promise<any>;
   getWorkOrderInspections(workOrderId: string): Promise<any>;
+  deleteWorkOrderInspection(inspectionId: string): Promise<any>;
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
