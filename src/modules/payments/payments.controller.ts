@@ -370,5 +370,33 @@ export class PaymentController {
       });
     }
   }
+
+  // Complete payment (for mobile app sandbox payments)
+  async completePayment(req: Request, res: Response) {
+    try {
+      const { paymentId } = req.params;
+      const { status, reference, notes } = req.body;
+
+      const updateData: UpdatePaymentRequest = {
+        paymentId,
+        status: status || 'PAID',
+        reference: reference || `SANDBOX-${Date.now()}`,
+        notes: notes || 'Payment completed via mobile app sandbox',
+      };
+
+      const payment = await this.paymentService.updatePayment(paymentId, updateData);
+
+      res.status(200).json({
+        success: true,
+        data: payment,
+        message: 'Payment completed successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to complete payment',
+      });
+    }
+  }
 }
 
