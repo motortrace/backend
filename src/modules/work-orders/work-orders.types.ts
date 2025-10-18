@@ -473,6 +473,8 @@ export interface IWorkOrderService {
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
     approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string): Promise<any>;
     rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string): Promise<any>;
+    finalizeEstimate(approvalId: string, finalizedById: string): Promise<any>;
+    generateInvoice(workOrderId: string, userId: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
     getGeneralStats(): Promise<GeneralStats>;
 }

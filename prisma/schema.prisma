@@ -736,6 +736,7 @@ model WorkOrderApproval {
   id           String       @id @default(cuid())
   workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
+  type         ApprovalType @default(ESTIMATE) // ESTIMATE or INVOICE
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
@@ -746,6 +747,12 @@ model WorkOrderApproval {
   customerSignature String? // URL to signature file or signature data
   pdfUrl        String?      // URL to generated estimate PDF
   inspectionPdfUrl String?   // URL to generated inspection PDF
+  
+  // Finalization and Versioning
+  isFinal      Boolean      @default(false) // Only finalized estimates enable payment gateway
+  version      Int          @default(1)    // Estimate version number
+  finalizedAt  DateTime?    // When estimate was finalized
+  
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -755,6 +762,11 @@ enum ApprovalStatus {
   APPROVED
   DECLINED
   EXPIRED
+}
+
+enum ApprovalType {
+  ESTIMATE
+  INVOICE
 }
 
 enum ApprovalMethod {

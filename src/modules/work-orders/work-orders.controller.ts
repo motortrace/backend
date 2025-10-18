@@ -1077,5 +1077,78 @@ export class WorkOrderController {
       });
     }
   }
+
+  async finalizeEstimate(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.finalizeEstimate(approvalId, userProfile.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async generateInvoice(req: any, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.generateInvoice(workOrderId, userProfile.id);
+
+      res.json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
 

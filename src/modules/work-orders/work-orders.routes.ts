@@ -69,6 +69,8 @@ router.get('/:workOrderId/approvals', workOrderController.getWorkOrderApprovals.
 // WorkOrderApproval approval routes (customer accessible)
 router.post('/approvals/:approvalId/approve', authenticateSupabaseToken, workOrderController.approveWorkOrderApproval.bind(workOrderController));
 router.post('/approvals/:approvalId/reject', authenticateSupabaseToken, workOrderController.rejectWorkOrderApproval.bind(workOrderController));
+router.post('/approvals/:approvalId/finalize', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.finalizeEstimate.bind(workOrderController));
+router.post('/:workOrderId/generate-invoice', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.generateInvoice.bind(workOrderController));
 
 router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
 router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));
