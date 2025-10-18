@@ -34,6 +34,7 @@ model UserProfile {
   workOrderApprovals WorkOrderApproval[] @relation("WorkOrderApprovals")
   mileageEntries MileageEntry[]
   carExpenses    CarExpense[]
+  sentMessages   WorkOrderMessage[]
 }
 
 model ServiceAdvisor {
@@ -218,6 +219,7 @@ model WorkOrder {
   invoices        Invoice[]
   notifications   Notification[]
   serviceHistory  VehicleServiceHistory[]
+  messages        WorkOrderMessage[]
 }
 
 // ============================================================================
@@ -1358,4 +1360,68 @@ enum LoginAction {
  LOGIN_SUCCESS
  LOGIN_FAILED
  LOGOUT
+}
+
+// ============================================================================
+// WORK ORDER MESSAGING SYSTEM
+// ============================================================================
+
+model WorkOrderMessage {
+  id            String            @id @default(cuid())
+  workOrder     WorkOrder         @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderId   String
+  
+  // Sender Information
+  sender        UserProfile       @relation(fields: [senderId], references: [id])
+  senderId      String
+  senderRole    UserRole          // Role of the sender (CUSTOMER, SERVICE_ADVISOR, TECHNICIAN, etc.)
+  
+  // Message Content
+  message       String            @db.Text
+  messageType   MessageType       @default(TEXT)
+  
+  // Status and Metadata
+  status        MessageStatus     @default(SENT)
+  isRead        Boolean           @default(false)
+  readAt        DateTime?
+  
+  // Attachments (optional)
+  attachments   MessageAttachment[]
+  
+  // Timestamps
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  @@index([workOrderId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([workOrderId, isRead])
+}
+
+model MessageAttachment {
+  id            String            @id @default(cuid())
+  message       WorkOrderMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId     String
+  
+  // File Information
+  fileUrl       String
+  fileName      String
+  fileType      String            // MIME type
+  fileSize      Int               // Size in bytes
+  
+  // Metadata
+  uploadedAt    DateTime          @default(now())
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM  // System-generated messages
+}
+
+enum MessageStatus {
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
 }
