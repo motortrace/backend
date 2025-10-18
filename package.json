@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.13.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@supabase/auth-js": "^2.75.1",
     "@supabase/supabase-js": "^2.53.0",
     "@types/multer": "^2.0.0",
@@ -27,6 +28,9 @@
     "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
     "pdfmake": "^0.2.20",
+    "redis": "^5.8.3",
+    "socket.io": "^4.7.5",
+    "socket.io-parser": "^4.2.4",
     "stripe": "^19.1.0",
     "uuid": "^12.0.0",
     "zod": "^4.0.14"

@@ -37,6 +37,8 @@ initializeServices().then(() => {
     console.log(` DB check: http://localhost:${PORT}/test-db`);
     console.log(` Storage endpoints: http://localhost:${PORT}/storage`);
   });
+
+  console.log(' Server ready - no Socket.IO initialized');
 });
 
 // Graceful shutdown
