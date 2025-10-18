@@ -806,7 +806,49 @@ export class InspectionTemplatesService {
 
   // Utility Methods
   async getAvailableTemplates(): Promise<InspectionTemplatesResponse> {
-    return this.getInspectionTemplates({ isActive: true });
+    try {
+      const templates = await this.prisma.inspectionTemplate.findMany({
+        where: { isActive: true },
+        include: {
+          templateItems: {
+            orderBy: { sortOrder: 'asc' }
+          },
+          _count: {
+            select: {
+              workOrderInspections: true
+            }
+          }
+        },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { name: 'asc' }
+        ]
+      });
+
+      return {
+        success: true,
+        data: templates,
+        pagination: {
+          page: 1,
+          limit: templates.length,
+          total: templates.length,
+          totalPages: 1
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching available templates:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch available templates',
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 0,
+          total: 0,
+          totalPages: 0
+        }
+      };
+    }
   }
 
   async getTemplatesByCategory(category: string): Promise<InspectionTemplatesResponse> {
