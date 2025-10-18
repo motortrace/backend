@@ -555,7 +555,7 @@ model ServiceInspection {
 // Updated WorkOrderInspection to link to templates
 model WorkOrderInspection {
   id           String              @id @default(cuid())
-  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   inspector    Technician?         @relation("Inspections", fields: [inspectorId], references: [id])
   inspectorId  String?
@@ -574,7 +574,7 @@ model WorkOrderInspection {
 // Updated InspectionChecklistItem to reference template items
 model InspectionChecklistItem {
   id                    String                  @id @default(cuid())
-  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id])
+  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId          String
   templateItem          InspectionTemplateItem? @relation(fields: [templateItemId], references: [id]) // NEW: Link to template
   templateItemId        String?                 // NEW: Template item this result is based on
@@ -599,7 +599,7 @@ enum ChecklistStatus {
 
 model TireInspection {
   id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId String
   position     TirePosition
   brand        String?    // Tire brand
@@ -621,7 +621,7 @@ enum TirePosition {
 
 model WorkOrderInspectionAttachment {
   id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId String
   fileUrl      String
   fileName     String?    // Original filename
@@ -636,11 +636,11 @@ model WorkOrderInspectionAttachment {
 // Labor & Parts Usage
 model WorkOrderLabor {
   id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // Parent service (REQUIRED - labor must belong to a service)
-  service          WorkOrderService @relation(fields: [serviceId], references: [id])
+  service          WorkOrderService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId        String
   
   laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
@@ -667,7 +667,7 @@ model WorkOrderLabor {
 
 model WorkOrderPart {
   id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // NO serviceId - parts are independent, not tied to services
@@ -696,7 +696,7 @@ model WorkOrderPart {
 // Miscellaneous Charges - Custom charges not covered by services or parts
 model WorkOrderMiscCharge {
   id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   description      String        // "Diagnostic Fee", "Towing Charge", etc.
   quantity         Int           @default(1)
@@ -725,7 +725,7 @@ enum MiscChargeCategory {
 
 model WorkOrderApproval {
   id           String       @id @default(cuid())
-  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
@@ -768,7 +768,7 @@ enum PartSource {
 // QC, Attachments & Payments
 model WorkOrderQC {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   passed       Boolean    // QC pass/fail status
   inspector    Technician? @relation("QCInspections", fields: [inspectorId], references: [id])
@@ -783,7 +783,7 @@ model WorkOrderQC {
 
 model WorkOrderAttachment {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   fileUrl      String     // URL to the stored file
   fileName     String?    // Original filename
@@ -810,7 +810,7 @@ enum AttachmentCategory {
 
 model Payment {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   method       PaymentMethod
   amount       Decimal    @db.Decimal(10,2)
@@ -873,7 +873,7 @@ enum ServiceStatus {
 
 model WorkOrderService {
   id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // Template reference (optional - can create custom services)
@@ -930,7 +930,7 @@ enum LineItemType {
 model Invoice {
   id              String        @id @default(cuid())
   invoiceNumber   String        @unique
-  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId     String
   
   // Invoice Details
@@ -1179,7 +1179,7 @@ model VehicleServiceHistory {
 
   // Link to work order if applicable
   workOrderId String?
-  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
 

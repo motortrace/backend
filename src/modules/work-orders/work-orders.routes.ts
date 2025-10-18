@@ -35,6 +35,7 @@ router.put('/labor/:laborId/reset-subtotal', authenticateSupabaseToken, requireS
 // Work Order Services Routes
 router.post('/:workOrderId/services', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrderService.bind(workOrderController));
 router.get('/:workOrderId/services', workOrderController.getWorkOrderServices.bind(workOrderController));
+router.delete('/services/:serviceId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderService.bind(workOrderController));
 
 // Work Order Payments Routes
 router.post('/:workOrderId/payments', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createPayment.bind(workOrderController));

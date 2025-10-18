@@ -251,6 +251,23 @@ export class WorkOrderController {
     }
   }
 
+  async deleteWorkOrderService(req: Request, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      await this.workOrderService.deleteWorkOrderService(serviceId);
+
+      res.json({
+        success: true,
+        message: 'Work order service deleted successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order Payments
   async createPayment(req: Request, res: Response) {
     try {

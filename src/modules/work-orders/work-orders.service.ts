@@ -1495,13 +1495,22 @@ export class WorkOrderService {
       throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
     }
 
+    // Use canned service data as defaults
+    const quantity = data.quantity || 1;
+    const unitPrice = data.unitPrice || Number(cannedService.price);
+    const description = data.description || cannedService.name;
+    
     // Create the work order service (this is what the customer pays for)
     const service = await this.prisma.workOrderService.create({
       data: {
-        ...data,
-        quantity: data.quantity || 1,
-        unitPrice: data.unitPrice || Number(cannedService.price),
-        subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
+        workOrderId: data.workOrderId,
+        cannedServiceId: data.cannedServiceId,
+        description: description,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: quantity * unitPrice,
+        status: 'PENDING',
+        notes: data.notes,
       },
     });
 
@@ -1585,6 +1594,25 @@ export class WorkOrderService {
     });
 
     return services;
+  }
+
+  // Delete work order service
+  async deleteWorkOrderService(serviceId: string) {
+    // Check if service exists
+    const service = await this.prisma.workOrderService.findUnique({
+      where: { id: serviceId },
+    });
+
+    if (!service) {
+      throw new Error(`Work order service with ID '${serviceId}' not found`);
+    }
+
+    // Delete the service (cascade will handle labor items)
+    await this.prisma.workOrderService.delete({
+      where: { id: serviceId },
+    });
+
+    return { message: 'Service deleted successfully' };
   }
 
   // Create payment

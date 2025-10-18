@@ -336,9 +336,9 @@ export interface WorkOrderWithDetails {
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;
   cannedServiceId: string;
-  description: string;  // Required field
+  description?: string;  // Optional - defaults to canned service name
   quantity?: number;
-  unitPrice?: number;
+  unitPrice?: number;  // Optional - defaults to canned service price
   notes?: string;
 }
 
@@ -429,6 +429,7 @@ export interface IWorkOrderService {
   // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
+  deleteWorkOrderService(serviceId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
