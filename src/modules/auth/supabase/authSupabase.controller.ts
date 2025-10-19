@@ -409,6 +409,7 @@ export class AuthSupabaseController {
       const userProfile = await this.prisma.userProfile.findUnique({
         where: { supabaseUserId: req.user.id },
         select: {
+          id: true,
           name: true,
           phone: true,
           profileImage: true,
@@ -434,6 +435,7 @@ export class AuthSupabaseController {
       res.json({
         success: true,
         profile: {
+          id: userProfile.id,
           fullName: userProfile.name || '',
           phoneNumber: userProfile.phone || '',
           profileImageUrl: normalizeImageUrl(userProfile.profileImage),

@@ -133,4 +133,11 @@ router.get(
   paymentController.getPaymentStatuses.bind(paymentController)
 );
 
+// Complete Payment Route (for sandbox/mobile app)
+router.post(
+  '/:paymentId/complete',
+  authenticateSupabaseToken,
+  paymentController.completePayment.bind(paymentController)
+);
+
 export default router;

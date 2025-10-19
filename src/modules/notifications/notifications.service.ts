@@ -19,7 +19,7 @@ export class NotificationService {
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.emailTemplates = new EmailTemplates();
-    
+
     // Configure nodemailer
     this.emailTransporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -30,6 +30,149 @@ export class NotificationService {
         pass: process.env.SMTP_PASS,
       },
     });
+  }
+
+  /**
+   * Get notifications for a user
+   */
+  async getNotifications(userId: string, limit?: number): Promise<any[]> {
+    try {
+      const notifications = await this.prisma.notification.findMany({
+        where: {
+          userProfileId: userId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+      });
+
+      return notifications;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get unread notification count for a user
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    try {
+      const count = await this.prisma.notification.count({
+        where: {
+          userProfileId: userId,
+          isRead: false,
+        },
+      });
+
+      return count;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark notification as read
+   */
+  async markAsRead(notificationId: string, userId: string): Promise<void> {
+    try {
+      await this.prisma.notification.updateMany({
+        where: {
+          id: notificationId,
+          userProfileId: userId,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark all notifications as read for a user
+   */
+  async markAllAsRead(userId: string): Promise<void> {
+    try {
+      await this.prisma.notification.updateMany({
+        where: {
+          userProfileId: userId,
+          isRead: false,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete notification
+   */
+  async deleteNotification(notificationId: string, userId: string): Promise<void> {
+    try {
+      await this.prisma.notification.deleteMany({
+        where: {
+          id: notificationId,
+          userProfileId: userId,
+        },
+      });
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get notification preferences for a user
+   */
+  async getPreferences(userId: string): Promise<any | null> {
+    try {
+      // For now, return default preferences
+      // In a real implementation, you'd have a NotificationPreferences table
+      return {
+        userProfileId: userId,
+        emailEnabled: true,
+        pushEnabled: true,
+        workOrderStatusChanges: true,
+        serviceApprovals: true,
+        partApprovals: true,
+        inspectionReports: true,
+        paymentConfirmations: true,
+        appointmentReminders: true,
+        vehicleReadyAlerts: true,
+        quietHoursEnabled: false,
+      };
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update notification preferences for a user
+   */
+  async updatePreferences(userId: string, preferences: any): Promise<any> {
+    try {
+      // For now, just return the preferences
+      // In a real implementation, you'd save to a NotificationPreferences table
+      return {
+        userProfileId: userId,
+        ...preferences,
+      };
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      throw error;
+    }
   }
 
   /**
