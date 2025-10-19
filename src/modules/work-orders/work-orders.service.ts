@@ -1827,6 +1827,7 @@ export class WorkOrderService {
             isFinal: true,
             version: true,
             finalizedAt: true,
+            pdfUrl: true,
             approvedBy: {
               select: {
                 id: true,
