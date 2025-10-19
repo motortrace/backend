@@ -670,6 +670,26 @@ export class WorkOrderController {
     }
   }
 
+  async updateWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      const updateData = req.body;
+
+      const inspection = await this.workOrderService.updateWorkOrderInspection(inspectionId, updateData);
+
+      res.json({
+        success: true,
+        data: inspection,
+        message: 'Work order inspection updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order QC
   async createWorkOrderQC(req: Request, res: Response) {
     try {

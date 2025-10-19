@@ -1818,15 +1818,6 @@ export class WorkOrderService {
           },
         },
         approvals: {
-          include: {
-            approvedBy: {
-              select: {
-                id: true,
-                name: true,
-                profileImage: true,
-              },
-            },
-          },
           select: {
             id: true,
             status: true,
@@ -3041,6 +3032,47 @@ export class WorkOrderService {
     });
 
     return { message: 'Inspection deleted successfully' };
+  }
+
+  // Update work order inspection
+  async updateWorkOrderInspection(inspectionId: string, data: any) {
+    // Check if inspection exists
+    const existingInspection = await this.prisma.workOrderInspection.findUnique({
+      where: { id: inspectionId },
+    });
+
+    if (!existingInspection) {
+      throw new Error(`Work order inspection with ID '${inspectionId}' not found`);
+    }
+
+    // Update the inspection
+    const updatedInspection = await this.prisma.workOrderInspection.update({
+      where: { id: inspectionId },
+      data: {
+        ...data,
+        // Convert date strings to Date objects if needed
+        ...(data.date && { date: new Date(data.date) }),
+      },
+      include: {
+        inspector: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        checklistItems: true,
+        tireChecks: true,
+        attachments: true,
+      },
+    });
+
+    return updatedInspection;
   }
 
   // Create work order QC
