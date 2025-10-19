@@ -29,10 +29,15 @@ router.get('/', appointmentController.getAppointments.bind(appointmentController
 router.get('/unassigned', authenticateSupabaseToken, requireServiceAdvisor, appointmentController.getUnassignedAppointments.bind(appointmentController));
 
 // Confirmed appointments without active work orders
-router.get('/confirmed-without-work-orders', appointmentController.getConfirmedAppointmentsWithoutWorkOrders.bind(appointmentController));
+router.get('/assigned-without-work-orders', appointmentController.getConfirmedAppointmentsWithoutWorkOrders.bind(appointmentController));
 
 // Calendar appointments (PENDING and CONFIRMED)
 router.get('/calendar', appointmentController.getCalendarAppointments.bind(appointmentController));
+
+// Status-specific routes
+router.get('/pending', appointmentController.getPendingAppointments.bind(appointmentController));
+router.get('/confirmed', appointmentController.getConfirmedAppointments.bind(appointmentController));
+router.get('/completed', appointmentController.getCompletedAppointments.bind(appointmentController));
 
 // Advisor availability for scheduling
 router.get('/advisors/availability', validateAdvisorAvailability, appointmentController.getAdvisorsAvailability.bind(appointmentController));

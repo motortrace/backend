@@ -55,9 +55,26 @@ export class WorkOrderService {
 
     // Lock services for estimate generation (change PENDING/REJECTED to ESTIMATED)
     async lockServicesForEstimate(workOrderId: string) {
+      // Update services to ESTIMATED status
       await this.prisma.workOrderService.updateMany({
         where: {
           workOrderId,
+          status: {
+            in: [ServiceStatus.PENDING, ServiceStatus.REJECTED],
+          },
+        },
+        data: {
+          status: ServiceStatus.ESTIMATED,
+        },
+      });
+
+      // Also update associated labor items to ESTIMATED status
+      await this.prisma.workOrderLabor.updateMany({
+        where: {
+          workOrderId,
+          service: {
+            status: ServiceStatus.ESTIMATED,
+          },
           status: {
             in: [ServiceStatus.PENDING, ServiceStatus.REJECTED],
           },
