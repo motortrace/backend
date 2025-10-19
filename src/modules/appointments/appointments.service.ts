@@ -701,7 +701,7 @@ export class AppointmentService implements IAppointmentsService {
   async assignAppointment(appointmentId: string, assignedToId: string): Promise<AppointmentWithServices> {
     const appointment = await this.prisma.appointment.update({
       where: { id: appointmentId },
-      data: { assignedToId },
+      data: { assignedToId, status: AppointmentStatus.CONFIRMED },
       include: {
         cannedServices: {
           include: {
