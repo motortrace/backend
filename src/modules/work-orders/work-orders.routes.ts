@@ -35,6 +35,7 @@ router.put('/labor/:laborId/reset-subtotal', authenticateSupabaseToken, requireS
 // Work Order Services Routes
 router.post('/:workOrderId/services', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrderService.bind(workOrderController));
 router.get('/:workOrderId/services', workOrderController.getWorkOrderServices.bind(workOrderController));
+router.delete('/services/:serviceId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderService.bind(workOrderController));
 
 // Work Order Payments Routes
 router.post('/:workOrderId/payments', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createPayment.bind(workOrderController));
@@ -47,17 +48,18 @@ router.get('/:workOrderId/attachments', workOrderController.getWorkOrderAttachme
 // Work Order Inspections Routes
 router.post('/:workOrderId/inspections', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderInspection.bind(workOrderController));
 router.get('/:workOrderId/inspections', workOrderController.getWorkOrderInspections.bind(workOrderController));
+router.put('/inspections/:inspectionId', authenticateSupabaseToken, requireTechnician, workOrderController.updateWorkOrderInspection.bind(workOrderController));
+router.delete('/inspections/:inspectionId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderInspection.bind(workOrderController));
 
 // Work Order QC Routes
 router.post('/:workOrderId/qc', authenticateSupabaseToken, requireTechnician, workOrderController.createWorkOrderQC.bind(workOrderController));
 router.get('/:workOrderId/qc', workOrderController.getWorkOrderQC.bind(workOrderController));
 
-// Customer Approval Routes (authenticated customers only)
-router.post('/services/:serviceId/approve', authenticateSupabaseToken, workOrderController.approveService.bind(workOrderController));
-router.post('/services/:serviceId/reject', authenticateSupabaseToken, workOrderController.rejectService.bind(workOrderController));
-router.post('/parts/:partId/approve', authenticateSupabaseToken, workOrderController.approvePart.bind(workOrderController));
-router.post('/parts/:partId/reject', authenticateSupabaseToken, workOrderController.rejectPart.bind(workOrderController));
-router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrderController.getPendingApprovals.bind(workOrderController));
+// Misc Charges Routes
+router.post('/:workOrderId/misc-charges', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.createWorkOrderMiscCharge.bind(workOrderController));
+router.get('/:workOrderId/misc-charges', workOrderController.getWorkOrderMiscCharges.bind(workOrderController));
+router.put('/misc-charges/:miscChargeId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderMiscCharge.bind(workOrderController));
+router.delete('/misc-charges/:miscChargeId', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.deleteWorkOrderMiscCharge.bind(workOrderController));
 
 // Part Installation Routes (technician workflows)
 
@@ -68,6 +70,8 @@ router.get('/:workOrderId/approvals', workOrderController.getWorkOrderApprovals.
 // WorkOrderApproval approval routes (customer accessible)
 router.post('/approvals/:approvalId/approve', authenticateSupabaseToken, workOrderController.approveWorkOrderApproval.bind(workOrderController));
 router.post('/approvals/:approvalId/reject', authenticateSupabaseToken, workOrderController.rejectWorkOrderApproval.bind(workOrderController));
+router.post('/approvals/:approvalId/finalize', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.finalizeEstimate.bind(workOrderController));
+router.post('/:workOrderId/generate-invoice', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.generateInvoice.bind(workOrderController));
 
 router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
 router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));

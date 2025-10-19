@@ -15,10 +15,18 @@ import {
   PaymentWebhookData,
 } from './payments.types';
 import { PrismaClient } from '@prisma/client';
+import Stripe from 'stripe';
 
 export class PaymentService {
-  constructor(private readonly prisma: PrismaClient) {}
-  // Create payment intent for online credit card payments (Stripe sandbox)
+  private stripe: Stripe;
+
+  constructor(private readonly prisma: PrismaClient) {
+    // Initialize Stripe with secret key from environment
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_SECRET_KEY', {
+      apiVersion: '2025-09-30.clover',
+    });
+  }
+  // Create payment intent for online credit card payments (Stripe integration)
   async createPaymentIntent(data: CreateOnlinePaymentRequest): Promise<PaymentIntentResponse> {
     // Verify work order exists and get estimate amount
     const workOrder = await this.prisma.workOrder.findUnique({
@@ -36,23 +44,35 @@ export class PaymentService {
     // Use estimate amount if available, otherwise use provided amount
     const amount = workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : data.amount;
 
-    // For sandbox testing, return a mock Stripe payment intent
-    // In production, this would create a real Stripe payment intent
-    const paymentIntent: PaymentIntentResponse = {
-      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      clientSecret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
-      amount,
-      currency: data.currency || 'USD',
-      status: 'requires_payment_method',
-      metadata: {
-        workOrderId: data.workOrderId,
-        workOrderNumber: workOrder.workOrderNumber,
-        customerName: workOrder.customer.name,
-        vehicleInfo: `${workOrder.vehicle.make} ${workOrder.vehicle.model}`,
-      },
-    };
+    // Create real Stripe payment intent
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: (data.currency || 'usd').toLowerCase(),
+        metadata: {
+          workOrderId: data.workOrderId,
+          workOrderNumber: workOrder.workOrderNumber,
+          customerName: workOrder.customer.name,
+          vehicleInfo: `${workOrder.vehicle.make} ${workOrder.vehicle.model}`,
+        },
+        description: `Payment for Work Order ${workOrder.workOrderNumber}`,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
 
-    return paymentIntent;
+      return {
+        id: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret!,
+        amount: paymentIntent.amount / 100, // Convert back to dollars
+        currency: paymentIntent.currency.toUpperCase(),
+        status: paymentIntent.status,
+        metadata: paymentIntent.metadata,
+      };
+    } catch (error) {
+      console.error('Stripe payment intent creation failed:', error);
+      throw new Error('Failed to create payment intent');
+    }
   }
 
   // Create manual payment (cash, check, etc.) with image upload
@@ -66,34 +86,34 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
-    // Verify invoice exists before accepting payment
+    // Optional: Check if invoice exists and validate amount against it
     const invoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
-    if (!invoice) {
-      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
+    // If invoice exists, validate payment amount doesn't exceed remaining balance
+    if (invoice) {
+      const invoiceTotal = Number(invoice.totalAmount);
+      const alreadyPaid = Number(invoice.paidAmount || 0);
+      const remainingBalance = invoiceTotal - alreadyPaid;
+
+      if (data.amount > remainingBalance) {
+        throw new Error(
+          `Payment amount (${data.amount}) exceeds remaining balance (${remainingBalance}). ` +
+          `Invoice total: ${invoiceTotal}, Already paid: ${alreadyPaid}`
+        );
+      }
     }
 
-    // Validate payment amount doesn't exceed invoice total
-    const invoiceTotal = Number(invoice.totalAmount);
-    const alreadyPaid = Number(invoice.paidAmount || 0);
-    const remainingBalance = invoiceTotal - alreadyPaid;
+    // Verify service advisor exists (if provided)
+    if (data.processedById) {
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
+        where: { id: data.processedById },
+      });
 
-    if (data.amount > remainingBalance) {
-      throw new Error(
-        `Payment amount (${data.amount}) exceeds remaining balance (${remainingBalance}). ` +
-        `Invoice total: ${invoiceTotal}, Already paid: ${alreadyPaid}`
-      );
-    }
-
-    // Verify service advisor exists
-    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
-      where: { id: data.processedById },
-    });
-
-    if (!serviceAdvisor) {
-      throw new Error('Service advisor not found');
+      if (!serviceAdvisor) {
+        throw new Error('Service advisor not found');
+      }
     }
 
     // Create payment record with image
@@ -104,7 +124,7 @@ export class PaymentService {
         amount: data.amount,
         reference: data.reference,
         status: PaymentStatus.PAID,
-        processedById: data.processedById,
+        processedById: data.processedById || undefined,
         notes: data.notes,
         paidAt: new Date(),
         // Store payment image URL in notes or create a separate field
@@ -146,18 +166,15 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
-    // Verify invoice exists before accepting payment
+    // Check if invoice exists
     const invoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
-    if (!invoice) {
-      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
-    }
-
-    // For sandbox testing, use invoice total instead of estimatedTotal
-    // In production, this would process with Stripe
-    const amount = Number(invoice.totalAmount);
+    // Use invoice total if available, otherwise use provided amount or estimated total
+    const amount = invoice 
+      ? Number(invoice.totalAmount) 
+      : (data.amount || (workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : 0));
     
     // Generate mock transaction ID
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -300,13 +317,15 @@ export class PaymentService {
       throw new Error('Refund amount cannot exceed payment amount');
     }
 
-    // Verify service advisor exists
-    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
-      where: { id: data.processedById },
-    });
+    // Verify service advisor exists (if provided)
+    if (data.processedById) {
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
+        where: { id: data.processedById },
+      });
 
-    if (!serviceAdvisor) {
-      throw new Error('Service advisor not found');
+      if (!serviceAdvisor) {
+        throw new Error('Service advisor not found');
+      }
     }
 
     const updatedPayment = await this.prisma.payment.update({

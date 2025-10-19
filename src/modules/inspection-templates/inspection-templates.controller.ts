@@ -10,6 +10,7 @@ import {
   validateUpdateChecklistItem,
   validateInspectionTemplateFilters,
   validateWorkOrderInspectionFilters,
+  validateCancelInspection,
   templateIdSchema,
   inspectionIdSchema,
   checklistItemIdSchema
@@ -843,6 +844,200 @@ export class InspectionTemplatesController {
     return upload.single('file');
   }
 
+  // Status Transition Controllers
+  async startInspectionController(req: Request, res: Response) {
+    try {
+      const validation = inspectionIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.startInspection(validation.value.id);
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        // Check if it's a not found error
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        // Otherwise it's a validation/transition error
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - startInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async pauseInspectionController(req: Request, res: Response) {
+    try {
+      const validation = inspectionIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.pauseInspection(validation.value.id);
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - pauseInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async resumeInspectionController(req: Request, res: Response) {
+    try {
+      const validation = inspectionIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.resumeInspection(validation.value.id);
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - resumeInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async completeInspectionController(req: Request, res: Response) {
+    try {
+      const validation = inspectionIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.completeInspection(validation.value.id);
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - completeInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async cancelInspectionController(req: Request, res: Response) {
+    try {
+      const idValidation = inspectionIdSchema.validate({ id: req.params.id });
+      if (idValidation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: idValidation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const bodyValidation = validateCancelInspection(req.body);
+      if (bodyValidation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: bodyValidation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.cancelInspection(
+        idValidation.value.id,
+        bodyValidation.value.reason
+      );
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - cancelInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  async deleteInspectionController(req: Request, res: Response) {
+    try {
+      const validation = inspectionIdSchema.validate({ id: req.params.id });
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid inspection ID',
+          details: validation.error.details.map(detail => detail.message)
+        });
+      }
+
+      const result = await this.service.deleteWorkOrderInspection(validation.value.id);
+      
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        if (result.error?.includes('not found')) {
+          return res.status(404).json(result);
+        }
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Controller error - deleteInspectionController:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
 
 }
 
