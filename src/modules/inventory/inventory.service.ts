@@ -926,40 +926,42 @@ export class InventoryService {
   async getLowStockProducts(category?: string): Promise<any[]> {
     const prismaAny = this.prisma as any;
 
-    const where: any = {
-      stock: { lt: 10, gt: 0 },
-    };
-
+    // Only use the availability flag 'Low Stock' (case-insensitive) to find low-stock items.
+    // We removed the column-to-column comparison (quantity < minquantity) to avoid including
+    // 'Out of Stock' items that were being matched by that check.
     if (category && category !== 'All Categories') {
-      where.category = category;
+      const rows = await prismaAny.$queryRawUnsafe(
+        `SELECT * FROM products WHERE lower(availability) = 'low stock' AND category = $1 ORDER BY COALESCE(quantity, 999999) ASC, productname ASC`,
+        category,
+      );
+      return rows;
     }
 
-    const products = await prismaAny.product.findMany({
-      where,
-      orderBy: [{ stock: 'asc' }, { productname: 'asc' }],
-    });
+    const rows = await prismaAny.$queryRawUnsafe(
+      `SELECT * FROM products WHERE lower(availability) = 'low stock' ORDER BY COALESCE(quantity, 999999) ASC, productname ASC`,
+    );
 
-    return products;
+    return rows;
   }
 
   // Get out-of-stock products (stock = 0), optional category filter
   async getOutOfStockProducts(category?: string): Promise<any[]> {
     const prismaAny = this.prisma as any;
 
-    const where: any = {
-      stock: 0,
-    };
-
+    // Include products that are explicitly marked 'Out of Stock' OR have quantity/stock = 0
     if (category && category !== 'All Categories') {
-      where.category = category;
+      const rows = await prismaAny.$queryRawUnsafe(
+        `SELECT * FROM products WHERE (lower(availability) = 'out of stock' OR quantity = 0 OR stock = 0) AND category = $1 ORDER BY productname ASC`,
+        category,
+      );
+      return rows;
     }
 
-    const products = await prismaAny.product.findMany({
-      where,
-      orderBy: { productname: 'asc' },
-    });
+    const rows = await prismaAny.$queryRawUnsafe(
+      `SELECT * FROM products WHERE (lower(availability) = 'out of stock' OR quantity = 0 OR stock = 0) ORDER BY productname ASC`,
+    );
 
-    return products;
+    return rows;
   }
 
   // Update product quantity and minquantity (also updates stock and availability)
