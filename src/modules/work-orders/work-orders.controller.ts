@@ -44,8 +44,8 @@ export class WorkOrderController {
         // Generate estimate PDF
         const pdfUrl = await this.workOrderService.generateEstimatePDF(workOrderId);
 
-        // Expire previous WorkOrderApproval entries for this work order/status
-        await this.workOrderService.expirePreviousApprovals(workOrderId, 'PENDING');
+        // Expire previous WorkOrderApproval entries for this work order
+        await this.workOrderService.expirePreviousApprovals(workOrderId);
 
         // Create new WorkOrderApproval entry
         const approval = await this.workOrderService.createWorkOrderApproval({
@@ -1006,7 +1006,7 @@ export class WorkOrderController {
       }
 
       // Check if user is a customer or manager
-      let customerId: string | null = null;
+      let approvedById: string | null = null;
 
       // Try to find customer profile first
       const customer = await (this.workOrderService as any).prisma.customer.findUnique({
@@ -1014,11 +1014,11 @@ export class WorkOrderController {
       });
 
       if (customer) {
-        // User is a customer
-        customerId = customer.id;
+        // User is a customer - use their UserProfile ID for approval
+        approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
         // Manager can approve on behalf of customers
-        customerId = null;
+        approvedById = null;
       } else {
         return res.status(403).json({
           success: false,
@@ -1026,7 +1026,7 @@ export class WorkOrderController {
         });
       }
 
-      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, customerId, notes);
+      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, approvedById, notes);
 
       res.json({
         success: true,
@@ -1064,7 +1064,7 @@ export class WorkOrderController {
       }
 
       // Check if user is a customer or manager
-      let customerId: string | null = null;
+      let approvedById: string | null = null;
 
       // Try to find customer profile first
       const customer = await (this.workOrderService as any).prisma.customer.findUnique({
@@ -1072,19 +1072,19 @@ export class WorkOrderController {
       });
 
       if (customer) {
-        // User is a customer
-        customerId = customer.id;
+        // User is a customer - use their UserProfile ID for rejection
+        approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
-        // Manager can approve on behalf of customers
-        customerId = null;
+        // Manager can reject on behalf of customers
+        approvedById = null;
       } else {
         return res.status(403).json({
           success: false,
-          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+          error: 'Unauthorized: Only customers or managers can reject work order approvals'
         });
       }
 
-      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, customerId, reason);
+      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, approvedById, reason);
 
       res.json({
         success: true,

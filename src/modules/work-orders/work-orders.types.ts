@@ -469,11 +469,11 @@ export interface IWorkOrderService {
     // Estimate PDF and approval helpers
     generateEstimatePDF(workOrderId: string): Promise<string>;
     lockServicesForEstimate(workOrderId: string): Promise<void>;
-    expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
+    expirePreviousApprovals(workOrderId: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
-    approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string): Promise<any>;
-    rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string): Promise<any>;
+    approveWorkOrderApproval(approvalId: string, approvedById: string | null, notes?: string): Promise<any>;
+    rejectWorkOrderApproval(approvalId: string, approvedById: string | null, reason?: string): Promise<any>;
     finalizeEstimate(approvalId: string, finalizedById: string): Promise<any>;
     generateInvoice(workOrderId: string, userId: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;

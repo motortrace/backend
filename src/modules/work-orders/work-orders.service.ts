@@ -68,13 +68,11 @@ export class WorkOrderService {
       });
     }
 
-    // Expire previous WorkOrderApproval entries for a work order and status
-    async expirePreviousApprovals(workOrderId: string, status: ApprovalStatus) {
+    // Expire previous WorkOrderApproval entries for a work order
+    async expirePreviousApprovals(workOrderId: string) {
       await this.prisma.workOrderApproval.updateMany({
         where: {
           workOrderId,
-          status,
-          pdfUrl: { not: null },
         },
         data: { status: ApprovalStatus.EXPIRED },
       });
@@ -156,7 +154,7 @@ export class WorkOrderService {
     }
 
   // Approve WorkOrderApproval entry and auto-approve all services and parts
-  async approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string) {
+  async approveWorkOrderApproval(approvalId: string, approvedById: string | null, notes?: string) {
       // Get the WorkOrderApproval entry
       const approval = await this.prisma.workOrderApproval.findUnique({
         where: { id: approvalId },
@@ -173,9 +171,14 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If customerId is provided (not a manager approval), validate that the customer owns this work order
-      if (customerId) {
-        if (approval.workOrder.customerId !== customerId) {
+      // If approvedById is provided (not a manager approval), validate that the user is the customer who owns this work order
+      if (approvedById) {
+        // Find the customer profile for this user
+        const customerForUser = await this.prisma.customer.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        if (!customerForUser || approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only approve work order approvals for your own work orders');
         }
       }
@@ -186,7 +189,7 @@ export class WorkOrderService {
         data: {
           status: ApprovalStatus.APPROVED,
           approvedAt: new Date(),
-          approvedById: customerId || undefined, // Allow null for manager approvals
+          approvedById: approvedById || null, // Allow null for manager approvals
           method: ApprovalMethod.APP,
           notes,
         },
@@ -213,7 +216,7 @@ export class WorkOrderService {
     }
 
   // Reject WorkOrderApproval entry
-  async rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string) {
+  async rejectWorkOrderApproval(approvalId: string, approvedById: string | null, reason?: string) {
       // Get the WorkOrderApproval entry
       const approval = await this.prisma.workOrderApproval.findUnique({
         where: { id: approvalId },
@@ -230,9 +233,14 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If customerId is provided (not a manager approval), validate that the customer owns this work order
-      if (customerId) {
-        if (approval.workOrder.customerId !== customerId) {
+      // If approvedById is provided (not a manager rejection), validate that the user is the customer who owns this work order
+      if (approvedById) {
+        // Find the customer profile for this user
+        const customerForUser = await this.prisma.customer.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        if (!customerForUser || approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only reject work order approvals for your own work orders');
         }
       }
@@ -243,7 +251,7 @@ export class WorkOrderService {
         data: {
           status: ApprovalStatus.DECLINED,
           approvedAt: new Date(),
-          approvedById: customerId || undefined, // Allow null for manager approvals
+          approvedById: approvedById || null, // Allow null for manager rejections
           notes: reason,
         },
       });
