@@ -388,6 +388,340 @@ export class InventoryService {
     });
   }
 
+  // Create an issuance (transactional): create issuance header, parts, and update product quantities
+  async createIssuance(data: any) {
+    const parts = data.parts || [];
+    if (!data.issuance_number || !data.technician_name || !Array.isArray(parts) || parts.length === 0) {
+      throw new Error('Issuance number, technician name, and at least one part are required');
+    }
+
+    const totalQuantity = parts.reduce((s: number, p: any) => s + (p.quantity || 0), 0);
+
+    // Use a transaction to ensure consistency
+  const result = await this.prisma.$transaction(async (tx: any) => {
+      // Create issuance header
+      const issuance = await tx.issuance.create({
+        data: {
+          issuanceNumber: data.issuance_number,
+          dateIssued: data.date_issued ? new Date(data.date_issued) : undefined,
+          technicianName: data.technician_name,
+          recipient: data.recipient,
+          issuedBy: data.issued_by,
+          serviceJob: data.service_job,
+          carDetails: data.car_details,
+          notes: data.notes,
+          totalQuantity: totalQuantity,
+        },
+      });
+
+      // For each part: validate product exists, sufficient quantity, insert part and update product
+      for (const p of parts) {
+        const productId = p.product_id;
+        const requestedQty = Number(p.quantity || 0);
+
+        const product = await tx.product.findUnique({ where: { id: productId } });
+        if (!product) throw new Error(`Product with ID ${productId} not found`);
+
+        const currentQty = product.quantity || 0;
+        const minQty = product.minquantity || 0;
+
+        if (currentQty < requestedQty) {
+          throw new Error(`Insufficient quantity for ${product.productname}. Available: ${currentQty}, Requested: ${requestedQty}`);
+        }
+
+        const newQty = currentQty - requestedQty;
+
+        // Create issuance part row
+        await tx.issuancePart.create({
+          data: {
+            issuanceId: issuance.id,
+            productId: productId,
+            quantity: requestedQty,
+            notes: p.notes || null,
+          },
+        });
+
+        // Update product quantity and availability
+        const availability = newQty === 0 ? 'Out of Stock' : (newQty < minQty ? 'Low Stock' : 'In Stock');
+
+        await tx.product.update({
+          where: { id: productId },
+          data: {
+            quantity: newQty,
+            availability,
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      return issuance;
+    });
+
+    // return issuance with parts included
+    return this.getIssuanceWithParts(result.id);
+  }
+
+  async getIssuanceWithParts(issuanceId: number) {
+    // `this.prisma` types may be out-of-date until `npx prisma generate` is run.
+    // Cast to any here to avoid TypeScript errors while preserving runtime behavior.
+    return await (this.prisma as any).issuance.findUnique({
+      where: { id: issuanceId },
+      include: {
+        parts: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Get issuances with their parts (optional date filtering)
+  async getIssuances(filter: { dateFrom?: string; dateTo?: string } = {}) {
+    const { dateFrom, dateTo } = filter;
+    // Build parameterized query
+    const params: any[] = [];
+    let whereClauses: string[] = [];
+
+    if (dateFrom) {
+      params.push(dateFrom);
+      // Cast the parameter to date to avoid text/date comparison errors
+      whereClauses.push(`i.date_issued >= $${params.length}::date`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      // Cast the parameter to date to avoid text/date comparison errors
+      whereClauses.push(`i.date_issued <= $${params.length}::date`);
+    }
+
+    let query = `
+      SELECT
+        i.*,
+        COALESCE(json_agg(json_build_object(
+          'id', ip.id,
+          'product_id', ip.product_id,
+          'product_name', p.productname,
+          'quantity', ip.quantity,
+          'notes', ip.notes,
+          'image', p.image,
+          'price', p.price
+        )) FILTER (WHERE ip.id IS NOT NULL), '[]') AS parts
+      FROM issuances i
+      LEFT JOIN issuance_parts ip ON i.id = ip.issuance_id
+      LEFT JOIN products p ON ip.product_id = p.id
+    `;
+
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
+    query += ` GROUP BY i.id ORDER BY i.date_issued DESC, i.issuance_number DESC`;
+
+    // Use prisma's raw query; cast prisma to any in case types are not yet generated
+    const rows = await (this.prisma as any).$queryRawUnsafe(query, ...params);
+    return rows;
+  }
+
+  // Parts usage analytics: summary, top parts, and category distribution
+  async getPartsUsageAnalytics(filter: { dateFrom?: string; dateTo?: string; limit?: number } = {}) {
+    const dateFrom = filter.dateFrom || null;
+    const dateTo = filter.dateTo || null;
+    const limit = filter.limit || 10;
+
+    // Use NULL-safe filters so callers can omit dates.
+    const query = `
+      WITH issuance_stats AS (
+        SELECT 
+          COUNT(DISTINCT i.id) as total_issuances,
+          COUNT(ip.id) as total_parts_issued,
+          COUNT(DISTINCT ip.product_id) as unique_parts,
+          CASE 
+            WHEN COUNT(DISTINCT i.id) > 0 THEN COUNT(ip.id)::DECIMAL / COUNT(DISTINCT i.id)
+            ELSE 0 
+          END as avg_parts_per_issuance
+        FROM issuances i
+        LEFT JOIN issuance_parts ip ON i.id = ip.issuance_id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+      ),
+      top_parts AS (
+        SELECT 
+          p.id as product_id,
+          p.productname as product_name,
+          p.category,
+          SUM(ip.quantity) as total_quantity,
+          COUNT(DISTINCT ip.issuance_id) as frequency,
+          CASE 
+            WHEN COUNT(DISTINCT ip.issuance_id) > 0 THEN SUM(ip.quantity)::DECIMAL / COUNT(DISTINCT ip.issuance_id)
+            ELSE 0 
+          END as average_per_issuance
+        FROM issuance_parts ip
+        JOIN products p ON ip.product_id = p.id
+        JOIN issuances i ON ip.issuance_id = i.id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+        GROUP BY p.id, p.productname, p.category
+        ORDER BY total_quantity DESC
+        LIMIT $3
+      ),
+      category_stats AS (
+        SELECT 
+          p.category,
+          SUM(ip.quantity) as quantity,
+          CASE 
+            WHEN (SELECT total_parts_issued FROM issuance_stats) > 0 
+            THEN (SUM(ip.quantity)::DECIMAL / (SELECT total_parts_issued FROM issuance_stats)) * 100
+            ELSE 0 
+          END as percentage
+        FROM issuance_parts ip
+        JOIN products p ON ip.product_id = p.id
+        JOIN issuances i ON ip.issuance_id = i.id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+        GROUP BY p.category
+        ORDER BY quantity DESC
+      )
+      SELECT 
+        (SELECT total_issuances FROM issuance_stats) as total_issuances,
+        (SELECT total_parts_issued FROM issuance_stats) as total_parts_issued,
+        (SELECT unique_parts FROM issuance_stats) as unique_parts,
+        (SELECT avg_parts_per_issuance FROM issuance_stats) as avg_parts_per_issuance,
+        (SELECT json_agg(json_build_object(
+          'product_id', product_id,
+          'product_name', product_name,
+          'category', category,
+          'total_quantity', total_quantity,
+          'frequency', frequency,
+          'average_per_issuance', average_per_issuance
+        )) FROM top_parts) as top_parts,
+        (SELECT json_agg(json_build_object(
+          'category', category,
+          'quantity', quantity,
+          'percentage', ROUND(percentage, 1)
+        )) FROM category_stats) as category_distribution
+    `;
+
+    const rows = await (this.prisma as any).$queryRawUnsafe(query, dateFrom, dateTo, limit);
+    return rows[0] || { total_issuances: 0, total_parts_issued: 0, unique_parts: 0, avg_parts_per_issuance: 0, top_parts: [], category_distribution: [] };
+  }
+
+  // Cost summary analytics: total cost, monthly trend, and category breakdown
+  async getCostSummaryAnalytics(filter: { dateFrom?: string; dateTo?: string } = {}) {
+    const dateFrom = filter.dateFrom || null;
+    const dateTo = filter.dateTo || null;
+
+    const query = `
+      WITH issuance_costs AS (
+        SELECT 
+          i.id,
+          i.date_issued,
+          TO_CHAR(i.date_issued, 'Mon YYYY') as month_display,
+          TO_CHAR(i.date_issued, 'YYYY-MM') as month_key,
+          SUM(
+            CASE 
+              WHEN p.price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(p.price AS NUMERIC) * ip.quantity
+              ELSE 0
+            END
+          ) as issuance_cost
+        FROM issuances i
+        JOIN issuance_parts ip ON i.id = ip.issuance_id
+        JOIN products p ON ip.product_id = p.id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+        GROUP BY i.id, i.date_issued
+      ),
+      monthly_costs AS (
+        SELECT 
+          month_display,
+          month_key,
+          SUM(issuance_cost) as monthly_cost,
+          COUNT(DISTINCT id) as monthly_issuances
+        FROM issuance_costs
+        GROUP BY month_display, month_key
+        ORDER BY month_key
+      ),
+      category_costs AS (
+        SELECT 
+          p.category,
+          SUM(
+            CASE 
+              WHEN p.price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(p.price AS NUMERIC) * ip.quantity
+              ELSE 0
+            END
+          ) as category_cost
+        FROM issuances i
+        JOIN issuance_parts ip ON i.id = ip.issuance_id
+        JOIN products p ON ip.product_id = p.id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+        GROUP BY p.category
+      ),
+      summary_stats AS (
+        SELECT 
+          COUNT(DISTINCT i.id) as total_issuances,
+          SUM(
+            CASE 
+              WHEN p.price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(p.price AS NUMERIC) * ip.quantity
+              ELSE 0
+            END
+          ) as total_cost,
+          CASE 
+            WHEN COUNT(DISTINCT i.id) > 0 THEN 
+              SUM(
+                CASE 
+                  WHEN p.price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(p.price AS NUMERIC) * ip.quantity
+                  ELSE 0
+                END
+              ) / COUNT(DISTINCT i.id)
+            ELSE 0 
+          END as avg_cost_per_issuance,
+          (SELECT MAX(monthly_cost) FROM monthly_costs) as highest_monthly_cost
+        FROM issuances i
+        JOIN issuance_parts ip ON i.id = ip.issuance_id
+        JOIN products p ON ip.product_id = p.id
+        WHERE ($1::date IS NULL OR i.date_issued >= $1::date) AND ($2::date IS NULL OR i.date_issued <= $2::date)
+      )
+      SELECT 
+        (SELECT total_cost FROM summary_stats) as total_cost,
+        (SELECT total_issuances FROM summary_stats) as total_issuances,
+        (SELECT avg_cost_per_issuance FROM summary_stats) as avg_cost_per_issuance,
+        (SELECT highest_monthly_cost FROM summary_stats) as highest_monthly_cost,
+        (SELECT json_agg(json_build_object(
+          'month', month_display,
+          'cost', ROUND(monthly_cost, 2),
+          'issuances', monthly_issuances
+        )) FROM monthly_costs) as monthly_trend,
+        (SELECT json_agg(json_build_object(
+          'category', category,
+          'cost', ROUND(category_cost, 2),
+          'percentage', CASE 
+            WHEN (SELECT total_cost FROM summary_stats) > 0 
+            THEN ROUND((category_cost / (SELECT total_cost FROM summary_stats)) * 100, 1)
+            ELSE 0 
+          END
+        )) FROM category_costs) as category_breakdown
+    `;
+
+    const row = await (this.prisma as any).$queryRawUnsafe(query, dateFrom, dateTo);
+    return row[0] || { total_cost: 0, total_issuances: 0, avg_cost_per_issuance: 0, highest_monthly_cost: 0, monthly_trend: [], category_breakdown: [] };
+  }
+
+  // Order metrics: total issuances, total issued parts, total sales
+  async getOrderMetrics() {
+    const query = `
+      SELECT 
+        COUNT(DISTINCT i.id) as total_issuances,
+        COALESCE(SUM(ip.quantity), 0) as total_issued_parts,
+        COALESCE(SUM(
+          CASE 
+            WHEN p.price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(p.price AS NUMERIC) * ip.quantity
+            ELSE 0
+          END
+        ), 0) as total_sales
+      FROM issuances i
+      LEFT JOIN issuance_parts ip ON i.id = ip.issuance_id
+      LEFT JOIN products p ON ip.product_id = p.id
+    `;
+
+    const rows = await (this.prisma as any).$queryRawUnsafe(query);
+    return rows[0] || { total_issuances: 0, total_issued_parts: 0, total_sales: 0 };
+  }
+
   async getInventoryReport(): Promise<InventoryReport[]> {
     const items = await this.prisma.inventoryItem.findMany({
       include: {
@@ -434,6 +768,227 @@ export class InventoryService {
         usageCount: item._count.workOrderParts,
       };
     });
+  }
+
+  // Fetch products from the products table
+  // Note: The `Product` type is generated by `prisma generate`. If you see TS errors
+  // about `Product` not existing, run `npx prisma generate` and restart the TS server.
+  // Use `any` here until the generated types are available.
+  async getProducts(): Promise<any[]> {
+    return await (this.prisma as any).product.findMany({
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  // Add a new product to the products table
+  async addProduct(data: any): Promise<any> {
+    // Map incoming camelCase request fields to Prisma model fields
+    const payload: any = {
+      productname: data.productName,
+      category: data.category,
+      subcategory: data.subcategory,
+      description: data.description,
+      price: data.price,
+      rating: data.rating ?? 0,
+      reviewcount: data.reviewCount ?? 0,
+      availability: data.availability ?? 'Out of Stock',
+      image: data.image,
+      stock: data.stock ?? 0,
+      compatibility: data.compatibility,
+      position: data.position,
+      brand: data.brand,
+      finish: data.finish,
+      material: data.material,
+      surfaceuse: data.surfaceUse,
+      type: data.type,
+      color: data.color,
+      volume: data.volume,
+      mountingfeatures: data.mountingFeatures,
+      colorcode: data.colorCode,
+      quantity: data.quantity ?? 0,
+      minquantity: data.minQuantity ?? 0,
+      discounttype: data.discountType,
+      discountvalue: data.discountValue ?? 0,
+      warranty: data.warranty,
+      manufacturer: data.manufacturer,
+      manufactureddate: data.manufacturedDate ? new Date(data.manufacturedDate) : undefined,
+      expirydate: data.expiryDate ? new Date(data.expiryDate) : undefined,
+      notes: data.notes,
+      resistance: data.resistance,
+      drytime: data.dryTime,
+      applicationmethod: data.applicationMethod,
+      voltage: data.voltage,
+      amprating: data.ampRating,
+      connectortype: data.connectorType,
+      size: data.size,
+    };
+
+    // Remove undefined keys so Prisma/DB defaults apply
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+
+    return await (this.prisma as any).product.create({ data: payload });
+  }
+
+  // Update existing product by id with provided fields
+  async updateProduct(id: number | string, data: any): Promise<any> {
+    // Ensure product exists
+    const existing = await (this.prisma as any).product.findUnique({ where: { id: Number(id) } });
+    if (!existing) {
+      throw new Error('Product not found');
+    }
+
+    // Build update payload by mapping known camelCase fields to DB columns
+    const fieldMap: Record<string, string> = {
+      productName: 'productname', category: 'category', subcategory: 'subcategory', description: 'description',
+      price: 'price', rating: 'rating', reviewCount: 'reviewcount', availability: 'availability', image: 'image',
+      stock: 'stock', compatibility: 'compatibility', position: 'position', brand: 'brand', finish: 'finish',
+      material: 'material', surfaceUse: 'surfaceuse', type: 'type', color: 'color', volume: 'volume',
+      mountingFeatures: 'mountingfeatures', colorCode: 'colorcode', quantity: 'quantity', minQuantity: 'minquantity',
+      discountType: 'discounttype', discountValue: 'discountvalue', warranty: 'warranty', manufacturer: 'manufacturer',
+      manufacturedDate: 'manufactureddate', expiryDate: 'expirydate', notes: 'notes', resistance: 'resistance',
+      dryTime: 'drytime', applicationMethod: 'applicationmethod', voltage: 'voltage', ampRating: 'amprating',
+      connectorType: 'connectortype', size: 'size'
+    };
+
+    const payload: any = {};
+    for (const [key, col] of Object.entries(fieldMap)) {
+      if (data[key] !== undefined) {
+        // parse dates
+        if (key === 'manufacturedDate' || key === 'expiryDate') {
+          payload[col] = data[key] ? new Date(data[key]) : null;
+        } else {
+          payload[col] = data[key];
+        }
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      throw new Error('No valid fields provided for update');
+    }
+
+    // updated_at handled by Prisma @updatedAt if configured; otherwise set explicitly
+    const updated = await (this.prisma as any).product.update({ where: { id: Number(id) }, data: payload });
+    return updated;
+  }
+
+  // Delete product by id
+  async deleteProduct(id: number | string): Promise<any> {
+    const existing = await (this.prisma as any).product.findUnique({ where: { id: Number(id) } });
+    if (!existing) {
+      throw new Error('Product not found');
+    }
+
+    const deleted = await (this.prisma as any).product.delete({ where: { id: Number(id) } });
+    return deleted;
+  }
+
+  // Inventory analytics aggregated from products table
+  async getInventoryAnalytics(): Promise<any> {
+    const prismaAny = this.prisma as any;
+
+    const totalProductsRes: any = await prismaAny.$queryRaw`SELECT COUNT(*)::int as count FROM products`;
+    const totalProducts = Number(totalProductsRes[0]?.count ?? 0);
+
+    const lowStockRes: any = await prismaAny.$queryRaw`SELECT COUNT(*)::int as count FROM products WHERE stock < 10 AND stock > 0`;
+    const lowStockItems = Number(lowStockRes[0]?.count ?? 0);
+
+    const outOfStockRes: any = await prismaAny.$queryRaw`SELECT COUNT(*)::int as count FROM products WHERE stock = 0`;
+    const outOfStockItems = Number(outOfStockRes[0]?.count ?? 0);
+
+    const inStockRes: any = await prismaAny.$queryRaw`SELECT COUNT(*)::int as count FROM products WHERE stock > 0`;
+    const inStockItems = Number(inStockRes[0]?.count ?? 0);
+
+    const inventoryValueRes: any = await prismaAny.$queryRaw`
+      SELECT SUM(
+        CASE WHEN price ~ '^[0-9]+(\\.[0-9]+)?$' THEN CAST(price AS NUMERIC) * COALESCE(stock,0) ELSE 0 END
+      ) AS total_value FROM products`;
+    const inventoryValue = Number(inventoryValueRes[0]?.total_value ?? 0);
+
+    const categoryDistribution: any = await prismaAny.$queryRaw`
+      SELECT category, COUNT(*)::int as count FROM products GROUP BY category ORDER BY count DESC`;
+
+    const availabilityDistribution: any = await prismaAny.$queryRaw`
+      SELECT availability, COUNT(*)::int as count FROM products GROUP BY availability ORDER BY count DESC`;
+
+    return {
+      totalProducts,
+      lowStockItems,
+      outOfStockItems,
+      inStockItems,
+      inventoryValue: Math.round(inventoryValue * 100) / 100,
+      categoryDistribution,
+      availabilityDistribution,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // Get low stock products (stock < 10 and stock > 0), optional category filter
+  async getLowStockProducts(category?: string): Promise<any[]> {
+    const prismaAny = this.prisma as any;
+
+    const where: any = {
+      stock: { lt: 10, gt: 0 },
+    };
+
+    if (category && category !== 'All Categories') {
+      where.category = category;
+    }
+
+    const products = await prismaAny.product.findMany({
+      where,
+      orderBy: [{ stock: 'asc' }, { productname: 'asc' }],
+    });
+
+    return products;
+  }
+
+  // Get out-of-stock products (stock = 0), optional category filter
+  async getOutOfStockProducts(category?: string): Promise<any[]> {
+    const prismaAny = this.prisma as any;
+
+    const where: any = {
+      stock: 0,
+    };
+
+    if (category && category !== 'All Categories') {
+      where.category = category;
+    }
+
+    const products = await prismaAny.product.findMany({
+      where,
+      orderBy: { productname: 'asc' },
+    });
+
+    return products;
+  }
+
+  // Update product quantity and minquantity (also updates stock and availability)
+  async updateProductQuantity(id: number | string, fields: { quantity?: number; minquantity?: number }): Promise<any> {
+    const prismaAny = this.prisma as any;
+
+    // Ensure product exists
+    const existing = await prismaAny.product.findUnique({ where: { id: Number(id) } });
+    if (!existing) throw new Error('Product not found');
+
+    const updateData: any = {};
+    if (fields.quantity !== undefined) {
+      updateData.quantity = fields.quantity;
+      updateData.stock = fields.quantity; // assume stock mirrors quantity
+
+      // Set availability string based on new quantity
+      if (fields.quantity === 0) updateData.availability = 'Out of Stock';
+      else if (fields.quantity < 10) updateData.availability = 'Low Stock';
+      else updateData.availability = 'In Stock';
+    }
+
+    if (fields.minquantity !== undefined) {
+      updateData.minquantity = fields.minquantity;
+    }
+
+    if (Object.keys(updateData).length === 0) throw new Error('At least one field (quantity or minquantity) is required for update');
+
+    const updated = await prismaAny.product.update({ where: { id: Number(id) }, data: updateData });
+    return updated;
   }
 
   async getReorderSuggestions(): Promise<ReorderSuggestion[]> {
