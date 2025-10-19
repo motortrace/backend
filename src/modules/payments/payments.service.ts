@@ -15,10 +15,18 @@ import {
   PaymentWebhookData,
 } from './payments.types';
 import { PrismaClient } from '@prisma/client';
+import Stripe from 'stripe';
 
 export class PaymentService {
-  constructor(private readonly prisma: PrismaClient) {}
-  // Create payment intent for online credit card payments (Stripe sandbox)
+  private stripe: Stripe;
+
+  constructor(private readonly prisma: PrismaClient) {
+    // Initialize Stripe with secret key from environment
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_SECRET_KEY', {
+      apiVersion: '2025-09-30.clover',
+    });
+  }
+  // Create payment intent for online credit card payments (Stripe integration)
   async createPaymentIntent(data: CreateOnlinePaymentRequest): Promise<PaymentIntentResponse> {
     // Verify work order exists and get estimate amount
     const workOrder = await this.prisma.workOrder.findUnique({
@@ -36,23 +44,35 @@ export class PaymentService {
     // Use estimate amount if available, otherwise use provided amount
     const amount = workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : data.amount;
 
-    // For sandbox testing, return a mock Stripe payment intent
-    // In production, this would create a real Stripe payment intent
-    const paymentIntent: PaymentIntentResponse = {
-      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      clientSecret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
-      amount,
-      currency: data.currency || 'USD',
-      status: 'requires_payment_method',
-      metadata: {
-        workOrderId: data.workOrderId,
-        workOrderNumber: workOrder.workOrderNumber,
-        customerName: workOrder.customer.name,
-        vehicleInfo: `${workOrder.vehicle.make} ${workOrder.vehicle.model}`,
-      },
-    };
+    // Create real Stripe payment intent
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: (data.currency || 'usd').toLowerCase(),
+        metadata: {
+          workOrderId: data.workOrderId,
+          workOrderNumber: workOrder.workOrderNumber,
+          customerName: workOrder.customer.name,
+          vehicleInfo: `${workOrder.vehicle.make} ${workOrder.vehicle.model}`,
+        },
+        description: `Payment for Work Order ${workOrder.workOrderNumber}`,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
 
-    return paymentIntent;
+      return {
+        id: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret!,
+        amount: paymentIntent.amount / 100, // Convert back to dollars
+        currency: paymentIntent.currency.toUpperCase(),
+        status: paymentIntent.status,
+        metadata: paymentIntent.metadata,
+      };
+    } catch (error) {
+      console.error('Stripe payment intent creation failed:', error);
+      throw new Error('Failed to create payment intent');
+    }
   }
 
   // Create manual payment (cash, check, etc.) with image upload
