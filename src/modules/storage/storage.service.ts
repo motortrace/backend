@@ -1,6 +1,6 @@
 import { supabase } from '../../shared/utils/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export interface UploadResult {
   success: boolean;
@@ -29,7 +29,7 @@ export class StorageService {
         return { success: false, error: 'PDF size exceeds 20MB limit' };
       }
       const fileExtension = fileName.split('.').pop() || 'pdf';
-      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${workOrderId}/${randomUUID()}.${fileExtension}`;
       const serviceClient = this.getServiceClient();
       const { error } = await serviceClient.storage
         .from(this.ESTIMATES_BUCKET)
@@ -61,7 +61,7 @@ export class StorageService {
         return { success: false, error: 'PDF size exceeds 20MB limit' };
       }
       const fileExtension = fileName.split('.').pop() || 'pdf';
-      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${workOrderId}/${randomUUID()}.${fileExtension}`;
       const serviceClient = this.getServiceClient();
       const { error } = await serviceClient.storage
         .from(this.INSPECTIONS_BUCKET)
@@ -141,7 +141,7 @@ export class StorageService {
 
       // Generate unique filename
       const fileExtension = fileName.split('.').pop() || 'jpg';
-      const uniqueFileName = `${userId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${userId}/${randomUUID()}.${fileExtension}`;
 
       // Use service client for uploads (bypasses RLS)
       const serviceClient = this.getServiceClient();
@@ -199,7 +199,7 @@ export class StorageService {
       }
 
       const fileExtension = fileName.split('.').pop() || 'jpg';
-      const uniqueFileName = `${userId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${userId}/${randomUUID()}.${fileExtension}`;
 
       const serviceClient = this.getServiceClient();
 
@@ -327,7 +327,7 @@ export class StorageService {
       }
 
       const fileExtension = fileName.split('.').pop() || 'jpg';
-      const uniqueFileName = `${workOrderId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${workOrderId}/${randomUUID()}.${fileExtension}`;
 
       const serviceClient = this.getServiceClient();
 
@@ -369,7 +369,7 @@ export class StorageService {
       }
 
       const fileExtension = fileName.split('.').pop() || 'jpg';
-      const uniqueFileName = `${inspectionId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${inspectionId}/${randomUUID()}.${fileExtension}`;
 
       const serviceClient = this.getServiceClient();
 
@@ -421,7 +421,7 @@ export class StorageService {
 
       // Generate unique filename
       const fileExtension = fileName.split('.').pop() || 'jpg';
-      const uniqueFileName = `${templateId}/${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${templateId}/${randomUUID()}.${fileExtension}`;
 
       // Use service client for uploads (bypasses RLS)
       const serviceClient = this.getServiceClient();

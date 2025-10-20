@@ -1,0 +1,47 @@
+-- Auto-generated migration to add products table
+CREATE TABLE IF NOT EXISTS public.products (
+    id serial PRIMARY KEY,
+    productname character varying(255) NOT NULL,
+    category character varying(50),
+    subcategory character varying(100),
+    description text,
+    price character varying(50),
+    rating numeric(3,2) DEFAULT 0,
+    reviewcount integer DEFAULT 0,
+    availability character varying(20) DEFAULT 'Out of Stock',
+    image character varying(500),
+    stock integer DEFAULT 0,
+    compatibility character varying(255),
+    "position" character varying(100),
+    brand character varying(100),
+    finish character varying(100),
+    material character varying(100),
+    surfaceuse character varying(100),
+    type character varying(100),
+    color character varying(50),
+    volume character varying(50),
+    mountingfeatures character varying(255),
+    colorcode character varying(50),
+    quantity integer DEFAULT 0,
+    minquantity integer DEFAULT 0,
+    discounttype character varying(50),
+    discountvalue numeric(10,2) DEFAULT 0,
+    warranty character varying(100),
+    manufacturer character varying(100),
+    manufactureddate date,
+    expirydate date,
+    notes text,
+    resistance character varying(100),
+    drytime character varying(50),
+    applicationmethod character varying(100),
+    voltage character varying(50),
+    amprating character varying(50),
+    connectortype character varying(100),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    size character varying(100)
+);
+
+-- Add enum constraints via CHECKs if desired (keeping simple per request)
+
+-- End of migration
