@@ -69,7 +69,7 @@ router.delete('/products/:id', inventoryController.deleteProduct.bind(inventoryC
 
 // Individual item operations (dynamic route should come last)
 router.get('/:id', inventoryController.getInventoryItem.bind(inventoryController));
-router.put('/:id', validateUpdateInventoryItem, inventoryController.updateInventoryItem.bind(inventoryController));
+router.put('/:id', inventoryController.updateInventoryItem.bind(inventoryController));
 router.delete('/:id', inventoryController.deleteInventoryItem.bind(inventoryController));
 
 export default router;
