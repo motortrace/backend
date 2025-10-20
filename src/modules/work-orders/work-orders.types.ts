@@ -40,6 +40,12 @@ export interface CreateWorkOrderRequest {
   serviceNotes?: string[];
 }
 
+export interface CreateWorkOrderPartRequest {
+  inventoryItemId: string;
+  quantity: number;
+  technicianId?: string;
+}
+
 export interface UpdateWorkOrderRequest {
   status?: WorkOrderStatus;
   jobType?: JobType;
@@ -432,6 +438,8 @@ export interface IWorkOrderService {
   // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
+  createWorkOrderPart(workOrderId: string, data: CreateWorkOrderPartRequest): Promise<any>;
+  getWorkOrderParts(workOrderId: string): Promise<any>;
   deleteWorkOrderService(serviceId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;

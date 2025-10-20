@@ -251,6 +251,53 @@ export class WorkOrderController {
     }
   }
 
+  async createWorkOrderPart(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const { inventoryItemId, quantity, technicianId } = req.body;
+
+      if (!inventoryItemId || !quantity) {
+        return res.status(400).json({
+          success: false,
+          error: 'inventoryItemId and quantity are required',
+        });
+      }
+
+      const part = await this.workOrderService.createWorkOrderPart(workOrderId, {
+        inventoryItemId,
+        quantity,
+        technicianId,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: part,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getWorkOrderParts(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const parts = await this.workOrderService.getWorkOrderParts(workOrderId);
+
+      res.json({
+        success: true,
+        data: parts,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async deleteWorkOrderService(req: Request, res: Response) {
     try {
       const { serviceId } = req.params;

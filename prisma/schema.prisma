@@ -388,6 +388,7 @@ model InventoryItem {
   supplierPartNumber String?
   core           Boolean    @default(false) // Core charge applicable
   corePrice      Decimal?   @db.Decimal(10,2)
+  isOEM        Boolean      @default(true) // OEM vs non-OEM indicator
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

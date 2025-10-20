@@ -9,6 +9,7 @@ import {
   WorkOrderStatistics,
   WorkOrderCreationStats,
   GeneralStats,
+  CreateWorkOrderPartRequest,
 } from './work-orders.types';
 import { CalendarAppointment } from '../appointments/appointments.types';
 import { PrismaClient } from '@prisma/client';
@@ -25,7 +26,7 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
     inspections: { include: { inspector: { select: { id: true; userProfile: { select: { id: true; name: true; profileImage: true } } } } } };
     laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedMinutes: true } }; technician: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
-    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
+    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true; isOEM: true } }; installedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
     attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
     approvals: {
@@ -2080,6 +2081,139 @@ export class WorkOrderService {
     });
 
     return services;
+  }
+
+  // Create work order part and reduce inventory
+  async createWorkOrderPart(workOrderId: string, data: { inventoryItemId: string; quantity: number; technicianId?: string }) {
+    // Verify work order exists
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+    });
+
+    if (!workOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Get inventory item
+    const inventoryItem = await this.prisma.inventoryItem.findUnique({
+      where: { id: data.inventoryItemId },
+    });
+
+    if (!inventoryItem) {
+      throw new Error('Inventory item not found');
+    }
+
+    // Check if sufficient stock is available
+    if (inventoryItem.quantity < data.quantity) {
+      throw new Error(`Insufficient stock. Available: ${inventoryItem.quantity}, Requested: ${data.quantity}`);
+    }
+
+    // Verify technician exists if provided
+    if (data.technicianId) {
+      const technician = await this.prisma.technician.findUnique({
+        where: { id: data.technicianId },
+      });
+
+      if (!technician) {
+        throw new Error('Technician not found');
+      }
+    }
+
+    // Create part and reduce inventory in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Reduce inventory stock
+      await tx.inventoryItem.update({
+        where: { id: data.inventoryItemId },
+        data: {
+          quantity: {
+            decrement: data.quantity,
+          },
+        },
+      });
+
+      // Create work order part
+      const part = await tx.workOrderPart.create({
+        data: {
+          workOrderId,
+          inventoryItemId: data.inventoryItemId,
+          quantity: data.quantity,
+          unitPrice: inventoryItem.unitPrice,
+          subtotal: inventoryItem.unitPrice.toNumber() * data.quantity,
+          installedById: data.technicianId,
+          status: ServiceStatus.PENDING,
+        },
+        include: {
+          part: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              partNumber: true,
+              manufacturer: true,
+              isOEM: true,
+              location: true,
+            },
+          },
+          installedBy: data.technicianId ? {
+            select: {
+              id: true,
+              employeeId: true,
+              userProfile: {
+                select: {
+                  id: true,
+                  name: true,
+                  profileImage: true,
+                },
+              },
+            },
+          } : undefined,
+        },
+      });
+
+      return part;
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(workOrderId);
+
+    return result;
+  }
+
+  // Get work order parts
+  async getWorkOrderParts(workOrderId: string) {
+    const parts = await this.prisma.workOrderPart.findMany({
+      where: { workOrderId },
+      include: {
+        part: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            partNumber: true,
+            manufacturer: true,
+            location: true,
+          },
+        },
+        installedBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return parts;
   }
 
   // Delete work order service
