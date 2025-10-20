@@ -388,6 +388,7 @@ model InventoryItem {
   supplierPartNumber String?
   core           Boolean    @default(false) // Core charge applicable
   corePrice      Decimal?   @db.Decimal(10,2)
+  isOEM        Boolean      @default(true) // OEM vs non-OEM indicator
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -396,6 +397,94 @@ model InventoryItem {
   
   // Relations
   workOrderParts WorkOrderPart[]
+}
+
+// Simple product catalog table added from provided SQL dump
+// NOTE: `availability` was previously modeled as an enum. The DB contains
+// human-readable values (e.g. 'Low Stock') which caused enum mapping errors
+// at runtime. Keep availability as a simple String to match the existing table.
+
+model Product {
+  id                 Int       @id @default(autoincrement())
+  productname        String    @db.VarChar(255)
+  category           String?   @db.VarChar(50)
+  subcategory        String?   @db.VarChar(100)
+  description        String?
+  price              String?   @db.VarChar(50)
+  rating             Decimal?  @db.Decimal(3,2) @default(0)
+  reviewcount        Int?      @default(0)
+  availability       String?   @db.VarChar(20) @default("Out of Stock")
+  image              String?   @db.VarChar(500)
+  stock              Int?      @default(0)
+  compatibility      String?   @db.VarChar(255)
+  position           String?   @db.VarChar(100) @map("position")
+  brand              String?   @db.VarChar(100)
+  finish             String?   @db.VarChar(100)
+  material           String?   @db.VarChar(100)
+  surfaceuse         String?   @db.VarChar(100)
+  type               String?   @db.VarChar(100)
+  color              String?   @db.VarChar(50)
+  volume             String?   @db.VarChar(50)
+  mountingfeatures   String?   @db.VarChar(255)
+  colorcode          String?   @db.VarChar(50)
+  quantity           Int?      @default(0)
+  minquantity        Int?      @default(0)
+  discounttype       String?   @db.VarChar(50)
+  discountvalue      Decimal?  @db.Decimal(10,2) @default(0)
+  warranty           String?   @db.VarChar(100)
+  manufacturer       String?   @db.VarChar(100)
+  manufactureddate   DateTime?
+  expirydate         DateTime?
+  notes              String?
+  resistance         String?   @db.VarChar(100)
+  drytime            String?   @db.VarChar(50)
+  applicationmethod  String?   @db.VarChar(100)
+  voltage            String?   @db.VarChar(50)
+  amprating          String?   @db.VarChar(50)
+  connectortype      String?   @db.VarChar(100)
+  created_at         DateTime? @default(now())
+  updated_at         DateTime? @updatedAt
+  size               String?   @db.VarChar(100)
+
+  // Relations
+  issuanceParts      IssuancePart[]
+
+  @@map("products")
+}
+
+// Issuance records and parts used in issuance (matching SQL dump files)
+model Issuance {
+  id               Int      @id @default(autoincrement())
+  issuanceNumber   String   @db.VarChar(50) @unique @map("issuance_number")
+  dateIssued       DateTime @default(now()) @map("date_issued")
+  technicianName   String   @db.VarChar(100) @map("technician_name")
+  recipient        String?  @db.VarChar(200)
+  issuedBy         String?  @db.VarChar(100) @map("issued_by")
+  serviceJob       String?  @db.VarChar(200) @map("service_job")
+  carDetails       String?  @db.Text @map("car_details")
+  notes            String?  @db.Text
+  totalQuantity    Int      @default(0) @map("total_quantity")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  parts IssuancePart[]
+
+  @@map("issuances")
+}
+
+model IssuancePart {
+  id          Int      @id @default(autoincrement())
+  issuanceId  Int?     @map("issuance_id")
+  productId   Int?     @map("product_id")
+  quantity    Int
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  issuance Issuance? @relation(fields: [issuanceId], references: [id], onDelete: Cascade)
+  product  Product?   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([issuanceId, productId])
+  @@map("issuance_parts")
 }
 
 enum UserRole {

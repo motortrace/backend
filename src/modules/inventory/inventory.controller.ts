@@ -352,6 +352,110 @@ export class InventoryController {
     }
   }
 
+  // New: get products from products table
+  async getProducts(req: Request, res: Response) {
+    try {
+      const products = await this.inventoryService.getProducts();
+      res.status(200).json({ success: true, data: products });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async addProduct(req: Request, res: Response) {
+    try {
+      const data = req.body;
+
+      // Basic validation
+      if (!data.productName || !data.category || !data.price) {
+        return res.status(400).json({ success: false, error: 'Missing required fields: productName, category, and price are required' });
+      }
+
+      const product = await this.inventoryService.addProduct(data);
+      res.status(201).json({ success: true, data: product });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async updateProduct(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      const updated = await this.inventoryService.updateProduct(id, data);
+      res.status(200).json({ success: true, data: updated });
+    } catch (error: any) {
+      if (error.message === 'Product not found') {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+      if (error.message === 'No valid fields provided for update') {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async deleteProduct(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const deleted = await this.inventoryService.deleteProduct(id);
+      res.status(200).json({ success: true, message: 'Product deleted successfully', deletedProduct: deleted });
+    } catch (error: any) {
+      if (error.message === 'Product not found') {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async getInventoryAnalytics(req: Request, res: Response) {
+    try {
+      const analytics = await this.inventoryService.getInventoryAnalytics();
+      res.status(200).json(analytics);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async getLowStockProducts(req: Request, res: Response) {
+    try {
+      const category = (req.query.category as string) || undefined;
+      const products = await this.inventoryService.getLowStockProducts(category);
+      res.status(200).json({ lowStockProducts: products, count: products.length, category: category || 'All Categories' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async getOutOfStockProducts(req: Request, res: Response) {
+    try {
+      const category = (req.query.category as string) || undefined;
+      const products = await this.inventoryService.getOutOfStockProducts(category);
+      res.status(200).json({ outOfStockProducts: products, count: products.length, category: category || 'All Categories' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async updateProductQuantity(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { quantity, minquantity } = req.body;
+
+      if (quantity === undefined && minquantity === undefined) {
+        return res.status(400).json({ success: false, error: 'At least one field (quantity or minquantity) is required for update' });
+      }
+
+      const updated = await this.inventoryService.updateProductQuantity(id, { quantity, minquantity });
+      res.status(200).json({ message: 'Product quantity updated successfully', product: updated });
+    } catch (error: any) {
+      if (error.message === 'Product not found') return res.status(404).json({ success: false, error: 'Product not found' });
+      if (error.message === 'At least one field (quantity or minquantity) is required for update') return res.status(400).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
   async bulkUpdateInventory(req: Request, res: Response) {
     try {
       const { items } = req.body;
@@ -431,6 +535,134 @@ export class InventoryController {
         success: false,
         error: error.message,
       });
+    }
+  }
+
+  // Create a new issuance (transactional)
+  async createIssuance(req: Request, res: Response) {
+    try {
+      const data = req.body;
+      const issuance = await this.inventoryService.createIssuance(data as any);
+
+      res.status(201).json({
+        success: true,
+        message: 'Issuance created successfully',
+        data: issuance,
+      });
+    } catch (error: any) {
+      // Match existing error handling style
+      if (error.message && error.message.startsWith('Insufficient quantity')) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      if (error.message && error.message.includes('not found')) {
+        return res.status(404).json({ success: false, error: error.message });
+      }
+      console.error('createIssuance error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+    }
+  }
+
+  // Get all issuances with optional dateFrom and dateTo filters
+  async getIssuances(req: Request, res: Response) {
+    try {
+      const { dateFrom, dateTo } = req.query as any;
+      const rows = await this.inventoryService.getIssuances({ dateFrom, dateTo });
+      res.status(200).json({ success: true, data: rows });
+    } catch (error: any) {
+      console.error('getIssuances error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+    }
+  }
+
+  // Get a single issuance by ID with its parts
+  async getIssuanceById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const issuanceId = Number(id);
+      if (isNaN(issuanceId)) return res.status(400).json({ success: false, error: 'Invalid issuance id' });
+
+      const issuance = await this.inventoryService.getIssuanceWithParts(issuanceId);
+
+      if (!issuance) return res.status(404).json({ success: false, error: 'Issuance not found' });
+
+      res.status(200).json({ success: true, data: issuance });
+    } catch (error: any) {
+      console.error('getIssuanceById error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+    }
+  }
+
+  // Parts usage analytics
+  async getPartsUsageAnalytics(req: Request, res: Response) {
+    try {
+      const { dateFrom, dateTo, limit } = req.query as any;
+      const data = await this.inventoryService.getPartsUsageAnalytics({ dateFrom, dateTo, limit: limit ? Number(limit) : undefined });
+
+      const analyticsData = {
+        summary: {
+          totalPartsIssued: parseInt(data.total_parts_issued) || 0,
+          totalIssuances: parseInt(data.total_issuances) || 0,
+          uniqueParts: parseInt(data.unique_parts) || 0,
+          averagePartsPerIssuance: parseFloat(data.avg_parts_per_issuance) || 0,
+        },
+        topParts: data.top_parts || [],
+        categoryDistribution: data.category_distribution || [],
+      };
+
+      res.status(200).json({ success: true, data: analyticsData });
+    } catch (error: any) {
+      console.error('getPartsUsageAnalytics error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+    }
+  }
+
+  // Cost summary analytics
+  async getCostSummaryAnalytics(req: Request, res: Response) {
+    try {
+      const { dateFrom, dateTo } = req.query as any;
+      const row = await this.inventoryService.getCostSummaryAnalytics({ dateFrom, dateTo });
+
+      const costSummary = {
+        summary: {
+          totalCost: parseFloat(row.total_cost) || 0,
+          totalIssuances: parseInt(row.total_issuances) || 0,
+          averageCostPerIssuance: parseFloat(row.avg_cost_per_issuance) || 0,
+          highestMonthlyCost: parseFloat(row.highest_monthly_cost) || 0,
+        },
+        monthlyTrend: row.monthly_trend || [],
+        categoryBreakdown: row.category_breakdown || [],
+      };
+
+      res.status(200).json({ success: true, data: costSummary });
+    } catch (error: any) {
+      console.error('getCostSummaryAnalytics error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+    }
+  }
+
+  // Order metrics analytics
+  async getOrderMetrics(req: Request, res: Response) {
+    try {
+      const row = await this.inventoryService.getOrderMetrics();
+
+      const orderMetrics = {
+        metrics: {
+          totalIssuances: parseInt(row.total_issuances) || 0,
+          totalIssuedParts: parseInt(row.total_issued_parts) || 0,
+          totalSales: parseFloat(parseFloat(row.total_sales).toFixed(2)) || 0,
+        },
+        // Placeholder: you can replace with real delta calculations
+        changes: {
+          totalIssuances: 12.5,
+          totalIssuedParts: 8.2,
+          totalSales: -3.1,
+        },
+      };
+
+      res.status(200).json({ success: true, data: orderMetrics });
+    } catch (error: any) {
+      console.error('getOrderMetrics error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
     }
   }
 }
