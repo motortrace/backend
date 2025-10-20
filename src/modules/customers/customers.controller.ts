@@ -254,4 +254,38 @@ export class CustomerController {
       });
     }
   }
+
+  // Create customer without authentication (for admin panel)
+  async createCustomerWithoutAuth(req: Request, res: Response) {
+    try {
+      const { name, email, phone } = req.body;
+
+      // Validate required fields
+      if (!name) {
+        res.status(400).json({
+          success: false,
+          error: 'Name is required'
+        });
+        return;
+      }
+
+      const customer = await this.customerService.createCustomer({
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: customer,
+        message: 'Customer created successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: 'Failed to create customer',
+        message: error.message,
+      });
+    }
+  }
 }

@@ -409,4 +409,45 @@ router.get('/:customerId/statistics', customerController.getCustomerStatistics.b
  */
 router.get('/:customerId/service-history', customerController.getCustomerServiceHistory.bind(customerController));
 
+/**
+ * @swagger
+ * /customers/create-without-auth:
+ *   post:
+ *     summary: Create customer without authentication (for admin panel)
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Customer created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Customer'
+ *       400:
+ *         description: Invalid input
+ */
+router.post('/create-without-auth', customerController.createCustomerWithoutAuth.bind(customerController));
+
 export default router;
