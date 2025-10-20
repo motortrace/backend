@@ -27,6 +27,7 @@ import { serviceRecommendationsRouter } from './modules/service-recommendations'
 import { carExpensesRouter } from './modules/car-expenses';
 import notificationsRoutes from './modules/notifications/notifications.routes';
 import { messageRoutes } from './modules/messages';
+import partsRoutes from './modules/parts/parts.routes';
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/service-recommendations', serviceRecommendationsRouter);
 app.use('/car-expenses', carExpensesRouter);
 app.use('/notifications', notificationsRoutes);
 app.use('/messages', messageRoutes);
+app.use('/parts', partsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

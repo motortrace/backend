@@ -1,4 +1,4 @@
-import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, AppointmentStatus, Prisma } from '@prisma/client';
+import { WorkOrderStatus, JobType, JobPriority, JobSource, WarrantyStatus, WorkflowStep, PaymentStatus, ServiceStatus, PartSource, PaymentMethod, ApprovalStatus, ApprovalMethod, ChecklistStatus, TirePosition, AttachmentCategory, AppointmentStatus, ApprovalType, Prisma } from '@prisma/client';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
@@ -9,6 +9,7 @@ import {
   WorkOrderStatistics,
   WorkOrderCreationStats,
   GeneralStats,
+  CreateWorkOrderPartRequest,
 } from './work-orders.types';
 import { CalendarAppointment } from '../appointments/appointments.types';
 import { PrismaClient } from '@prisma/client';
@@ -25,7 +26,7 @@ type WorkOrderWithDetails = Prisma.WorkOrderGetPayload<{
     services: { include: { cannedService: { select: { id: true; code: true; name: true; description: true; duration: true; price: true } } } };
     inspections: { include: { inspector: { select: { id: true; userProfile: { select: { id: true; name: true; profileImage: true } } } } } };
     laborItems: { include: { laborCatalog: { select: { id: true; code: true; name: true; estimatedMinutes: true } }; technician: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
-    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true } }; installedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
+    partsUsed: { include: { part: { select: { id: true; name: true; sku: true; partNumber: true; manufacturer: true; isOEM: true } }; installedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
     payments: { include: { processedBy: { select: { id: true; userProfile: { select: { id: true; name: true } } } } } };
     attachments: { include: { uploadedBy: { select: { id: true; name: true } } } };
     approvals: {
@@ -53,20 +54,74 @@ export class WorkOrderService {
     this.notificationService = new NotificationService(prisma);
   }
 
-    // Expire previous WorkOrderApproval entries for a work order and status
-    async expirePreviousApprovals(workOrderId: string, status: ApprovalStatus) {
+    // Lock services for estimate generation (change PENDING/REJECTED to ESTIMATED)
+    async lockServicesForEstimate(workOrderId: string) {
+      // Update services to ESTIMATED status
+      await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          status: {
+            in: [ServiceStatus.PENDING, ServiceStatus.REJECTED],
+          },
+        },
+        data: {
+          status: ServiceStatus.ESTIMATED,
+        },
+      });
+
+      // Also update associated labor items to ESTIMATED status
+      await this.prisma.workOrderLabor.updateMany({
+        where: {
+          workOrderId,
+          service: {
+            status: ServiceStatus.ESTIMATED,
+          },
+          status: {
+            in: [ServiceStatus.PENDING, ServiceStatus.REJECTED],
+          },
+        },
+        data: {
+          status: ServiceStatus.ESTIMATED,
+        },
+      });
+    }
+
+    // Expire previous WorkOrderApproval entries for a work order
+    async expirePreviousApprovals(workOrderId: string) {
       await this.prisma.workOrderApproval.updateMany({
         where: {
           workOrderId,
-          status,
-          pdfUrl: { not: null },
         },
         data: { status: ApprovalStatus.EXPIRED },
       });
     }
 
     // Create WorkOrderApproval entry
-    async createWorkOrderApproval(data: { workOrderId: string; status: ApprovalStatus; approvedById: string; pdfUrl: string }) {
+    async createWorkOrderApproval(data: { workOrderId: string; status: ApprovalStatus; approvedById: string; pdfUrl: string; type?: ApprovalType }) {
+      // Check if there's already a finalized estimate for this work order
+      // Only prevent new ESTIMATE type approvals if there's already a finalized estimate
+      // Allow INVOICE type approvals even if there's a finalized estimate
+      if (data.type === ApprovalType.ESTIMATE || !data.type) {
+        const existingFinalizedApproval = await this.prisma.workOrderApproval.findFirst({
+          where: {
+            workOrderId: data.workOrderId,
+            isFinal: true,
+          },
+        });
+
+        if (existingFinalizedApproval) {
+          throw new Error('Cannot create new estimate: A finalized estimate already exists for this work order');
+        }
+      }
+
+      // Get the latest version number for this work order
+      const latestApproval = await this.prisma.workOrderApproval.findFirst({
+        where: { workOrderId: data.workOrderId },
+        orderBy: { version: 'desc' },
+      });
+
+      const nextVersion = (latestApproval?.version || 0) + 1;
+
       // Generate inspection PDF if inspections exist
       let inspectionPdfUrl: string | undefined;
       try {
@@ -91,6 +146,7 @@ export class WorkOrderService {
       return await this.prisma.workOrderApproval.create({
         data: {
           ...data,
+          version: nextVersion,
           inspectionPdfUrl,
         },
       });
@@ -116,7 +172,7 @@ export class WorkOrderService {
     }
 
   // Approve WorkOrderApproval entry and auto-approve all services and parts
-  async approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string) {
+  async approveWorkOrderApproval(approvalId: string, approvedById: string | null, notes?: string) {
       // Get the WorkOrderApproval entry
       const approval = await this.prisma.workOrderApproval.findUnique({
         where: { id: approvalId },
@@ -133,10 +189,26 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If customerId is provided (not a manager approval), validate that the customer owns this work order
-      if (customerId) {
-        if (approval.workOrder.customerId !== customerId) {
+      // If approvedById is provided (not a manager approval), validate authorization
+      if (approvedById) {
+        // Check if user is a customer
+        const customerForUser = await this.prisma.customer.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // Check if user is a service advisor
+        const serviceAdvisorForUser = await this.prisma.serviceAdvisor.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // If customer, validate they own the work order
+        if (customerForUser && approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only approve work order approvals for your own work orders');
+        }
+
+        // If neither customer nor service advisor, reject
+        if (!customerForUser && !serviceAdvisorForUser) {
+          throw new Error('Unauthorized: Only customers or service advisors can approve work order approvals');
         }
       }
 
@@ -146,39 +218,31 @@ export class WorkOrderService {
         data: {
           status: ApprovalStatus.APPROVED,
           approvedAt: new Date(),
-          approvedById: customerId || undefined, // Allow null for manager approvals
+          approvedById: approvedById || null, // Allow null for manager approvals
           method: ApprovalMethod.APP,
           notes,
         },
       });
 
-      // Auto-approve all WorkOrderService entries
+      // Update all WorkOrderService entries to APPROVED (customer approved, ready to assign)
       await this.prisma.workOrderService.updateMany({
         where: {
           workOrderId,
-          customerApproved: false,
-          customerRejected: false,
           status: ServiceStatus.ESTIMATED,
         },
         data: {
-          customerApproved: true,
-          customerRejected: false,
-          approvedAt: new Date(),
-          status: ServiceStatus.PENDING, // Ready to start work
+          status: ServiceStatus.APPROVED,
         },
       });
 
-      // Auto-approve all WorkOrderPart entries
-      await this.prisma.workOrderPart.updateMany({
+      // Update all WorkOrderLabor entries to APPROVED (customer approved, ready to assign)
+      await this.prisma.workOrderLabor.updateMany({
         where: {
           workOrderId,
-          customerApproved: false,
-          customerRejected: false,
+          status: ServiceStatus.ESTIMATED,
         },
         data: {
-          customerApproved: true,
-          customerRejected: false,
-          approvedAt: new Date(),
+          status: ServiceStatus.APPROVED,
         },
       });
 
@@ -188,11 +252,11 @@ export class WorkOrderService {
       // Auto-update work order status (should become APPROVED)
       await this.autoUpdateWorkOrderStatus(workOrderId);
 
-      return { message: 'WorkOrderApproval approved and all services/parts auto-approved successfully' };
+      return { message: 'Work order approved successfully' };
     }
 
   // Reject WorkOrderApproval entry
-  async rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string) {
+  async rejectWorkOrderApproval(approvalId: string, approvedById: string | null, reason?: string) {
       // Get the WorkOrderApproval entry
       const approval = await this.prisma.workOrderApproval.findUnique({
         where: { id: approvalId },
@@ -209,10 +273,26 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If customerId is provided (not a manager approval), validate that the customer owns this work order
-      if (customerId) {
-        if (approval.workOrder.customerId !== customerId) {
+      // If approvedById is provided (not a manager rejection), validate authorization
+      if (approvedById) {
+        // Check if user is a customer
+        const customerForUser = await this.prisma.customer.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // Check if user is a service advisor
+        const serviceAdvisorForUser = await this.prisma.serviceAdvisor.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // If customer, validate they own the work order
+        if (customerForUser && approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only reject work order approvals for your own work orders');
+        }
+
+        // If neither customer nor service advisor, reject
+        if (!customerForUser && !serviceAdvisorForUser) {
+          throw new Error('Unauthorized: Only customers or service advisors can reject work order approvals');
         }
       }
 
@@ -222,12 +302,170 @@ export class WorkOrderService {
         data: {
           status: ApprovalStatus.DECLINED,
           approvedAt: new Date(),
-          approvedById: customerId || undefined, // Allow null for manager approvals
+          approvedById: approvedById || null, // Allow null for manager rejections
           notes: reason,
         },
       });
 
+      // Change all ESTIMATED services back to REJECTED (allows editing/deleting again)
+      await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          status: ServiceStatus.REJECTED,
+        },
+      });
+
+      // Change all ESTIMATED labor items back to REJECTED (allows editing/deleting again)
+      await this.prisma.workOrderLabor.updateMany({
+        where: {
+          workOrderId,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          status: ServiceStatus.REJECTED,
+        },
+      });
+
       return { message: 'WorkOrderApproval rejected' };
+    }
+
+  // Finalize estimate to enable payment gateway
+  async finalizeEstimate(approvalId: string, userId: string) {
+      // Get the WorkOrderApproval entry
+      const approval = await this.prisma.workOrderApproval.findUnique({
+        where: { id: approvalId },
+        include: { workOrder: true },
+      });
+
+      if (!approval) {
+        throw new Error('WorkOrderApproval entry not found');
+      }
+
+      if (approval.status !== ApprovalStatus.APPROVED) {
+        throw new Error('Estimate can only be finalized after customer approval');
+      }
+
+      if (approval.isFinal) {
+        throw new Error('Estimate is already finalized');
+      }
+
+      // Finalize the estimate - just mark it as final, don't change version
+      await this.prisma.workOrderApproval.update({
+        where: { id: approvalId },
+        data: {
+          isFinal: true,
+          finalizedAt: new Date(),
+        },
+      });
+
+      return { message: 'Estimate finalized successfully' };
+    }
+
+  // Generate invoice from finalized estimate
+  async generateInvoice(workOrderId: string, userId: string) {
+      // Check if there's a finalized estimate for this work order
+      const finalizedEstimate = await this.prisma.workOrderApproval.findFirst({
+        where: {
+          workOrderId,
+          isFinal: true,
+          type: ApprovalType.ESTIMATE,
+        },
+        include: { workOrder: true },
+      });
+
+      if (!finalizedEstimate) {
+        throw new Error('Cannot generate invoice: No finalized estimate found for this work order');
+      }
+
+      // Check if invoice already exists
+      const existingInvoice = await this.prisma.workOrderApproval.findFirst({
+        where: {
+          workOrderId,
+          type: ApprovalType.INVOICE,
+        },
+      });
+
+      if (existingInvoice) {
+        throw new Error('Invoice already exists for this work order');
+      }
+
+      // Find the ServiceAdvisor from UserProfile ID for payment processing
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userId },
+      });
+
+      if (!serviceAdvisor) {
+        throw new Error('Service advisor not found for the authenticated user');
+      }
+
+      // Generate invoice PDF
+      const pdfUrl = await this.generateInvoicePDF(workOrderId);
+
+      // Create INVOICE type WorkOrderApproval
+      const invoiceApproval = await this.createWorkOrderApproval({
+        workOrderId,
+        status: ApprovalStatus.APPROVED, // Invoices are auto-approved
+        approvedById: userId,
+        pdfUrl,
+        type: ApprovalType.INVOICE,
+      });
+
+      // Get work order totals for payment creation
+      const workOrder = await this.prisma.workOrder.findUnique({
+        where: { id: workOrderId },
+        include: {
+          services: true,
+          partsUsed: true,
+          miscCharges: true,
+        },
+      });
+
+      if (!workOrder) {
+        throw new Error('Work order not found');
+      }
+
+      // Calculate total amount
+      const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
+      const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
+      const subtotalMisc = workOrder.miscCharges.reduce((sum, m) => sum + Number(m.subtotal), 0);
+      const subtotal = subtotalServices + subtotalParts + subtotalMisc;
+
+      let discountAmount = 0;
+      if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
+        if (workOrder.discountType === 'PERCENTAGE') {
+          discountAmount = subtotal * (Number(workOrder.discountAmount) / 100);
+        } else {
+          discountAmount = Number(workOrder.discountAmount);
+        }
+      }
+
+      const subtotalAfterDiscount = subtotal - discountAmount;
+      const taxRate = 0.18;
+      const taxAmount = subtotalAfterDiscount * taxRate;
+      const totalAmount = subtotalAfterDiscount + taxAmount;
+
+      // Create payment entry for the full invoice amount
+      await this.createPayment({
+        workOrderId,
+        method: PaymentMethod.CASH, // Default to cash, can be updated later
+        amount: totalAmount,
+        reference: `Invoice-${invoiceApproval.id}`,
+        notes: `Auto-generated payment for invoice ${invoiceApproval.id}`,
+        processedById: serviceAdvisor.id, // Use ServiceAdvisor ID for payment
+      });
+
+      // Update work order status to COMPLETED and payment status to PAID
+      await this.updateWorkOrderStatus(workOrderId, WorkOrderStatus.COMPLETED, WorkflowStep.CLOSED);
+
+      return {
+        message: 'Invoice generated successfully',
+        invoiceId: invoiceApproval.id,
+        pdfUrl,
+        totalAmount,
+      };
     }
 
   // Generate PDF estimate for a work order
@@ -246,7 +484,8 @@ export class WorkOrderService {
         },
         partsUsed: {
           include: { part: true }
-        }
+        },
+        miscCharges: true
       }
     });
 
@@ -292,6 +531,17 @@ export class WorkOrderService {
       ]);
     });
 
+    // Add misc charges
+    workOrder.miscCharges.forEach(misc => {
+      tableBody.push([
+        { text: 'Misc', style: 'tableCell' },
+        { text: misc.description, style: 'tableCell' },
+        { text: misc.quantity?.toString() || '1', style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(Number(misc.unitPrice)), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(Number(misc.subtotal)), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
     // Add labor (for reference, not billed)
     workOrder.laborItems.forEach(labor => {
       tableBody.push([
@@ -315,7 +565,8 @@ export class WorkOrderService {
     // Calculate totals
     const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
-    const subtotal = subtotalServices + subtotalParts;
+    const subtotalMisc = workOrder.miscCharges.reduce((sum, m) => sum + Number(m.subtotal), 0);
+    const subtotal = subtotalServices + subtotalParts + subtotalMisc;
     let discountAmount = 0;
     if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
       if (workOrder.discountType === 'PERCENTAGE') {
@@ -358,7 +609,6 @@ export class WorkOrderService {
                 { text: 'ESTIMATE', style: 'invoiceTitle', fontSize: 24, bold: true, alignment: 'right' },
                 { text: `#${workOrder.workOrderNumber}`, style: 'invoiceNumber', fontSize: 14, alignment: 'right' },
                 { text: `Date: ${formatDate(workOrder.createdAt)}`, style: 'invoiceInfo', alignment: 'right' },
-                { text: `Status: ${workOrder.status}`, style: 'invoiceInfo', alignment: 'right' },
               ],
             },
           ],
@@ -836,6 +1086,263 @@ export class WorkOrderService {
     // Upload to Supabase Storage
     const { StorageService } = require('../storage/storage.service');
     const uploadResult = await StorageService.uploadInspectionPDF(
+      pdfBuffer,
+      fileName,
+      workOrderId
+    );
+    if (!uploadResult.success) {
+      throw new Error(uploadResult.error || 'Failed to upload PDF to storage');
+    }
+    return uploadResult.url!;
+  }
+  
+  // Generate PDF invoice for a work order
+  async generateInvoicePDF(workOrderId: string): Promise<string> {
+    // Get work order with all details
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        customer: true,
+        vehicle: true,
+        services: {
+          include: { cannedService: true }
+        },
+        laborItems: {
+          include: { laborCatalog: true }
+        },
+        partsUsed: {
+          include: { part: true }
+        },
+        miscCharges: true
+      }
+    });
+
+    if (!workOrder) throw new Error('WorkOrder not found');
+
+    // Generate file name for storage
+    const fileName = `invoice-${workOrder.workOrderNumber}-${Date.now()}.pdf`;
+
+    // Format currency for Sri Lanka
+    const formatCurrency = (amount: number) => `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatDate = (date: Date) => date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Build table rows: Type | Description | Qty | Unit Price | Total
+    const tableBody: any[][] = [
+      [
+        { text: 'Type', style: 'tableHeader', bold: true },
+        { text: 'Description', style: 'tableHeader', bold: true },
+        { text: 'Qty', style: 'tableHeader', bold: true, alignment: 'center' },
+        { text: 'Unit Price', style: 'tableHeader', bold: true, alignment: 'right' },
+        { text: 'Total', style: 'tableHeader', bold: true, alignment: 'right' },
+      ],
+    ];
+
+    // Add services
+    workOrder.services.forEach(service => {
+      tableBody.push([
+        { text: 'Service', style: 'tableCell' },
+        { text: service.cannedService?.name || service.description, style: 'tableCell' },
+        { text: service.quantity?.toString() || '1', style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(Number(service.unitPrice)), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(Number(service.subtotal)), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
+    // Add parts
+    workOrder.partsUsed.forEach(part => {
+      tableBody.push([
+        { text: 'Part', style: 'tableCell' },
+        { text: part.part?.name || '', style: 'tableCell' },
+        { text: part.quantity?.toString() || '1', style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(Number(part.unitPrice)), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(Number(part.subtotal)), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
+    // Add misc charges
+    workOrder.miscCharges.forEach(misc => {
+      tableBody.push([
+        { text: 'Misc', style: 'tableCell' },
+        { text: misc.description, style: 'tableCell' },
+        { text: misc.quantity?.toString() || '1', style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(Number(misc.unitPrice)), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(Number(misc.subtotal)), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
+    // Vehicle info
+    const vehicle = workOrder.vehicle;
+    const vehicleInfo = [
+      `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+      vehicle.licensePlate ? `License: ${vehicle.licensePlate}` : '',
+      vehicle.vin ? `VIN: ${vehicle.vin}` : '',
+      workOrder.odometerReading ? `Odometer: ${workOrder.odometerReading.toLocaleString()} km` : '',
+    ].filter(line => line).join('\n');
+
+    // Calculate totals
+    const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
+    const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
+    const subtotalMisc = workOrder.miscCharges.reduce((sum, m) => sum + Number(m.subtotal), 0);
+    const subtotal = subtotalServices + subtotalParts + subtotalMisc;
+    let discountAmount = 0;
+    if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
+      if (workOrder.discountType === 'PERCENTAGE') {
+        discountAmount = subtotal * (Number(workOrder.discountAmount) / 100);
+      } else {
+        discountAmount = Number(workOrder.discountAmount);
+      }
+    }
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxRate = 0.18;
+    const taxAmount = subtotalAfterDiscount * taxRate;
+    const totalAmount = subtotalAfterDiscount + taxAmount;
+
+    // Build PDF document definition
+    const pdfMake = require('pdfmake/build/pdfmake');
+    const pdfFonts = require('pdfmake/build/vfs_fonts');
+    if (pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
+      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+    }
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 60],
+      content: [
+        {
+          columns: [
+            {
+              width: '*',
+              stack: [
+                { text: 'MotorTrace Auto Service', style: 'companyName', fontSize: 20, bold: true },
+                { text: 'No. 123, Service Center Road', style: 'companyInfo' },
+                { text: 'Colombo 00500, Sri Lanka', style: 'companyInfo' },
+                { text: 'Tel: +94 11 234 5678', style: 'companyInfo' },
+                { text: 'Email: service@motortrace.lk', style: 'companyInfo' },
+                { text: 'VAT Reg No: 123456789-7000', style: 'companyInfo' },
+              ],
+            },
+            {
+              width: 'auto',
+              stack: [
+                { text: 'INVOICE', style: 'invoiceTitle', fontSize: 24, bold: true, alignment: 'right' },
+                { text: `#${workOrder.workOrderNumber}`, style: 'invoiceNumber', fontSize: 14, alignment: 'right' },
+                { text: `Date: ${formatDate(new Date())}`, style: 'invoiceInfo', alignment: 'right' },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+        {
+          columns: [
+            {
+              width: '50%',
+              stack: [
+                { text: 'CUSTOMER:', style: 'sectionTitle', bold: true, fontSize: 11 },
+                { text: workOrder.customer.name, style: 'customerInfo', bold: true },
+                ...(workOrder.customer.email ? [{ text: workOrder.customer.email, style: 'customerInfo' }] : []),
+                ...(workOrder.customer.phone ? [{ text: workOrder.customer.phone, style: 'customerInfo' }] : []),
+              ],
+            },
+            {
+              width: '50%',
+              stack: [
+                { text: 'VEHICLE:', style: 'sectionTitle', bold: true, fontSize: 11 },
+                { text: vehicleInfo, style: 'customerInfo' },
+                { text: `Work Order: ${workOrder.workOrderNumber}`, style: 'customerInfo', marginTop: 5 },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['auto', '*', 'auto', 'auto', 'auto'],
+            body: tableBody,
+          },
+          layout: {
+            fillColor: (rowIndex: number) => (rowIndex === 0 ? '#0066cc' : null),
+            hLineWidth: () => 0.5,
+            vLineWidth: () => 0.5,
+            hLineColor: () => '#cccccc',
+            vLineColor: () => '#cccccc',
+          },
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+        {
+          columns: [
+            { width: '*', text: '' },
+            {
+              width: 200,
+              stack: [
+                {
+                  columns: [
+                    { width: '*', text: 'Subtotal:', alignment: 'right', bold: true },
+                    { width: 100, text: formatCurrency(subtotal), alignment: 'right' },
+                  ],
+                  margin: [0, 0, 0, 5],
+                },
+                ...(discountAmount > 0 ? [{
+                  columns: [
+                    { width: '*', text: 'Discount:', alignment: 'right', bold: true },
+                    { width: 100, text: `-${formatCurrency(discountAmount)}`, alignment: 'right', color: '#cc0000' },
+                  ],
+                  margin: [0, 0, 0, 5],
+                }] : []),
+                {
+                  columns: [
+                    { width: '*', text: 'VAT (18%):', alignment: 'right', bold: true },
+                    { width: 100, text: formatCurrency(taxAmount), alignment: 'right' },
+                  ],
+                  margin: [0, 0, 0, 5],
+                },
+                {
+                  canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }],
+                  margin: [0, 5, 0, 5],
+                },
+                {
+                  columns: [
+                    { width: '*', text: 'TOTAL:', alignment: 'right', bold: true, fontSize: 14 },
+                    { width: 100, text: formatCurrency(totalAmount), alignment: 'right', bold: true, fontSize: 14 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+        ...(workOrder.estimateNotes ? [{
+          stack: [
+            { text: 'NOTES:', style: 'sectionTitle', bold: true, fontSize: 11 },
+            { text: workOrder.estimateNotes, style: 'notes' },
+          ],
+        }] : []),
+      ],
+      styles: {
+        companyName: { fontSize: 20, bold: true, color: '#0066cc' },
+        companyInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        invoiceTitle: { fontSize: 24, bold: true, color: '#0066cc' },
+        invoiceNumber: { fontSize: 14, marginTop: 5 },
+        invoiceInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        sectionTitle: { fontSize: 11, bold: true, marginBottom: 5 },
+        customerInfo: { fontSize: 10, marginTop: 2 },
+        tableHeader: { fontSize: 10, bold: true, color: 'white', fillColor: '#0066cc', margin: [5, 5, 5, 5] },
+        tableCell: { fontSize: 9, margin: [5, 5, 5, 5] },
+        notes: { fontSize: 9, color: '#666666', marginTop: 5 },
+      },
+      defaultStyle: { font: 'Roboto' },
+    };
+
+    // Generate PDF buffer using pdfMake
+    const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+        resolve(buffer);
+      });
+    });
+
+    // Upload to Supabase Storage
+    const { StorageService } = require('../storage/storage.service');
+    const uploadResult = await StorageService.uploadInvoicePDF(
       pdfBuffer,
       fileName,
       workOrderId
@@ -1381,7 +1888,16 @@ export class WorkOrderService {
           },
         },
         approvals: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            notes: true,
+            createdAt: true,
+            updatedAt: true,
+            isFinal: true,
+            version: true,
+            finalizedAt: true,
+            pdfUrl: true,
             approvedBy: {
               select: {
                 id: true,
@@ -1488,13 +2004,22 @@ export class WorkOrderService {
       throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
     }
 
+    // Use canned service data as defaults
+    const quantity = data.quantity || 1;
+    const unitPrice = data.unitPrice || Number(cannedService.price);
+    const description = data.description || cannedService.name;
+    
     // Create the work order service (this is what the customer pays for)
     const service = await this.prisma.workOrderService.create({
       data: {
-        ...data,
-        quantity: data.quantity || 1,
-        unitPrice: data.unitPrice || Number(cannedService.price),
-        subtotal: (data.quantity || 1) * Number(data.unitPrice || cannedService.price),
+        workOrderId: data.workOrderId,
+        cannedServiceId: data.cannedServiceId,
+        description: description,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: quantity * unitPrice,
+        status: 'PENDING',
+        notes: data.notes,
       },
     });
 
@@ -1578,6 +2103,158 @@ export class WorkOrderService {
     });
 
     return services;
+  }
+
+  // Create work order part and reduce inventory
+  async createWorkOrderPart(workOrderId: string, data: { inventoryItemId: string; quantity: number; technicianId?: string }) {
+    // Verify work order exists
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+    });
+
+    if (!workOrder) {
+      throw new Error('Work order not found');
+    }
+
+    // Get inventory item
+    const inventoryItem = await this.prisma.inventoryItem.findUnique({
+      where: { id: data.inventoryItemId },
+    });
+
+    if (!inventoryItem) {
+      throw new Error('Inventory item not found');
+    }
+
+    // Check if sufficient stock is available
+    if (inventoryItem.quantity < data.quantity) {
+      throw new Error(`Insufficient stock. Available: ${inventoryItem.quantity}, Requested: ${data.quantity}`);
+    }
+
+    // Verify technician exists if provided
+    if (data.technicianId) {
+      const technician = await this.prisma.technician.findUnique({
+        where: { id: data.technicianId },
+      });
+
+      if (!technician) {
+        throw new Error('Technician not found');
+      }
+    }
+
+    // Create part and reduce inventory in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Reduce inventory stock
+      await tx.inventoryItem.update({
+        where: { id: data.inventoryItemId },
+        data: {
+          quantity: {
+            decrement: data.quantity,
+          },
+        },
+      });
+
+      // Create work order part
+      const part = await tx.workOrderPart.create({
+        data: {
+          workOrderId,
+          inventoryItemId: data.inventoryItemId,
+          quantity: data.quantity,
+          unitPrice: inventoryItem.unitPrice,
+          subtotal: inventoryItem.unitPrice.toNumber() * data.quantity,
+          installedById: data.technicianId,
+          status: ServiceStatus.PENDING,
+        },
+        include: {
+          part: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              partNumber: true,
+              manufacturer: true,
+              isOEM: true,
+              location: true,
+            },
+          },
+          installedBy: data.technicianId ? {
+            select: {
+              id: true,
+              employeeId: true,
+              userProfile: {
+                select: {
+                  id: true,
+                  name: true,
+                  profileImage: true,
+                },
+              },
+            },
+          } : undefined,
+        },
+      });
+
+      return part;
+    });
+
+    // Recalculate work order totals
+    await this.updateWorkOrderTotals(workOrderId);
+
+    return result;
+  }
+
+  // Get work order parts
+  async getWorkOrderParts(workOrderId: string) {
+    const parts = await this.prisma.workOrderPart.findMany({
+      where: { workOrderId },
+      include: {
+        part: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            partNumber: true,
+            manufacturer: true,
+            location: true,
+          },
+        },
+        installedBy: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return parts;
+  }
+
+  // Delete work order service
+  async deleteWorkOrderService(serviceId: string) {
+    // Check if service exists
+    const service = await this.prisma.workOrderService.findUnique({
+      where: { id: serviceId },
+    });
+
+    if (!service) {
+      throw new Error(`Work order service with ID '${serviceId}' not found`);
+    }
+
+    // Delete the service (cascade will handle labor items)
+    await this.prisma.workOrderService.delete({
+      where: { id: serviceId },
+    });
+
+    return { message: 'Service deleted successfully' };
   }
 
   // Create payment
@@ -1911,9 +2588,9 @@ export class WorkOrderService {
   // Labor is for tracking work only, not for billing
 
   // Helper method to update work order totals
-  // NOTE: Only services and parts are billable. Labor is for tracking only.
+  // NOTE: Services, parts, and misc charges are billable. Labor is for tracking only.
   private async updateWorkOrderTotals(workOrderId: string) {
-    const [partItems, serviceItems] = await Promise.all([
+    const [partItems, serviceItems, miscCharges] = await Promise.all([
       this.prisma.workOrderPart.findMany({
         where: { workOrderId },
         select: { subtotal: true },
@@ -1922,11 +2599,16 @@ export class WorkOrderService {
         where: { workOrderId },
         select: { subtotal: true },
       }),
+      this.prisma.workOrderMiscCharge.findMany({
+        where: { workOrderId },
+        select: { subtotal: true },
+      }),
     ]);
 
     const subtotalParts = partItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
     const subtotalServices = serviceItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    const subtotal = subtotalParts + subtotalServices;
+    const subtotalMisc = miscCharges.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const subtotal = subtotalParts + subtotalServices + subtotalMisc;
 
     // Get existing tax and discount amounts
     const existingWorkOrder = await this.prisma.workOrder.findUnique({
@@ -1943,10 +2625,122 @@ export class WorkOrderService {
       data: {
         subtotalServices,
         subtotalParts,
+        subtotalMisc,
         subtotal,
         totalAmount,
       },
     });
+  }
+
+  // Misc Charge CRUD Methods
+
+  // Create misc charge
+  async createWorkOrderMiscCharge(data: any) {
+    // Support both 'amount' and 'unitPrice' field names for backwards compatibility
+    const unitPrice = data.unitPrice ?? data.amount;
+    
+    // Validation
+    if (!data.description || data.description.trim().length === 0) {
+      throw new Error('Description is required');
+    }
+
+    if (!data.quantity || data.quantity <= 0) {
+      throw new Error('Quantity must be greater than zero');
+    }
+
+    if (unitPrice === undefined || unitPrice === null) {
+      throw new Error('Unit price (unitPrice or amount) is required');
+    }
+
+    if (unitPrice < 0) {
+      throw new Error('Unit price cannot be negative');
+    }
+
+    const miscCharge = await this.prisma.workOrderMiscCharge.create({
+      data: {
+        workOrderId: data.workOrderId,
+        description: data.description,
+        quantity: data.quantity,
+        unitPrice: unitPrice,
+        subtotal: data.quantity * unitPrice,
+        category: data.category || 'OTHER',
+        notes: data.notes,
+      },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(data.workOrderId);
+
+    return miscCharge;
+  }
+
+  // Get misc charges for a work order
+  async getWorkOrderMiscCharges(workOrderId: string) {
+    return await this.prisma.workOrderMiscCharge.findMany({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Update misc charge
+  async updateWorkOrderMiscCharge(id: string, data: any) {
+    // Validation
+    if (data.quantity !== undefined && data.quantity <= 0) {
+      throw new Error('Quantity must be greater than zero');
+    }
+
+    if (data.unitPrice !== undefined && data.unitPrice < 0) {
+      throw new Error('Unit price cannot be negative');
+    }
+
+    if (data.description !== undefined && data.description.trim().length === 0) {
+      throw new Error('Description cannot be empty');
+    }
+
+    // Get existing misc charge to calculate new subtotal
+    const existing = await this.prisma.workOrderMiscCharge.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new Error('Misc charge not found');
+    }
+
+    const quantity = data.quantity !== undefined ? data.quantity : existing.quantity;
+    const unitPrice = data.unitPrice !== undefined ? data.unitPrice : Number(existing.unitPrice);
+
+    const miscCharge = await this.prisma.workOrderMiscCharge.update({
+      where: { id },
+      data: {
+        ...data,
+        subtotal: quantity * unitPrice,
+      },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(miscCharge.workOrderId);
+
+    return miscCharge;
+  }
+
+  // Delete misc charge
+  async deleteWorkOrderMiscCharge(id: string) {
+    const miscCharge = await this.prisma.workOrderMiscCharge.findUnique({
+      where: { id },
+    });
+
+    if (!miscCharge) {
+      throw new Error('Misc charge not found');
+    }
+
+    await this.prisma.workOrderMiscCharge.delete({
+      where: { id },
+    });
+
+    // Update work order totals
+    await this.updateWorkOrderTotals(miscCharge.workOrderId);
+
+    return { message: 'Misc charge deleted successfully' };
   }
 
   /**
@@ -1957,8 +2751,8 @@ export class WorkOrderService {
     const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       include: {
-        services: { select: { customerApproved: true, customerRejected: true, status: true } },
-        partsUsed: { select: { customerApproved: true, customerRejected: true, installedAt: true } },
+        services: { select: { status: true } },
+        partsUsed: { select: { installedAt: true } },
       },
     });
 
@@ -1985,13 +2779,13 @@ export class WorkOrderService {
       return;
     }
 
-    // Check if all non-rejected services are approved
-    const nonRejectedServices = workOrder.services.filter(s => !s.customerRejected);
-    const allServicesApproved = nonRejectedServices.every(s => s.customerApproved);
+    // Check bulk approval status via WorkOrderApproval
+    const latestApproval = await this.prisma.workOrderApproval.findFirst({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // Check if all non-rejected parts are approved
-    const nonRejectedParts = workOrder.partsUsed.filter(p => !p.customerRejected);
-    const allPartsApproved = nonRejectedParts.every(p => p.customerApproved);
+    const isApproved = latestApproval?.status === ApprovalStatus.APPROVED;
 
     // Check if any work has started
     const anyServiceInProgress = workOrder.services.some(s => 
@@ -2001,12 +2795,12 @@ export class WorkOrderService {
     const workStarted = anyServiceInProgress || anyPartInstalled;
 
     // Check if all work is completed
-    const allServicesCompleted = nonRejectedServices.every(s => 
+    const allServicesCompleted = workOrder.services.every(s => 
       s.status === ServiceStatus.COMPLETED || s.status === ServiceStatus.CANCELLED
     );
-    const allPartsInstalled = nonRejectedParts.every(p => p.installedAt !== null);
-    const allWorkCompleted = (nonRejectedServices.length === 0 || allServicesCompleted) && 
-                             (nonRejectedParts.length === 0 || allPartsInstalled);
+    const allPartsInstalled = workOrder.partsUsed.every(p => p.installedAt !== null);
+    const allWorkCompleted = (workOrder.services.length === 0 || allServicesCompleted) && 
+                             (workOrder.partsUsed.length === 0 || allPartsInstalled);
 
     // Determine new status
     let newStatus: WorkOrderStatus | null = null;
@@ -2015,9 +2809,9 @@ export class WorkOrderService {
       newStatus = WorkOrderStatus.COMPLETED;
     } else if (workStarted && workOrder.status === WorkOrderStatus.APPROVED) {
       newStatus = WorkOrderStatus.IN_PROGRESS;
-    } else if (allServicesApproved && allPartsApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
+    } else if (isApproved && workOrder.status === WorkOrderStatus.AWAITING_APPROVAL) {
       newStatus = WorkOrderStatus.APPROVED;
-    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING) {
+    } else if (hasItems && workOrder.status === WorkOrderStatus.PENDING && !latestApproval) {
       newStatus = WorkOrderStatus.AWAITING_APPROVAL;
     }
 
@@ -2425,6 +3219,86 @@ export class WorkOrderService {
     return inspections;
   }
 
+  // Delete work order inspection
+  async deleteWorkOrderInspection(inspectionId: string) {
+    // Check if inspection exists
+    const inspection = await this.prisma.workOrderInspection.findUnique({
+      where: { id: inspectionId },
+    });
+
+    if (!inspection) {
+      throw new Error(`Work order inspection with ID '${inspectionId}' not found`);
+    }
+
+    // Delete the inspection (cascade will handle checklist items, tire checks, and attachments)
+    await this.prisma.workOrderInspection.delete({
+      where: { id: inspectionId },
+    });
+
+    return { message: 'Inspection deleted successfully' };
+  }
+
+  // Update work order inspection
+  async updateWorkOrderInspection(inspectionId: string, data: any) {
+    // Check if inspection exists
+    const existingInspection = await this.prisma.workOrderInspection.findUnique({
+      where: { id: inspectionId },
+    });
+
+    if (!existingInspection) {
+      throw new Error(`Work order inspection with ID '${inspectionId}' not found`);
+    }
+
+    // Prepare update data - exclude nested relations that should be updated separately
+    const { checklistItems, tireChecks, attachments, ...updateData } = data;
+    
+    const finalUpdateData: any = {
+      ...updateData,
+      // Convert date strings to Date objects if needed
+      ...(data.date && { date: new Date(data.date) }),
+    };
+
+    // Handle time tracking based on status changes
+    if (data.status) {
+      if (data.status === 'ONGOING' && existingInspection.status !== 'ONGOING') {
+        // Starting the inspection
+        finalUpdateData.startedAt = new Date();
+      } else if (data.status === 'COMPLETED' && existingInspection.status !== 'COMPLETED') {
+        // Completing the inspection
+        finalUpdateData.completedAt = new Date();
+        // If startedAt wasn't set before, set it now too
+        if (!existingInspection.startedAt) {
+          finalUpdateData.startedAt = new Date();
+        }
+      }
+    }
+
+    // Update the inspection
+    const updatedInspection = await this.prisma.workOrderInspection.update({
+      where: { id: inspectionId },
+      data: finalUpdateData,
+      include: {
+        inspector: {
+          select: {
+            id: true,
+            employeeId: true,
+            userProfile: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        checklistItems: true,
+        tireChecks: true,
+        attachments: true,
+      },
+    });
+
+    return updatedInspection;
+  }
+
   // Create work order QC
   async createWorkOrderQC(workOrderId: string, data: {
     passed: boolean;
@@ -2481,199 +3355,6 @@ export class WorkOrderService {
     });
 
     return qc;
-  }
-
-  // Customer Approval Methods
-
-  // Approve a service (and all its labor items)
-  async approveService(serviceId: string, customerId: string, notes?: string) {
-    const service = await this.prisma.workOrderService.findUnique({
-      where: { id: serviceId },
-      include: { workOrder: true },
-    });
-
-    if (!service) {
-      throw new Error('Service not found');
-    }
-
-    // Verify customer owns this work order
-    if (service.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This service does not belong to your work order');
-    }
-
-    // Update service approval
-    await this.prisma.workOrderService.update({
-      where: { id: serviceId },
-      data: {
-        customerApproved: true,
-        customerRejected: false,
-        approvedAt: new Date(),
-        customerNotes: notes,
-        status: ServiceStatus.PENDING, // Ready to start work
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(service.workOrderId);
-
-    // Auto-update work order status if all items approved
-    await this.autoUpdateWorkOrderStatus(service.workOrderId);
-
-    return { message: 'Service approved successfully' };
-  }
-
-  // Reject a service
-  async rejectService(serviceId: string, customerId: string, reason?: string) {
-    const service = await this.prisma.workOrderService.findUnique({
-      where: { id: serviceId },
-      include: { workOrder: true },
-    });
-
-    if (!service) {
-      throw new Error('Service not found');
-    }
-
-    // Verify customer owns this work order
-    if (service.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This service does not belong to your work order');
-    }
-
-    // Update service rejection
-    await this.prisma.workOrderService.update({
-      where: { id: serviceId },
-      data: {
-        customerApproved: false,
-        customerRejected: true,
-        rejectedAt: new Date(),
-        customerNotes: reason,
-        status: ServiceStatus.CANCELLED,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(service.workOrderId);
-
-    return { message: 'Service rejected' };
-  }
-
-  // Approve a part
-  async approvePart(partId: string, customerId: string, notes?: string) {
-    const part = await this.prisma.workOrderPart.findUnique({
-      where: { id: partId },
-      include: { workOrder: true },
-    });
-
-    if (!part) {
-      throw new Error('Part not found');
-    }
-
-    // Verify customer owns this work order
-    if (part.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This part does not belong to your work order');
-    }
-
-    // Update part approval
-    await this.prisma.workOrderPart.update({
-      where: { id: partId },
-      data: {
-        customerApproved: true,
-        customerRejected: false,
-        approvedAt: new Date(),
-        customerNotes: notes,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(part.workOrderId);
-
-    // Auto-update work order status if all items approved
-    await this.autoUpdateWorkOrderStatus(part.workOrderId);
-
-    return { message: 'Part approved successfully' };
-  }
-
-  // Reject a part
-  async rejectPart(partId: string, customerId: string, reason?: string) {
-    const part = await this.prisma.workOrderPart.findUnique({
-      where: { id: partId },
-      include: { workOrder: true },
-    });
-
-    if (!part) {
-      throw new Error('Part not found');
-    }
-
-    // Verify customer owns this work order
-    if (part.workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This part does not belong to your work order');
-    }
-
-    // Update part rejection
-    await this.prisma.workOrderPart.update({
-      where: { id: partId },
-      data: {
-        customerApproved: false,
-        customerRejected: true,
-        rejectedAt: new Date(),
-        customerNotes: reason,
-      },
-    });
-
-    // Recalculate work order totals
-    await this.updateWorkOrderTotals(part.workOrderId);
-
-    return { message: 'Part rejected' };
-  }
-
-  // Get pending items (services and parts) awaiting customer approval
-  async getPendingApprovals(workOrderId: string, customerId: string) {
-    const workOrder = await this.prisma.workOrder.findUnique({
-      where: { id: workOrderId },
-    });
-
-    if (!workOrder) {
-      throw new Error('Work order not found');
-    }
-
-    // Verify customer owns this work order
-    if (workOrder.customerId !== customerId) {
-      throw new Error('Unauthorized: This work order does not belong to you');
-    }
-
-    const [services, parts] = await Promise.all([
-      this.prisma.workOrderService.findMany({
-        where: {
-          workOrderId,
-          customerApproved: false,
-          customerRejected: false,
-          status: ServiceStatus.ESTIMATED,
-        },
-        include: {
-          cannedService: true,
-          laborItems: {
-            include: {
-              laborCatalog: true,
-            },
-          },
-        },
-      }),
-      this.prisma.workOrderPart.findMany({
-        where: {
-          workOrderId,
-          customerApproved: false,
-          customerRejected: false,
-        },
-        include: {
-          part: true,
-        },
-      }),
-    ]);
-
-    return {
-      services,
-      parts,
-      totalPending: services.length + parts.length,
-    };
   }
 
   // Part Installation Management

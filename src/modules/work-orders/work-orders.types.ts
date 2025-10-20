@@ -13,7 +13,8 @@ import {
   ApprovalMethod,
   ChecklistStatus,
   TirePosition,
-  AttachmentCategory
+  AttachmentCategory,
+  MiscChargeCategory
 } from '@prisma/client';
 
 export interface CreateWorkOrderRequest {
@@ -37,6 +38,12 @@ export interface CreateWorkOrderRequest {
   quantities?: number[];
   prices?: number[];
   serviceNotes?: string[];
+}
+
+export interface CreateWorkOrderPartRequest {
+  inventoryItemId: string;
+  quantity: number;
+  technicianId?: string;
 }
 
 export interface UpdateWorkOrderRequest {
@@ -225,6 +232,9 @@ export interface WorkOrderWithDetails {
     notes?: string;
     installedAt?: Date;
     installedById?: string;
+    status: ServiceStatus;
+    startTime?: Date;
+    endTime?: Date;
     part: {
       id: string;
       name: string;
@@ -335,9 +345,9 @@ export interface WorkOrderWithDetails {
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;
   cannedServiceId: string;
-  description: string;  // Required field
+  description?: string;  // Optional - defaults to canned service name
   quantity?: number;
-  unitPrice?: number;
+  unitPrice?: number;  // Optional - defaults to canned service price
   notes?: string;
 }
 
@@ -360,6 +370,23 @@ export interface CreatePaymentRequest {
   reference?: string;
   notes?: string;
   processedById?: string;
+}
+
+export interface CreateWorkOrderMiscChargeRequest {
+  workOrderId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  category: MiscChargeCategory;
+  notes?: string;
+}
+
+export interface UpdateWorkOrderMiscChargeRequest {
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  category?: MiscChargeCategory;
+  notes?: string;
 }
 
 export interface WorkOrderStatistics {
@@ -411,6 +438,9 @@ export interface IWorkOrderService {
   // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
+  createWorkOrderPart(workOrderId: string, data: CreateWorkOrderPartRequest): Promise<any>;
+  getWorkOrderParts(workOrderId: string): Promise<any>;
+  deleteWorkOrderService(serviceId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
@@ -426,17 +456,17 @@ export interface IWorkOrderService {
   getWorkOrderAttachments(workOrderId: string, category?: string): Promise<any>;
   createWorkOrderInspection(workOrderId: string, inspectorId: string, notes?: string): Promise<any>;
   getWorkOrderInspections(workOrderId: string): Promise<any>;
+  updateWorkOrderInspection(inspectionId: string, data: any): Promise<any>;
+  deleteWorkOrderInspection(inspectionId: string): Promise<any>;
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
   
-  // Customer approval methods
-  approveService(serviceId: string, customerId: string, notes?: string): Promise<any>;
-  rejectService(serviceId: string, customerId: string, reason?: string): Promise<any>;
-  approvePart(partId: string, customerId: string, notes?: string): Promise<any>;
-  rejectPart(partId: string, customerId: string, reason?: string): Promise<any>;
-  getPendingApprovals(workOrderId: string, customerId: string): Promise<any>;
-  getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
+  // Misc charges methods
+  createWorkOrderMiscCharge(data: CreateWorkOrderMiscChargeRequest): Promise<any>;
+  getWorkOrderMiscCharges(workOrderId: string): Promise<any>;
+  updateWorkOrderMiscCharge(id: string, data: UpdateWorkOrderMiscChargeRequest): Promise<any>;
+  deleteWorkOrderMiscCharge(id: string): Promise<any>;
   
   // Part installation methods
   assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
@@ -449,11 +479,14 @@ export interface IWorkOrderService {
 
     // Estimate PDF and approval helpers
     generateEstimatePDF(workOrderId: string): Promise<string>;
-    expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
+    lockServicesForEstimate(workOrderId: string): Promise<void>;
+    expirePreviousApprovals(workOrderId: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
-    approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string): Promise<any>;
-    rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string): Promise<any>;
+    approveWorkOrderApproval(approvalId: string, approvedById: string | null, notes?: string): Promise<any>;
+    rejectWorkOrderApproval(approvalId: string, approvedById: string | null, reason?: string): Promise<any>;
+    finalizeEstimate(approvalId: string, finalizedById: string): Promise<any>;
+    generateInvoice(workOrderId: string, userId: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
     getGeneralStats(): Promise<GeneralStats>;
 }

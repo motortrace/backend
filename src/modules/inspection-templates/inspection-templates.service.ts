@@ -16,9 +16,15 @@ import {
   InspectionTemplatesResponse,
   WorkOrderInspectionResponse,
   WorkOrderInspectionsResponse,
-  TemplateAssignmentResponse
+  TemplateAssignmentResponse,
+  DeleteInspectionResponse
 } from './inspection-templates.types';
 import { PrismaClient } from '@prisma/client';
+import {
+  InspectionStatus,
+  isValidTransition,
+  generateTransitionErrorMessage
+} from './inspection-status.helper';
 
 export class InspectionTemplatesService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -806,7 +812,49 @@ export class InspectionTemplatesService {
 
   // Utility Methods
   async getAvailableTemplates(): Promise<InspectionTemplatesResponse> {
-    return this.getInspectionTemplates({ isActive: true });
+    try {
+      const templates = await this.prisma.inspectionTemplate.findMany({
+        where: { isActive: true },
+        include: {
+          templateItems: {
+            orderBy: { sortOrder: 'asc' }
+          },
+          _count: {
+            select: {
+              workOrderInspections: true
+            }
+          }
+        },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { name: 'asc' }
+        ]
+      });
+
+      return {
+        success: true,
+        data: templates,
+        pagination: {
+          page: 1,
+          limit: templates.length,
+          total: templates.length,
+          totalPages: 1
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching available templates:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch available templates',
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 0,
+          total: 0,
+          totalPages: 0
+        }
+      };
+    }
   }
 
   async getTemplatesByCategory(category: string): Promise<InspectionTemplatesResponse> {
@@ -1167,6 +1215,330 @@ export class InspectionTemplatesService {
           total: 0,
           totalPages: 0
         }
+      };
+    }
+  }
+
+  // Status Transition Methods
+
+  /**
+   * Start an inspection (PENDING → ONGOING)
+   * Requirements: 2.1, 3.1, 5.1, 5.2, 5.3
+   */
+  async startInspection(inspectionId: string): Promise<WorkOrderInspectionResponse> {
+    try {
+      // Fetch inspection with current status
+      const inspection = await this.prisma.workOrderInspection.findUnique({
+        where: { id: inspectionId },
+        select: { status: true }
+      });
+
+      // Check if inspection exists
+      if (!inspection) {
+        return {
+          success: false,
+          error: `Inspection with ID ${inspectionId} not found`
+        };
+      }
+
+      // Validate state transition
+      if (!isValidTransition(inspection.status as InspectionStatus, InspectionStatus.ONGOING)) {
+        return {
+          success: false,
+          error: generateTransitionErrorMessage(
+            inspectionId,
+            inspection.status as InspectionStatus,
+            InspectionStatus.ONGOING
+          )
+        };
+      }
+
+      // Update inspection status
+      const updated = await this.prisma.workOrderInspection.update({
+        where: { id: inspectionId },
+        data: { status: InspectionStatus.ONGOING },
+        include: {
+          template: {
+            include: {
+              templateItems: {
+                orderBy: { sortOrder: 'asc' }
+              }
+            }
+          },
+          checklistItems: {
+            include: {
+              templateItem: true
+            },
+            orderBy: { createdAt: 'asc' }
+          },
+          inspector: {
+            include: {
+              userProfile: true
+            }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          ...updated,
+          workOrderNumber: updated.workOrder?.workOrderNumber || null
+        },
+        message: 'Inspection started successfully'
+      };
+    } catch (error) {
+      console.error('Error starting inspection:', error);
+      return {
+        success: false,
+        error: 'Failed to start inspection'
+      };
+    }
+  }
+
+  /**
+   * Complete an inspection (ONGOING → COMPLETED)
+   * Requirements: 2.4, 3.2, 5.1, 5.2, 5.3
+   */
+  async completeInspection(inspectionId: string): Promise<WorkOrderInspectionResponse> {
+    try {
+      // Fetch inspection with current status
+      const inspection = await this.prisma.workOrderInspection.findUnique({
+        where: { id: inspectionId },
+        select: { status: true }
+      });
+
+      // Check if inspection exists
+      if (!inspection) {
+        return {
+          success: false,
+          error: `Inspection with ID ${inspectionId} not found`
+        };
+      }
+
+      // Validate state transition
+      if (!isValidTransition(inspection.status as InspectionStatus, InspectionStatus.COMPLETED)) {
+        return {
+          success: false,
+          error: generateTransitionErrorMessage(
+            inspectionId,
+            inspection.status as InspectionStatus,
+            InspectionStatus.COMPLETED
+          )
+        };
+      }
+
+      // Update inspection status and set isCompleted to true
+      const updated = await this.prisma.workOrderInspection.update({
+        where: { id: inspectionId },
+        data: { 
+          status: InspectionStatus.COMPLETED,
+          isCompleted: true
+        },
+        include: {
+          template: {
+            include: {
+              templateItems: {
+                orderBy: { sortOrder: 'asc' }
+              }
+            }
+          },
+          checklistItems: {
+            include: {
+              templateItem: true
+            },
+            orderBy: { createdAt: 'asc' }
+          },
+          inspector: {
+            include: {
+              userProfile: true
+            }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          ...updated,
+          workOrderNumber: updated.workOrder?.workOrderNumber || null
+        },
+        message: 'Inspection completed successfully'
+      };
+    } catch (error) {
+      console.error('Error completing inspection:', error);
+      return {
+        success: false,
+        error: 'Failed to complete inspection'
+      };
+    }
+  }
+
+  /**
+   * Cancel an inspection (PENDING/ONGOING → CANCELLED)
+   * Requirements: 2.5, 3.5, 5.1, 5.2, 5.3
+   */
+  async cancelInspection(inspectionId: string, reason?: string): Promise<WorkOrderInspectionResponse> {
+    try {
+      // Fetch inspection with current status
+      const inspection = await this.prisma.workOrderInspection.findUnique({
+        where: { id: inspectionId },
+        select: { status: true, notes: true }
+      });
+
+      // Check if inspection exists
+      if (!inspection) {
+        return {
+          success: false,
+          error: `Inspection with ID ${inspectionId} not found`
+        };
+      }
+
+      // Validate state transition
+      if (!isValidTransition(inspection.status as InspectionStatus, InspectionStatus.CANCELLED)) {
+        return {
+          success: false,
+          error: generateTransitionErrorMessage(
+            inspectionId,
+            inspection.status as InspectionStatus,
+            InspectionStatus.CANCELLED
+          )
+        };
+      }
+
+      // Prepare notes with cancellation reason
+      let updatedNotes = inspection.notes || '';
+      if (reason) {
+        const cancellationNote = `Cancellation reason: ${reason}`;
+        updatedNotes = updatedNotes 
+          ? `${updatedNotes}\n\n${cancellationNote}` 
+          : cancellationNote;
+      }
+
+      // Update inspection status and store cancellation reason
+      const updated = await this.prisma.workOrderInspection.update({
+        where: { id: inspectionId },
+        data: { 
+          status: InspectionStatus.CANCELLED,
+          notes: updatedNotes
+        },
+        include: {
+          template: {
+            include: {
+              templateItems: {
+                orderBy: { sortOrder: 'asc' }
+              }
+            }
+          },
+          checklistItems: {
+            include: {
+              templateItem: true
+            },
+            orderBy: { createdAt: 'asc' }
+          },
+          inspector: {
+            include: {
+              userProfile: true
+            }
+          },
+          workOrder: {
+            select: {
+              id: true,
+              workOrderNumber: true
+            }
+          },
+          tireChecks: {
+            orderBy: { position: 'asc' }
+          },
+          attachments: {
+            orderBy: { uploadedAt: 'desc' }
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: {
+          ...updated,
+          workOrderNumber: updated.workOrder?.workOrderNumber || null
+        },
+        message: 'Inspection cancelled successfully'
+      };
+    } catch (error) {
+      console.error('Error cancelling inspection:', error);
+      return {
+        success: false,
+        error: 'Failed to cancel inspection'
+      };
+    }
+  }
+
+  /**
+   * Delete a work order inspection (only if status is PENDING)
+   * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.4, 5.5
+   */
+  async deleteWorkOrderInspection(inspectionId: string): Promise<DeleteInspectionResponse> {
+    try {
+      // Fetch inspection and check current status
+      const inspection = await this.prisma.workOrderInspection.findUnique({
+        where: { id: inspectionId },
+        select: { status: true }
+      });
+
+      // Check if inspection exists
+      if (!inspection) {
+        return {
+          success: false,
+          error: `Inspection with ID ${inspectionId} not found`
+        };
+      }
+
+      // Validate that status is PENDING
+      if (inspection.status !== InspectionStatus.PENDING) {
+        return {
+          success: false,
+          error: `Cannot delete inspection ${inspectionId} in ${inspection.status} status. Only PENDING inspections can be deleted.`
+        };
+      }
+
+      // Delete inspection if status is PENDING
+      await this.prisma.workOrderInspection.delete({
+        where: { id: inspectionId }
+      });
+
+      return {
+        success: true,
+        message: 'Inspection deleted successfully'
+      };
+    } catch (error) {
+      console.error('Error deleting work order inspection:', error);
+      return {
+        success: false,
+        error: 'Failed to delete work order inspection'
       };
     }
   }

@@ -490,7 +490,7 @@ export class AppointmentService implements IAppointmentsService {
     const appointments = await this.prisma.appointment.findMany({
       where: {
         assignedToId: null,
-        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+        status: AppointmentStatus.PENDING,
       },
       include: {
         cannedServices: {
@@ -530,7 +530,7 @@ export class AppointmentService implements IAppointmentsService {
   async getConfirmedAppointmentsWithoutWorkOrders(): Promise<AppointmentWithServices[]> {
     const appointments = await this.prisma.appointment.findMany({
       where: {
-        status: AppointmentStatus.CONFIRMED,
+        assignedToId: { not: null },
         // Exclude appointments that have active work orders
         workOrder: {
           is: null // No work order exists for this appointment
@@ -701,7 +701,7 @@ export class AppointmentService implements IAppointmentsService {
   async assignAppointment(appointmentId: string, assignedToId: string): Promise<AppointmentWithServices> {
     const appointment = await this.prisma.appointment.update({
       where: { id: appointmentId },
-      data: { assignedToId },
+      data: { assignedToId, status: AppointmentStatus.CONFIRMED },
       include: {
         cannedServices: {
           include: {

@@ -27,6 +27,12 @@ router.get(
   serviceAdvisorController.getServiceAdvisorStats.bind(serviceAdvisorController)
 );
 
+// Get service advisor count
+router.get(
+  '/count',
+  serviceAdvisorController.getServiceAdvisorCount.bind(serviceAdvisorController)
+);
+
 // Search service advisors
 router.get(
   '/search',

@@ -7,6 +7,7 @@ import {
   DailyCapacityRequest,
   IAppointmentsService,
 } from './appointments.types';
+import { AppointmentStatus } from '@prisma/client';
 
 export class AppointmentController {
   constructor(private readonly appointmentService: IAppointmentsService) {}
@@ -198,7 +199,7 @@ export class AppointmentController {
     }
   }
 
-  // Get confirmed appointments without active work orders
+  // Get assigned appointments without active work orders
   async getConfirmedAppointmentsWithoutWorkOrders(req: Request, res: Response) {
     try {
       const appointments = await this.appointmentService.getConfirmedAppointmentsWithoutWorkOrders();
@@ -271,6 +272,55 @@ export class AppointmentController {
         success: true,
         data: appointment,
         message: 'Appointment assigned successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Status-specific appointment getters
+  async getPendingAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.PENDING });
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getConfirmedAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.CONFIRMED });
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getCompletedAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.COMPLETED });
+
+      res.json({
+        success: true,
+        data: appointments,
       });
     } catch (error: any) {
       res.status(400).json({

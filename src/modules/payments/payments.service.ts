@@ -86,34 +86,34 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
-    // Verify invoice exists before accepting payment
+    // Optional: Check if invoice exists and validate amount against it
     const invoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
-    if (!invoice) {
-      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
+    // If invoice exists, validate payment amount doesn't exceed remaining balance
+    if (invoice) {
+      const invoiceTotal = Number(invoice.totalAmount);
+      const alreadyPaid = Number(invoice.paidAmount || 0);
+      const remainingBalance = invoiceTotal - alreadyPaid;
+
+      if (data.amount > remainingBalance) {
+        throw new Error(
+          `Payment amount (${data.amount}) exceeds remaining balance (${remainingBalance}). ` +
+          `Invoice total: ${invoiceTotal}, Already paid: ${alreadyPaid}`
+        );
+      }
     }
 
-    // Validate payment amount doesn't exceed invoice total
-    const invoiceTotal = Number(invoice.totalAmount);
-    const alreadyPaid = Number(invoice.paidAmount || 0);
-    const remainingBalance = invoiceTotal - alreadyPaid;
+    // Verify service advisor exists (if provided)
+    if (data.processedById) {
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
+        where: { id: data.processedById },
+      });
 
-    if (data.amount > remainingBalance) {
-      throw new Error(
-        `Payment amount (${data.amount}) exceeds remaining balance (${remainingBalance}). ` +
-        `Invoice total: ${invoiceTotal}, Already paid: ${alreadyPaid}`
-      );
-    }
-
-    // Verify service advisor exists
-    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
-      where: { id: data.processedById },
-    });
-
-    if (!serviceAdvisor) {
-      throw new Error('Service advisor not found');
+      if (!serviceAdvisor) {
+        throw new Error('Service advisor not found');
+      }
     }
 
     // Create payment record with image
@@ -124,7 +124,7 @@ export class PaymentService {
         amount: data.amount,
         reference: data.reference,
         status: PaymentStatus.PAID,
-        processedById: data.processedById,
+        processedById: data.processedById || undefined,
         notes: data.notes,
         paidAt: new Date(),
         // Store payment image URL in notes or create a separate field
@@ -166,18 +166,15 @@ export class PaymentService {
       throw new Error('Work order not found');
     }
 
-    // Verify invoice exists before accepting payment
+    // Check if invoice exists
     const invoice = await this.prisma.invoice.findFirst({
       where: { workOrderId: data.workOrderId },
     });
 
-    if (!invoice) {
-      throw new Error('Cannot accept payment: Invoice not yet generated for this work order');
-    }
-
-    // For sandbox testing, use invoice total instead of estimatedTotal
-    // In production, this would process with Stripe
-    const amount = Number(invoice.totalAmount);
+    // Use invoice total if available, otherwise use provided amount or estimated total
+    const amount = invoice 
+      ? Number(invoice.totalAmount) 
+      : (data.amount || (workOrder.estimatedTotal ? Number(workOrder.estimatedTotal) : 0));
     
     // Generate mock transaction ID
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -320,13 +317,15 @@ export class PaymentService {
       throw new Error('Refund amount cannot exceed payment amount');
     }
 
-    // Verify service advisor exists
-    const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
-      where: { id: data.processedById },
-    });
+    // Verify service advisor exists (if provided)
+    if (data.processedById) {
+      const serviceAdvisor = await this.prisma.serviceAdvisor.findUnique({
+        where: { id: data.processedById },
+      });
 
-    if (!serviceAdvisor) {
-      throw new Error('Service advisor not found');
+      if (!serviceAdvisor) {
+        throw new Error('Service advisor not found');
+      }
     }
 
     const updatedPayment = await this.prisma.payment.update({

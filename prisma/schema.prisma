@@ -175,7 +175,8 @@ model WorkOrder {
   // Pricing breakdown
   subtotalServices Decimal?      @db.Decimal(10,2)  // Sum of WorkOrderService.subtotal
   subtotalParts   Decimal?       @db.Decimal(10,2)  // Sum of WorkOrderPart.subtotal
-  subtotal        Decimal?       @db.Decimal(10,2)  // subtotalServices + subtotalParts
+  subtotalMisc    Decimal?       @db.Decimal(10,2)  // Sum of WorkOrderMiscCharge.subtotal
+  subtotal        Decimal?       @db.Decimal(10,2)  // subtotalServices + subtotalParts + subtotalMisc
   
   // Discount (applied at work order level only)
   discountAmount  Decimal?       @db.Decimal(10,2)
@@ -216,6 +217,7 @@ model WorkOrder {
   services        WorkOrderService[]
   laborItems     WorkOrderLabor[]
   partsUsed       WorkOrderPart[]
+  miscCharges     WorkOrderMiscCharge[]
   invoices        Invoice[]
   notifications   Notification[]
   serviceHistory  VehicleServiceHistory[]
@@ -386,6 +388,7 @@ model InventoryItem {
   supplierPartNumber String?
   core           Boolean    @default(false) // Core charge applicable
   corePrice      Decimal?   @db.Decimal(10,2)
+  isOEM        Boolean      @default(true) // OEM vs non-OEM indicator
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -394,6 +397,94 @@ model InventoryItem {
   
   // Relations
   workOrderParts WorkOrderPart[]
+}
+
+// Simple product catalog table added from provided SQL dump
+// NOTE: `availability` was previously modeled as an enum. The DB contains
+// human-readable values (e.g. 'Low Stock') which caused enum mapping errors
+// at runtime. Keep availability as a simple String to match the existing table.
+
+model Product {
+  id                 Int       @id @default(autoincrement())
+  productname        String    @db.VarChar(255)
+  category           String?   @db.VarChar(50)
+  subcategory        String?   @db.VarChar(100)
+  description        String?
+  price              String?   @db.VarChar(50)
+  rating             Decimal?  @db.Decimal(3,2) @default(0)
+  reviewcount        Int?      @default(0)
+  availability       String?   @db.VarChar(20) @default("Out of Stock")
+  image              String?   @db.VarChar(500)
+  stock              Int?      @default(0)
+  compatibility      String?   @db.VarChar(255)
+  position           String?   @db.VarChar(100) @map("position")
+  brand              String?   @db.VarChar(100)
+  finish             String?   @db.VarChar(100)
+  material           String?   @db.VarChar(100)
+  surfaceuse         String?   @db.VarChar(100)
+  type               String?   @db.VarChar(100)
+  color              String?   @db.VarChar(50)
+  volume             String?   @db.VarChar(50)
+  mountingfeatures   String?   @db.VarChar(255)
+  colorcode          String?   @db.VarChar(50)
+  quantity           Int?      @default(0)
+  minquantity        Int?      @default(0)
+  discounttype       String?   @db.VarChar(50)
+  discountvalue      Decimal?  @db.Decimal(10,2) @default(0)
+  warranty           String?   @db.VarChar(100)
+  manufacturer       String?   @db.VarChar(100)
+  manufactureddate   DateTime?
+  expirydate         DateTime?
+  notes              String?
+  resistance         String?   @db.VarChar(100)
+  drytime            String?   @db.VarChar(50)
+  applicationmethod  String?   @db.VarChar(100)
+  voltage            String?   @db.VarChar(50)
+  amprating          String?   @db.VarChar(50)
+  connectortype      String?   @db.VarChar(100)
+  created_at         DateTime? @default(now())
+  updated_at         DateTime? @updatedAt
+  size               String?   @db.VarChar(100)
+
+  // Relations
+  issuanceParts      IssuancePart[]
+
+  @@map("products")
+}
+
+// Issuance records and parts used in issuance (matching SQL dump files)
+model Issuance {
+  id               Int      @id @default(autoincrement())
+  issuanceNumber   String   @db.VarChar(50) @unique @map("issuance_number")
+  dateIssued       DateTime @default(now()) @map("date_issued")
+  technicianName   String   @db.VarChar(100) @map("technician_name")
+  recipient        String?  @db.VarChar(200)
+  issuedBy         String?  @db.VarChar(100) @map("issued_by")
+  serviceJob       String?  @db.VarChar(200) @map("service_job")
+  carDetails       String?  @db.Text @map("car_details")
+  notes            String?  @db.Text
+  totalQuantity    Int      @default(0) @map("total_quantity")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  parts IssuancePart[]
+
+  @@map("issuances")
+}
+
+model IssuancePart {
+  id          Int      @id @default(autoincrement())
+  issuanceId  Int?     @map("issuance_id")
+  productId   Int?     @map("product_id")
+  quantity    Int
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  issuance Issuance? @relation(fields: [issuanceId], references: [id], onDelete: Cascade)
+  product  Product?   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([issuanceId, productId])
+  @@map("issuance_parts")
 }
 
 enum UserRole {
@@ -553,7 +644,7 @@ model ServiceInspection {
 // Updated WorkOrderInspection to link to templates
 model WorkOrderInspection {
   id           String              @id @default(cuid())
-  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   inspector    Technician?         @relation("Inspections", fields: [inspectorId], references: [id])
   inspectorId  String?
@@ -562,6 +653,11 @@ model WorkOrderInspection {
   date         DateTime            @default(now())
   notes        String?             // Overall inspection summary
   isCompleted  Boolean             @default(false) // NEW: Track completion status
+  status       InspectionStatus    @default(PENDING) // Inspection status
+  
+  // Time tracking
+  startedAt    DateTime?           // When the inspection was started
+  completedAt  DateTime?           // When the inspection was completed
   
   // Relations
   checklistItems InspectionChecklistItem[]
@@ -572,7 +668,7 @@ model WorkOrderInspection {
 // Updated InspectionChecklistItem to reference template items
 model InspectionChecklistItem {
   id                    String                  @id @default(cuid())
-  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id])
+  inspection            WorkOrderInspection     @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId          String
   templateItem          InspectionTemplateItem? @relation(fields: [templateItemId], references: [id]) // NEW: Link to template
   templateItemId        String?                 // NEW: Template item this result is based on
@@ -595,9 +691,16 @@ enum ChecklistStatus {
   RED      // Critical issue
 }
 
+enum InspectionStatus {
+  PENDING    // Inspection not yet started
+  ONGOING    // Inspection in progress
+  COMPLETED  // Inspection finished
+  CANCELLED  // Inspection cancelled
+}
+
 model TireInspection {
   id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId String
   position     TirePosition
   brand        String?    // Tire brand
@@ -619,7 +722,7 @@ enum TirePosition {
 
 model WorkOrderInspectionAttachment {
   id           String     @id @default(cuid())
-  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id])
+  inspection   WorkOrderInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   inspectionId String
   fileUrl      String
   fileName     String?    // Original filename
@@ -634,11 +737,11 @@ model WorkOrderInspectionAttachment {
 // Labor & Parts Usage
 model WorkOrderLabor {
   id               String          @id @default(cuid())
-  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // Parent service (REQUIRED - labor must belong to a service)
-  service          WorkOrderService @relation(fields: [serviceId], references: [id])
+  service          WorkOrderService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId        String
   
   laborCatalog     LaborCatalog?   @relation(fields: [laborCatalogId], references: [id])
@@ -665,7 +768,7 @@ model WorkOrderLabor {
 
 model WorkOrderPart {
   id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // NO serviceId - parts are independent, not tied to services
@@ -677,15 +780,6 @@ model WorkOrderPart {
   unitPrice        Decimal       @db.Decimal(10,2) // Price at time of use
   subtotal         Decimal       @db.Decimal(10,2) // quantity * unitPrice
   
-  // Customer approval status
-  customerApproved Boolean       @default(false)
-  customerRejected Boolean       @default(false)
-  customerNotes    String?       // Customer feedback on this part
-  
-  // Timestamps
-  approvedAt       DateTime?     // When customer approved
-  rejectedAt       DateTime?     // When customer rejected
-  
   source           PartSource    @default(INVENTORY)
   supplierName     String?       // Supplier name if not from inventory
   supplierInvoice  String?       // Supplier invoice number
@@ -694,18 +788,53 @@ model WorkOrderPart {
   installedAt      DateTime?     // When the part was installed
   installedBy      Technician?   @relation("PartInstallations", fields: [installedById], references: [id])
   installedById    String?
+
+  // Status and time tracking similar to services
+  status           ServiceStatus @default(PENDING)
+  startTime        DateTime?     // When work on this part started
+  endTime          DateTime?     // When work on this part ended
+
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   
   @@index([workOrderId])
-  @@index([customerApproved])
+}
+
+// Miscellaneous Charges - Custom charges not covered by services or parts
+model WorkOrderMiscCharge {
+  id               String        @id @default(cuid())
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderId      String
+  description      String        // "Diagnostic Fee", "Towing Charge", etc.
+  quantity         Int           @default(1)
+  unitPrice        Decimal       @db.Decimal(10,2)
+  subtotal         Decimal       @db.Decimal(10,2)  // quantity * unitPrice
+  category         MiscChargeCategory @default(OTHER)
+  notes            String?       // Internal notes
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  
+  @@index([workOrderId])
+  @@index([category])
+}
+
+enum MiscChargeCategory {
+  DIAGNOSTIC       // Diagnostic fees
+  LABOR            // Custom labor charges
+  TOWING           // Towing/transport fees
+  STORAGE          // Vehicle storage fees
+  DISPOSAL         // Waste disposal fees
+  ENVIRONMENTAL    // Environmental fees
+  ADMIN            // Admin/documentation fees
+  OTHER            // Miscellaneous
 }
 
 
 model WorkOrderApproval {
   id           String       @id @default(cuid())
-  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
+  type         ApprovalType @default(ESTIMATE) // ESTIMATE or INVOICE
   status       ApprovalStatus
   requestedAt  DateTime     @default(now())
   approvedAt   DateTime?
@@ -716,6 +845,12 @@ model WorkOrderApproval {
   customerSignature String? // URL to signature file or signature data
   pdfUrl        String?      // URL to generated estimate PDF
   inspectionPdfUrl String?   // URL to generated inspection PDF
+  
+  // Finalization and Versioning
+  isFinal      Boolean      @default(false) // Only finalized estimates enable payment gateway
+  version      Int          @default(1)    // Estimate version number
+  finalizedAt  DateTime?    // When estimate was finalized
+  
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -725,6 +860,11 @@ enum ApprovalStatus {
   APPROVED
   DECLINED
   EXPIRED
+}
+
+enum ApprovalType {
+  ESTIMATE
+  INVOICE
 }
 
 enum ApprovalMethod {
@@ -747,7 +887,7 @@ enum PartSource {
 // QC, Attachments & Payments
 model WorkOrderQC {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   passed       Boolean    // QC pass/fail status
   inspector    Technician? @relation("QCInspections", fields: [inspectorId], references: [id])
@@ -762,7 +902,7 @@ model WorkOrderQC {
 
 model WorkOrderAttachment {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   fileUrl      String     // URL to the stored file
   fileName     String?    // Original filename
@@ -789,7 +929,7 @@ enum AttachmentCategory {
 
 model Payment {
   id           String     @id @default(cuid())
-  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId  String
   method       PaymentMethod
   amount       Decimal    @db.Decimal(10,2)
@@ -841,8 +981,10 @@ enum PaymentStatus {
 }
 
 enum ServiceStatus {
-  ESTIMATED       // In estimate, awaiting customer approval
-  PENDING         // Approved, waiting to start
+  PENDING         // Draft - can be edited/deleted
+  ESTIMATED       // In estimate, awaiting customer approval (cannot be deleted)
+  APPROVED        // Customer approved, ready to assign
+  REJECTED        // Customer rejected, can be edited/deleted
   IN_PROGRESS     // Work in progress
   COMPLETED       // Work completed
   CANCELLED       // Cancelled
@@ -850,7 +992,7 @@ enum ServiceStatus {
 
 model WorkOrderService {
   id               String        @id @default(cuid())
-  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder        WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId      String
   
   // Template reference (optional - can create custom services)
@@ -864,16 +1006,7 @@ model WorkOrderService {
   unitPrice        Decimal       @db.Decimal(10,2)  // Price per service instance
   subtotal         Decimal       @db.Decimal(10,2)  // unitPrice × quantity
   
-  // Customer approval status
-  customerApproved Boolean       @default(false)
-  customerRejected Boolean       @default(false)
-  customerNotes    String?       // Customer feedback on this service
-  
-  // Timestamps
-  approvedAt       DateTime?     // When customer approved
-  rejectedAt       DateTime?     // When customer rejected
-  
-  status           ServiceStatus @default(ESTIMATED)
+  status           ServiceStatus @default(PENDING)
   notes            String?       // Internal notes
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -882,7 +1015,6 @@ model WorkOrderService {
   laborItems       WorkOrderLabor[]
   
   @@index([workOrderId])
-  @@index([customerApproved])
   @@index([status])
 }
 
@@ -909,6 +1041,7 @@ enum LineItemType {
   SERVICE
   LABOR
   PART
+  MISC
   DISCOUNT
   TAX
   OTHER
@@ -917,7 +1050,7 @@ enum LineItemType {
 model Invoice {
   id              String        @id @default(cuid())
   invoiceNumber   String        @unique
-  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id])
+  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   workOrderId     String
   
   // Invoice Details
@@ -929,6 +1062,7 @@ model Invoice {
   subtotalServices Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderService subtotals
   subtotalLabor    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderLabor subtotals  
   subtotalParts    Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderPart subtotals
+  subtotalMisc     Decimal     @db.Decimal(10,2) @default(0) // Sum of WorkOrderMiscCharge subtotals
   subtotal         Decimal     @db.Decimal(10,2) @default(0) // Total before tax/discount
   taxAmount        Decimal     @db.Decimal(10,2) @default(0)
   discountAmount   Decimal     @db.Decimal(10,2) @default(0)
@@ -1166,7 +1300,7 @@ model VehicleServiceHistory {
 
   // Link to work order if applicable
   workOrderId String?
-  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
 

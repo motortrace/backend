@@ -33,17 +33,18 @@ router.get('/manufacturers', inventoryController.getManufacturers.bind(inventory
 router.get('/suppliers', inventoryController.getSuppliers.bind(inventoryController));
 router.get('/locations', inventoryController.getLocations.bind(inventoryController));
 
-// Individual item operations
-router.get('/:id', inventoryController.getInventoryItem.bind(inventoryController));
-router.put('/:id', validateUpdateInventoryItem, inventoryController.updateInventoryItem.bind(inventoryController));
-router.delete('/:id', inventoryController.deleteInventoryItem.bind(inventoryController));
-
 // Inventory management operations
 router.post('/adjust', validateInventoryAdjustment, inventoryController.adjustInventory.bind(inventoryController));
 router.post('/transfer', validateInventoryTransfer, inventoryController.transferInventory.bind(inventoryController));
 router.put('/bulk-update', validateBulkUpdate, inventoryController.bulkUpdateInventory.bind(inventoryController));
+router.put('/update/:id', inventoryController.updateProductQuantity.bind(inventoryController));
 
-// Stock monitoring
+// Issuances
+router.post('/issuances', inventoryController.createIssuance.bind(inventoryController));
+router.get('/issuances', inventoryController.getIssuances.bind(inventoryController));
+router.get('/issuances/:id', inventoryController.getIssuanceById.bind(inventoryController));
+
+// Stock monitoring (static routes placed before dynamic '/:id' to avoid route shadowing)
 router.get('/low-stock/items', inventoryController.getLowStockItems.bind(inventoryController));
 router.get('/out-of-stock/items', inventoryController.getOutOfStockItems.bind(inventoryController));
 router.get('/reorder-suggestions', inventoryController.getReorderSuggestions.bind(inventoryController));
@@ -51,5 +52,24 @@ router.get('/reorder-suggestions', inventoryController.getReorderSuggestions.bin
 // Reports and analytics
 router.get('/report/inventory', inventoryController.getInventoryReport.bind(inventoryController));
 router.get('/report/work-order-parts', inventoryController.getWorkOrderParts.bind(inventoryController));
+// Inventory analytics summary
+router.get('/analytics', inventoryController.getInventoryAnalytics.bind(inventoryController));
+router.get('/analytics/low-stock', inventoryController.getLowStockProducts.bind(inventoryController));
+router.get('/analytics/out-of-stock', inventoryController.getOutOfStockProducts.bind(inventoryController));
+// Parts usage analytics
+router.get('/analytics/parts-usage', inventoryController.getPartsUsageAnalytics.bind(inventoryController));
+router.get('/analytics/cost-summary', inventoryController.getCostSummaryAnalytics.bind(inventoryController));
+router.get('/analytics/order-metrics', inventoryController.getOrderMetrics.bind(inventoryController));
+
+// Products (from products table)
+router.get('/products', inventoryController.getProducts.bind(inventoryController));
+router.post('/products', inventoryController.addProduct.bind(inventoryController));
+router.put('/products/:id', inventoryController.updateProduct.bind(inventoryController));
+router.delete('/products/:id', inventoryController.deleteProduct.bind(inventoryController));
+
+// Individual item operations (dynamic route should come last)
+router.get('/:id', inventoryController.getInventoryItem.bind(inventoryController));
+router.put('/:id', inventoryController.updateInventoryItem.bind(inventoryController));
+router.delete('/:id', inventoryController.deleteInventoryItem.bind(inventoryController));
 
 export default router;

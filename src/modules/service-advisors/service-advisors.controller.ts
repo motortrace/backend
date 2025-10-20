@@ -267,5 +267,24 @@ export class ServiceAdvisorController {
       });
     }
   }
+
+  // Get service advisor count
+  async getServiceAdvisorCount(req: Request, res: Response) {
+    try {
+      const count = await this.serviceAdvisorService.getServiceAdvisorCount();
+
+      res.json({
+        success: true,
+        data: { count },
+        message: 'Service advisor count retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get service advisor count',
+        message: error.message,
+      });
+    }
+  }
 }
 

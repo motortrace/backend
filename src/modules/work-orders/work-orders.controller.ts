@@ -38,11 +38,14 @@ export class WorkOrderController {
           return res.status(404).json({ success: false, error: 'User profile not found' });
         }
 
+        // Change all PENDING and REJECTED services to ESTIMATED (locks them from editing)
+        await this.workOrderService.lockServicesForEstimate(workOrderId);
+
         // Generate estimate PDF
         const pdfUrl = await this.workOrderService.generateEstimatePDF(workOrderId);
 
-        // Expire previous WorkOrderApproval entries for this work order/status
-        await this.workOrderService.expirePreviousApprovals(workOrderId, 'PENDING');
+        // Expire previous WorkOrderApproval entries for this work order
+        await this.workOrderService.expirePreviousApprovals(workOrderId);
 
         // Create new WorkOrderApproval entry
         const approval = await this.workOrderService.createWorkOrderApproval({
@@ -239,6 +242,70 @@ export class WorkOrderController {
       res.json({
         success: true,
         data: services,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async createWorkOrderPart(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const { inventoryItemId, quantity, technicianId } = req.body;
+
+      if (!inventoryItemId || !quantity) {
+        return res.status(400).json({
+          success: false,
+          error: 'inventoryItemId and quantity are required',
+        });
+      }
+
+      const part = await this.workOrderService.createWorkOrderPart(workOrderId, {
+        inventoryItemId,
+        quantity,
+        technicianId,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: part,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getWorkOrderParts(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const parts = await this.workOrderService.getWorkOrderParts(workOrderId);
+
+      res.json({
+        success: true,
+        data: parts,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteWorkOrderService(req: Request, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      await this.workOrderService.deleteWorkOrderService(serviceId);
+
+      res.json({
+        success: true,
+        message: 'Work order service deleted successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -633,6 +700,43 @@ export class WorkOrderController {
     }
   }
 
+  async deleteWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      await this.workOrderService.deleteWorkOrderInspection(inspectionId);
+
+      res.json({
+        success: true,
+        message: 'Work order inspection deleted successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      const updateData = req.body;
+
+      const inspection = await this.workOrderService.updateWorkOrderInspection(inspectionId, updateData);
+
+      res.json({
+        success: true,
+        data: inspection,
+        message: 'Work order inspection updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order QC
   async createWorkOrderQC(req: Request, res: Response) {
     try {
@@ -680,243 +784,74 @@ export class WorkOrderController {
     }
   }
 
-  // Customer Approval Endpoints
+  // Misc Charges Endpoints
 
-  async approveService(req: any, res: Response) {
-    try {
-      const { serviceId } = req.params;
-      const { notes } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find UserProfile then Customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.approveService(serviceId, customer.id, notes);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async rejectService(req: any, res: Response) {
-    try {
-      const { serviceId } = req.params;
-      const { reason } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.rejectService(serviceId, customer.id, reason);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async approvePart(req: any, res: Response) {
-    try {
-      const { partId } = req.params;
-      const { notes } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.approvePart(partId, customer.id, notes);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async rejectPart(req: any, res: Response) {
-    try {
-      const { partId } = req.params;
-      const { reason } = req.body;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
-
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
-
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
-      });
-
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.rejectPart(partId, customer.id, reason);
-
-      res.json({
-        success: true,
-        message: result.message,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
-
-  async getPendingApprovals(req: any, res: Response) {
+  async createWorkOrderMiscCharge(req: Request, res: Response) {
     try {
       const { workOrderId } = req.params;
-      
-      // Get customer ID from authenticated user
-      const supabaseUserId = req.user?.id;
-      if (!supabaseUserId) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not authenticated'
-        });
-      }
+      const data = req.body;
+      data.workOrderId = workOrderId;
 
-      // Find customer by Supabase user ID
-      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
-      if (!userProfile) {
-        return res.status(404).json({
-          success: false,
-          error: 'User profile not found'
-        });
-      }
+      const miscCharge = await this.workOrderService.createWorkOrderMiscCharge(data);
 
-      // Get Customer record linked to this UserProfile
-      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
-        where: { userProfileId: userProfile.id }
+      res.status(201).json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge created successfully',
       });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 
-      if (!customer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Customer profile not found'
-        });
-      }
-
-      const result = await this.workOrderService.getPendingApprovals(workOrderId, customer.id);
+  async getWorkOrderMiscCharges(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const miscCharges = await this.workOrderService.getWorkOrderMiscCharges(workOrderId);
 
       res.json({
         success: true,
-        data: result,
+        data: miscCharges,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const data = req.body;
+
+      const miscCharge = await this.workOrderService.updateWorkOrderMiscCharge(miscChargeId, data);
+
+      res.json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const result = await this.workOrderService.deleteWorkOrderMiscCharge(miscChargeId);
+
+      res.json({
+        success: true,
+        message: result.message,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -1117,28 +1052,36 @@ export class WorkOrderController {
         });
       }
 
-      // Check if user is a customer or manager
-      let customerId: string | null = null;
+      // Check if user is a customer, service advisor, or manager
+      let approvedById: string | null = null;
 
       // Try to find customer profile first
       const customer = await (this.workOrderService as any).prisma.customer.findUnique({
         where: { userProfileId: userProfile.id }
       });
 
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (customer) {
-        // User is a customer
-        customerId = customer.id;
+        // User is a customer - use their UserProfile ID for approval
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can approve manually - use their UserProfile ID
+        approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
         // Manager can approve on behalf of customers
-        customerId = null;
+        approvedById = null;
       } else {
         return res.status(403).json({
           success: false,
-          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+          error: 'Unauthorized: Only customers, service advisors, or managers can approve work order approvals'
         });
       }
 
-      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, customerId, notes);
+      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, approvedById, notes);
 
       res.json({
         success: true,
@@ -1175,31 +1118,112 @@ export class WorkOrderController {
         });
       }
 
-      // Check if user is a customer or manager
-      let customerId: string | null = null;
+      // Check if user is a customer, service advisor, or manager
+      let approvedById: string | null = null;
 
       // Try to find customer profile first
       const customer = await (this.workOrderService as any).prisma.customer.findUnique({
         where: { userProfileId: userProfile.id }
       });
 
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (customer) {
-        // User is a customer
-        customerId = customer.id;
+        // User is a customer - use their UserProfile ID for rejection
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can reject manually - use their UserProfile ID
+        approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
-        // Manager can approve on behalf of customers
-        customerId = null;
+        // Manager can reject on behalf of customers
+        approvedById = null;
       } else {
         return res.status(403).json({
           success: false,
-          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+          error: 'Unauthorized: Only customers, service advisors, or managers can reject work order approvals'
         });
       }
 
-      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, customerId, reason);
+      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, approvedById, reason);
 
       res.json({
         success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async finalizeEstimate(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.finalizeEstimate(approvalId, userProfile.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async generateInvoice(req: any, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.generateInvoice(workOrderId, userProfile.id);
+
+      res.json({
+        success: true,
+        data: result,
         message: result.message,
       });
     } catch (error: any) {

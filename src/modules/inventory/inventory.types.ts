@@ -74,6 +74,10 @@ export interface InventoryTransferRequest {
 }
 
 export interface InventoryItemWithUsage extends InventoryItem {
+  category?: {
+    id: string;
+    name: string;
+  };
   _count: {
     workOrderParts: number;
   };

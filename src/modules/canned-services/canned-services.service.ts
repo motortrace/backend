@@ -4,6 +4,7 @@ import {
   UpdateCannedServiceRequest,
   CannedServiceFilters,
   CannedServiceDetails,
+  InspectionTemplateRecommendation,
 } from './canned-services.types';
 import { PrismaClient } from '@prisma/client';
 
@@ -875,6 +876,91 @@ export class CannedServiceService {
 
     // Sort by service count descending
     return categoriesWithRevenue.sort((a, b) => b.serviceCount - a.serviceCount);
+  }
+
+  // Get inspection template recommendations for services in a work order
+  async getInspectionTemplatesForWorkOrder(workOrderId: string): Promise<InspectionTemplateRecommendation[]> {
+    // First verify the work order exists
+    const workOrder = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: { id: true }
+    });
+
+    if (!workOrder) {
+      throw new Error(`Work order with ID ${workOrderId} not found`);
+    }
+
+    // Get work order services with canned service IDs
+    const workOrderServices = await this.prisma.workOrderService.findMany({
+      where: {
+        workOrderId,
+        cannedServiceId: { not: null }
+      },
+      select: {
+        cannedServiceId: true
+      }
+    });
+
+    // Extract unique canned service IDs
+    const directCannedServiceIds = [...new Set(
+      workOrderServices
+        .map(wos => wos.cannedServiceId)
+        .filter((id): id is string => id !== null)
+    )];
+
+    if (directCannedServiceIds.length === 0) {
+      return [];
+    }
+
+    // Get the codes of these services to find related services (variants)
+    const services = await this.prisma.cannedService.findMany({
+      where: { id: { in: directCannedServiceIds } },
+      select: { id: true, code: true }
+    });
+
+    // Get all service IDs that share the same codes (including variants)
+    const codes = [...new Set(services.map(s => s.code))];
+    const allRelatedServices = await this.prisma.cannedService.findMany({
+      where: { code: { in: codes } },
+      select: { id: true }
+    });
+
+    const allCannedServiceIds = [...new Set(allRelatedServices.map(s => s.id))];
+
+    // Get inspection templates through service inspections
+    const inspectionTemplates = await this.prisma.inspectionTemplate.findMany({
+      where: {
+        serviceInspections: {
+          some: {
+            cannedServiceId: {
+              in: allCannedServiceIds
+            }
+          }
+        },
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        imageUrl: true,
+        _count: {
+          select: {
+            templateItems: true
+          }
+        }
+      },
+      distinct: ['id']
+    });
+
+    // Transform to the required format
+    return inspectionTemplates.map(template => ({
+      id: template.id,
+      image: template.imageUrl,
+      name: template.name,
+      itemCount: template._count.templateItems,
+      category: template.category
+    }));
   }
 }
 

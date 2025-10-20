@@ -19,7 +19,7 @@ export const createManualPaymentSchema = Joi.object({
   amount: Joi.number().positive().required(),
   reference: Joi.string().optional(),
   notes: Joi.string().optional(),
-  processedById: Joi.string().required(),
+  processedById: Joi.string().optional(), // Temporarily optional
   paymentImage: Joi.string().optional(), // Base64 or URL of payment receipt
 });
 
@@ -44,7 +44,7 @@ export const createRefundSchema = Joi.object({
   paymentId: Joi.string().required(),
   amount: Joi.number().positive().required(),
   reason: Joi.string().required(),
-  processedById: Joi.string().required(),
+  processedById: Joi.string().optional(), // Temporarily optional
 });
 
 // Payment Filters Schema

@@ -428,7 +428,7 @@ export class TechnicianService {
           // Active inspections (not completed)
           inspections: {
             where: {
-              isCompleted: false,
+              status: 'ONGOING',
               workOrder: {
                 status: {
                   in: ['IN_PROGRESS', 'APPROVED']
@@ -584,13 +584,13 @@ export class TechnicianService {
     technicianName: string;
     technicianImage: string | null;
     workOrderNumber: string;
-    taskType: 'Labor' | 'Part';
+    taskType: 'Labor' | 'Part' | 'Inspection';
     taskDescription: string;
     timeWorkedMinutes: number;
     expectedMinutes: number | null;
   }>> {
     const now = new Date();
-    // Get all technicians with active labor or part tasks
+    // Get all technicians with active labor, part, or inspection tasks
     const technicians = await this.prisma.technician.findMany({
       include: {
         userProfile: {
@@ -633,6 +633,28 @@ export class TechnicianService {
             }
           },
         },
+        inspections: {
+          where: {
+            status: 'ONGOING',
+            workOrder: {
+              status: {
+                in: ['IN_PROGRESS', 'APPROVED']
+              }
+            }
+          },
+          include: {
+            template: {
+              select: {
+                name: true,
+              }
+            },
+            workOrder: {
+              select: {
+                workOrderNumber: true,
+              }
+            }
+          },
+        },
       },
     });
 
@@ -641,7 +663,7 @@ export class TechnicianService {
       technicianName: string;
       technicianImage: string | null;
       workOrderNumber: string;
-      taskType: 'Labor' | 'Part';
+      taskType: 'Labor' | 'Part' | 'Inspection';
       taskDescription: string;
       timeWorkedMinutes: number;
       expectedMinutes: number | null;
@@ -674,6 +696,21 @@ export class TechnicianService {
           workOrderNumber: part.workOrder.workOrderNumber,
           taskType: 'Part',
           taskDescription: part.description || '',
+          timeWorkedMinutes: timeWorked,
+          expectedMinutes: null,
+        });
+      });
+      // Active inspections
+      tech.inspections.forEach(inspection => {
+        const timeWorked = inspection.date
+          ? Math.floor((now.getTime() - inspection.date.getTime()) / (1000 * 60))
+          : 0;
+        result.push({
+          technicianName: tech.userProfile?.name || 'Unknown',
+          technicianImage: tech.userProfile?.profileImage || null,
+          workOrderNumber: inspection.workOrder.workOrderNumber,
+          taskType: 'Inspection',
+          taskDescription: inspection.template?.name || 'Inspection',
           timeWorkedMinutes: timeWorked,
           expectedMinutes: null,
         });
@@ -976,7 +1013,7 @@ export class TechnicianService {
             {
               inspections: {
                 some: {
-                  isCompleted: false,
+                  status: 'ONGOING',
                   workOrder: {
                     status: {
                       in: ['IN_PROGRESS', 'APPROVED']
@@ -1149,7 +1186,7 @@ export class TechnicianService {
             {
               inspections: {
                 some: {
-                  isCompleted: false,
+                  status: 'ONGOING',
                   workOrder: {
                     status: {
                       in: ['IN_PROGRESS', 'APPROVED']
@@ -1179,7 +1216,7 @@ export class TechnicianService {
         SELECT COUNT(*)::int as count FROM (
           SELECT id FROM "WorkOrderLabor" WHERE "technicianId" = ${id} AND status = 'IN_PROGRESS'
           UNION ALL
-          SELECT id FROM "WorkOrderInspection" WHERE "inspectorId" = ${id} AND "isCompleted" = false
+          SELECT id FROM "WorkOrderInspection" WHERE "inspectorId" = ${id} AND status = 'ONGOING'
           UNION ALL
           SELECT id FROM "WorkOrderPart" WHERE "installedById" = ${id} AND "installedAt" IS NULL
         ) as active_tasks
@@ -1209,7 +1246,7 @@ export class TechnicianService {
       const activeInspections = await this.prisma.workOrderInspection.findMany({
         where: {
           inspectorId: id,
-          isCompleted: false,
+          status: 'ONGOING',
           workOrder: {
             status: {
               in: ['IN_PROGRESS', 'APPROVED']

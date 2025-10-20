@@ -382,5 +382,36 @@ export class CannedServiceController {
       });
     }
   }
+
+  // Get inspection template recommendations for work order services
+  async getInspectionTemplatesForWorkOrder(req: Request, res: Response): Promise<void> {
+    try {
+      const { workOrderId } = req.params;
+
+      if (!workOrderId) {
+        res.status(400).json({
+          success: false,
+          error: 'Work order ID is required',
+          message: 'Please provide a valid work order ID',
+        });
+        return;
+      }
+
+      const inspectionTemplates = await this.cannedServiceService.getInspectionTemplatesForWorkOrder(workOrderId);
+
+      res.status(200).json({
+        success: true,
+        data: inspectionTemplates,
+        count: inspectionTemplates.length,
+        message: 'Inspection template recommendations retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve inspection template recommendations',
+      });
+    }
+  }
 }
 

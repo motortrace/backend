@@ -99,4 +99,10 @@ router.get(
   cannedServiceController.getServiceCategories.bind(cannedServiceController)
 );
 
+// Get inspection template recommendations for work order services
+router.get(
+  '/work-orders/:workOrderId/inspection-templates',
+  cannedServiceController.getInspectionTemplatesForWorkOrder.bind(cannedServiceController)
+);
+
 export default router;
