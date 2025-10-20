@@ -223,6 +223,17 @@ export class WorkOrderService {
         },
       });
 
+      // Update all WorkOrderLabor entries to APPROVED (customer approved, ready to assign)
+      await this.prisma.workOrderLabor.updateMany({
+        where: {
+          workOrderId,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          status: ServiceStatus.APPROVED,
+        },
+      });
+
       // Recalculate work order totals
       await this.updateWorkOrderTotals(workOrderId);
 
@@ -275,6 +286,17 @@ export class WorkOrderService {
 
       // Change all ESTIMATED services back to REJECTED (allows editing/deleting again)
       await this.prisma.workOrderService.updateMany({
+        where: {
+          workOrderId,
+          status: ServiceStatus.ESTIMATED,
+        },
+        data: {
+          status: ServiceStatus.REJECTED,
+        },
+      });
+
+      // Change all ESTIMATED labor items back to REJECTED (allows editing/deleting again)
+      await this.prisma.workOrderLabor.updateMany({
         where: {
           workOrderId,
           status: ServiceStatus.ESTIMATED,
@@ -3071,14 +3093,34 @@ export class WorkOrderService {
       throw new Error(`Work order inspection with ID '${inspectionId}' not found`);
     }
 
+    // Prepare update data - exclude nested relations that should be updated separately
+    const { checklistItems, tireChecks, attachments, ...updateData } = data;
+    
+    const finalUpdateData: any = {
+      ...updateData,
+      // Convert date strings to Date objects if needed
+      ...(data.date && { date: new Date(data.date) }),
+    };
+
+    // Handle time tracking based on status changes
+    if (data.status) {
+      if (data.status === 'ONGOING' && existingInspection.status !== 'ONGOING') {
+        // Starting the inspection
+        finalUpdateData.startedAt = new Date();
+      } else if (data.status === 'COMPLETED' && existingInspection.status !== 'COMPLETED') {
+        // Completing the inspection
+        finalUpdateData.completedAt = new Date();
+        // If startedAt wasn't set before, set it now too
+        if (!existingInspection.startedAt) {
+          finalUpdateData.startedAt = new Date();
+        }
+      }
+    }
+
     // Update the inspection
     const updatedInspection = await this.prisma.workOrderInspection.update({
       where: { id: inspectionId },
-      data: {
-        ...data,
-        // Convert date strings to Date objects if needed
-        ...(data.date && { date: new Date(data.date) }),
-      },
+      data: finalUpdateData,
       include: {
         inspector: {
           select: {

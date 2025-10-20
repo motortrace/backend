@@ -566,6 +566,10 @@ model WorkOrderInspection {
   isCompleted  Boolean             @default(false) // NEW: Track completion status
   status       InspectionStatus    @default(PENDING) // Inspection status
   
+  // Time tracking
+  startedAt    DateTime?           // When the inspection was started
+  completedAt  DateTime?           // When the inspection was completed
+  
   // Relations
   checklistItems InspectionChecklistItem[]
   tireChecks    TireInspection[]
@@ -601,7 +605,6 @@ enum ChecklistStatus {
 enum InspectionStatus {
   PENDING    // Inspection not yet started
   ONGOING    // Inspection in progress
-  PAUSED     // Inspection temporarily paused
   COMPLETED  // Inspection finished
   CANCELLED  // Inspection cancelled
 }

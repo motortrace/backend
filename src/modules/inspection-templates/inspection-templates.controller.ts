@@ -877,66 +877,6 @@ export class InspectionTemplatesController {
     }
   }
 
-  async pauseInspectionController(req: Request, res: Response) {
-    try {
-      const validation = inspectionIdSchema.validate({ id: req.params.id });
-      if (validation.error) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid inspection ID',
-          details: validation.error.details.map(detail => detail.message)
-        });
-      }
-
-      const result = await this.service.pauseInspection(validation.value.id);
-      
-      if (result.success) {
-        return res.status(200).json(result);
-      } else {
-        if (result.error?.includes('not found')) {
-          return res.status(404).json(result);
-        }
-        return res.status(400).json(result);
-      }
-    } catch (error) {
-      console.error('Controller error - pauseInspectionController:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
-
-  async resumeInspectionController(req: Request, res: Response) {
-    try {
-      const validation = inspectionIdSchema.validate({ id: req.params.id });
-      if (validation.error) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid inspection ID',
-          details: validation.error.details.map(detail => detail.message)
-        });
-      }
-
-      const result = await this.service.resumeInspection(validation.value.id);
-      
-      if (result.success) {
-        return res.status(200).json(result);
-      } else {
-        if (result.error?.includes('not found')) {
-          return res.status(404).json(result);
-        }
-        return res.status(400).json(result);
-      }
-    } catch (error) {
-      console.error('Controller error - resumeInspectionController:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
-
   async completeInspectionController(req: Request, res: Response) {
     try {
       const validation = inspectionIdSchema.validate({ id: req.params.id });

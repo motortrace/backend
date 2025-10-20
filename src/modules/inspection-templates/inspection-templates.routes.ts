@@ -58,16 +58,6 @@ router.patch('/inspections/:id/start',
   requireTechnician,
   controller.startInspectionController.bind(controller)
 );
-router.patch('/inspections/:id/pause', 
-  authenticateSupabaseToken, 
-  requireTechnician,
-  controller.pauseInspectionController.bind(controller)
-);
-router.patch('/inspections/:id/resume', 
-  authenticateSupabaseToken, 
-  requireTechnician,
-  controller.resumeInspectionController.bind(controller)
-);
 router.patch('/inspections/:id/complete', 
   authenticateSupabaseToken, 
   requireTechnician,

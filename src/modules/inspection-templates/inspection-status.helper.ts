@@ -3,7 +3,6 @@
 export enum InspectionStatus {
   PENDING = 'PENDING',
   ONGOING = 'ONGOING',
-  PAUSED = 'PAUSED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
@@ -14,8 +13,7 @@ export enum InspectionStatus {
  */
 const STATE_TRANSITION_MATRIX: Record<InspectionStatus, InspectionStatus[]> = {
   [InspectionStatus.PENDING]: [InspectionStatus.ONGOING, InspectionStatus.CANCELLED],
-  [InspectionStatus.ONGOING]: [InspectionStatus.PAUSED, InspectionStatus.COMPLETED, InspectionStatus.CANCELLED],
-  [InspectionStatus.PAUSED]: [InspectionStatus.ONGOING, InspectionStatus.CANCELLED],
+  [InspectionStatus.ONGOING]: [InspectionStatus.COMPLETED, InspectionStatus.CANCELLED],
   [InspectionStatus.COMPLETED]: [], // Terminal state - no transitions allowed
   [InspectionStatus.CANCELLED]: [], // Terminal state - no transitions allowed
 };
