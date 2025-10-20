@@ -226,6 +226,9 @@ export interface WorkOrderWithDetails {
     notes?: string;
     installedAt?: Date;
     installedById?: string;
+    status: ServiceStatus;
+    startTime?: Date;
+    endTime?: Date;
     part: {
       id: string;
       name: string;

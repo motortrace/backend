@@ -699,6 +699,12 @@ model WorkOrderPart {
   installedAt      DateTime?     // When the part was installed
   installedBy      Technician?   @relation("PartInstallations", fields: [installedById], references: [id])
   installedById    String?
+
+  // Status and time tracking similar to services
+  status           ServiceStatus @default(PENDING)
+  startTime        DateTime?     // When work on this part started
+  endTime          DateTime?     // When work on this part ended
+
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   
