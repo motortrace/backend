@@ -1052,7 +1052,7 @@ export class WorkOrderController {
         });
       }
 
-      // Check if user is a customer or manager
+      // Check if user is a customer, service advisor, or manager
       let approvedById: string | null = null;
 
       // Try to find customer profile first
@@ -1060,8 +1060,16 @@ export class WorkOrderController {
         where: { userProfileId: userProfile.id }
       });
 
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (customer) {
         // User is a customer - use their UserProfile ID for approval
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can approve manually - use their UserProfile ID
         approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
         // Manager can approve on behalf of customers
@@ -1069,7 +1077,7 @@ export class WorkOrderController {
       } else {
         return res.status(403).json({
           success: false,
-          error: 'Unauthorized: Only customers or managers can approve work order approvals'
+          error: 'Unauthorized: Only customers, service advisors, or managers can approve work order approvals'
         });
       }
 
@@ -1110,7 +1118,7 @@ export class WorkOrderController {
         });
       }
 
-      // Check if user is a customer or manager
+      // Check if user is a customer, service advisor, or manager
       let approvedById: string | null = null;
 
       // Try to find customer profile first
@@ -1118,8 +1126,16 @@ export class WorkOrderController {
         where: { userProfileId: userProfile.id }
       });
 
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
       if (customer) {
         // User is a customer - use their UserProfile ID for rejection
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can reject manually - use their UserProfile ID
         approvedById = userProfile.id;
       } else if (req.user?.role === 'manager') {
         // Manager can reject on behalf of customers
@@ -1127,7 +1143,7 @@ export class WorkOrderController {
       } else {
         return res.status(403).json({
           success: false,
-          error: 'Unauthorized: Only customers or managers can reject work order approvals'
+          error: 'Unauthorized: Only customers, service advisors, or managers can reject work order approvals'
         });
       }
 

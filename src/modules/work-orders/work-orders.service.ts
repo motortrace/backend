@@ -189,15 +189,26 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If approvedById is provided (not a manager approval), validate that the user is the customer who owns this work order
+      // If approvedById is provided (not a manager approval), validate authorization
       if (approvedById) {
-        // Find the customer profile for this user
+        // Check if user is a customer
         const customerForUser = await this.prisma.customer.findUnique({
           where: { userProfileId: approvedById }
         });
 
-        if (!customerForUser || approval.workOrder.customerId !== customerForUser.id) {
+        // Check if user is a service advisor
+        const serviceAdvisorForUser = await this.prisma.serviceAdvisor.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // If customer, validate they own the work order
+        if (customerForUser && approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only approve work order approvals for your own work orders');
+        }
+
+        // If neither customer nor service advisor, reject
+        if (!customerForUser && !serviceAdvisorForUser) {
+          throw new Error('Unauthorized: Only customers or service advisors can approve work order approvals');
         }
       }
 
@@ -262,15 +273,26 @@ export class WorkOrderService {
 
       const workOrderId = approval.workOrderId;
 
-      // If approvedById is provided (not a manager rejection), validate that the user is the customer who owns this work order
+      // If approvedById is provided (not a manager rejection), validate authorization
       if (approvedById) {
-        // Find the customer profile for this user
+        // Check if user is a customer
         const customerForUser = await this.prisma.customer.findUnique({
           where: { userProfileId: approvedById }
         });
 
-        if (!customerForUser || approval.workOrder.customerId !== customerForUser.id) {
+        // Check if user is a service advisor
+        const serviceAdvisorForUser = await this.prisma.serviceAdvisor.findUnique({
+          where: { userProfileId: approvedById }
+        });
+
+        // If customer, validate they own the work order
+        if (customerForUser && approval.workOrder.customerId !== customerForUser.id) {
           throw new Error('Unauthorized: You can only reject work order approvals for your own work orders');
+        }
+
+        // If neither customer nor service advisor, reject
+        if (!customerForUser && !serviceAdvisorForUser) {
+          throw new Error('Unauthorized: Only customers or service advisors can reject work order approvals');
         }
       }
 
