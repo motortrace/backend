@@ -11,7 +11,6 @@ import authSupabaseRoutes from './modules/auth/supabase/authSupabase.routes';
 import usersRoutes from './modules/users/users.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import workOrdersRoutes from './modules/work-orders';
-import estimatesRoutes from './modules/estimates/estimates.routes';
 import laborRoutes from './modules/labor/labor.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import inspectionTemplatesRoutes from './modules/inspection-templates/inspection-templates.routes';
@@ -23,7 +22,12 @@ import storageRoutes from './modules/storage/storage.routes';
 import serviceAdvisorRoutes from './modules/service-advisors/service-advisors.routes';
 import technicianRoutes from './modules/technicians/technicians.routes';
 import invoicesRoutes from './modules/invoices/invoices.routes';
-
+import { mileageTrackingRouter } from './modules/mileage-tracking';
+import { serviceRecommendationsRouter } from './modules/service-recommendations';
+import { carExpensesRouter } from './modules/car-expenses';
+import notificationsRoutes from './modules/notifications/notifications.routes';
+import { messageRoutes } from './modules/messages';
+import partsRoutes from './modules/parts/parts.routes';
 
 const app = express();
 
@@ -60,7 +64,6 @@ app.use('/auth', authSupabaseRoutes);
 app.use('/users', usersRoutes); 
 app.use('/appointments', appointmentsRoutes);
 app.use('/work-orders', workOrdersRoutes);
-app.use('/estimates', estimatesRoutes);
 app.use('/labor', laborRoutes);
 app.use('/inventory', inventoryRoutes);
 app.use('/inspection-templates', inspectionTemplatesRoutes);
@@ -72,6 +75,12 @@ app.use('/storage', storageRoutes);
 app.use('/service-advisors', serviceAdvisorRoutes);
 app.use('/technicians', technicianRoutes);
 app.use('/invoices', invoicesRoutes);
+app.use('/mileage-tracking', mileageTrackingRouter);
+app.use('/service-recommendations', serviceRecommendationsRouter);
+app.use('/car-expenses', carExpensesRouter);
+app.use('/notifications', notificationsRoutes);
+app.use('/messages', messageRoutes);
+app.use('/parts', partsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

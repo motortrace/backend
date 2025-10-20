@@ -15,7 +15,7 @@ import { PrismaClient } from '@prisma/client';
 export class LaborService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  // Simple Labor Creation (following appointments pattern)
+  // Simple Labor Creation (for tracking work only - no pricing)
   async createLabor(data: CreateLaborRequest): Promise<WorkOrderLaborWithDetails> {
     // Validate work order exists
     const workOrder = await this.prisma.workOrder.findUnique({
@@ -24,6 +24,18 @@ export class LaborService {
 
     if (!workOrder) {
       throw new Error(`Work order with ID '${data.workOrderId}' not found`);
+    }
+
+    // Validate service exists and belongs to this work order
+    const service = await this.prisma.workOrderService.findFirst({
+      where: {
+        id: data.serviceId,
+        workOrderId: data.workOrderId,
+      },
+    });
+
+    if (!service) {
+      throw new Error(`Service with ID '${data.serviceId}' not found in this work order`);
     }
 
     // Validate technician exists if provided
@@ -37,17 +49,14 @@ export class LaborService {
       }
     }
 
-    // Calculate subtotal
-    const subtotal = data.hours * data.rate;
-
-    // Create labor record
+    // Create labor record (no pricing - just tracking)
     const labor = await this.prisma.workOrderLabor.create({
       data: {
         workOrderId: data.workOrderId,
+        serviceId: data.serviceId,
+        laborCatalogId: data.laborCatalogId,
         description: data.description,
-        hours: data.hours,
-        rate: data.rate,
-        subtotal,
+        estimatedMinutes: data.estimatedMinutes,
         technicianId: data.technicianId,
         startTime: data.startTime,
         endTime: data.endTime,
@@ -95,8 +104,8 @@ export class LaborService {
         code: data.code,
         name: data.name,
         description: data.description,
-        estimatedHours: data.estimatedHours,
-        hourlyRate: data.hourlyRate,
+        estimatedMinutes: data.estimatedMinutes,
+        skillLevel: data.skillLevel,
         category: data.category,
         isActive: data.isActive ?? true,
       },
@@ -207,6 +216,18 @@ export class LaborService {
       throw new Error(`Work order with ID '${data.workOrderId}' not found`);
     }
 
+    // Validate service exists and belongs to this work order
+    const service = await this.prisma.workOrderService.findFirst({
+      where: {
+        id: data.serviceId,
+        workOrderId: data.workOrderId,
+      },
+    });
+
+    if (!service) {
+      throw new Error(`Service with ID '${data.serviceId}' not found in this work order`);
+    }
+
     if (data.laborCatalogId) {
       const laborCatalog = await this.prisma.laborCatalog.findUnique({
         where: { id: data.laborCatalogId },
@@ -214,16 +235,6 @@ export class LaborService {
 
       if (!laborCatalog) {
         throw new Error(`Labor catalog with ID '${data.laborCatalogId}' not found`);
-      }
-    }
-
-    if (data.cannedServiceId) {
-      const cannedService = await this.prisma.cannedService.findUnique({
-        where: { id: data.cannedServiceId },
-      });
-
-      if (!cannedService) {
-        throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
       }
     }
 
@@ -237,16 +248,13 @@ export class LaborService {
       }
     }
 
-    const subtotal = data.hours * data.rate;
-
     return await this.prisma.workOrderLabor.create({
       data: {
         workOrderId: data.workOrderId,
+        serviceId: data.serviceId,
         laborCatalogId: data.laborCatalogId,
         description: data.description,
-        hours: data.hours,
-        rate: data.rate,
-        subtotal,
+        estimatedMinutes: data.estimatedMinutes,
         technicianId: data.technicianId,
         startTime: data.startTime,
         endTime: data.endTime,
@@ -400,6 +408,8 @@ export class LaborService {
       throw new Error(`Work order labor with ID '${id}' not found`);
     }
 
+    // Note: serviceId cannot be updated - it's a required foreign key
+
     if (data.laborCatalogId) {
       const laborCatalog = await this.prisma.laborCatalog.findUnique({
         where: { id: data.laborCatalogId },
@@ -407,16 +417,6 @@ export class LaborService {
 
       if (!laborCatalog) {
         throw new Error(`Labor catalog with ID '${data.laborCatalogId}' not found`);
-      }
-    }
-
-    if (data.cannedServiceId) {
-      const cannedService = await this.prisma.cannedService.findUnique({
-        where: { id: data.cannedServiceId },
-      });
-
-      if (!cannedService) {
-        throw new Error(`Canned service with ID '${data.cannedServiceId}' not found`);
       }
     }
 
@@ -430,13 +430,17 @@ export class LaborService {
       }
     }
 
-    const updateData: any = { ...data };
-
-    if (data.hours !== undefined || data.rate !== undefined) {
-      const hours = data.hours ?? Number(existingLabor.hours);
-      const rate = data.rate ?? Number(existingLabor.rate);
-      updateData.subtotal = hours * rate;
-    }
+    // Build update data object with only the fields that can be updated
+    const updateData: any = {};
+    if (data.laborCatalogId !== undefined) updateData.laborCatalogId = data.laborCatalogId;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.estimatedMinutes !== undefined) updateData.estimatedMinutes = data.estimatedMinutes;
+    if (data.actualMinutes !== undefined) updateData.actualMinutes = data.actualMinutes;
+    if (data.technicianId !== undefined) updateData.technicianId = data.technicianId;
+    if (data.startTime !== undefined) updateData.startTime = data.startTime;
+    if (data.endTime !== undefined) updateData.endTime = data.endTime;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.notes !== undefined) updateData.notes = data.notes;
 
     return await this.prisma.workOrderLabor.update({
       where: { id },
@@ -509,12 +513,12 @@ export class LaborService {
       },
     });
 
-    const totalHours = laborItems.reduce((sum: number, item: any) => sum + Number(item.hours), 0);
-    const totalCost = laborItems.reduce((sum: number, item: any) => sum + Number(item.subtotal), 0);
+    const totalMinutes = laborItems.reduce((sum: number, item: any) => sum + Number(item.actualMinutes || 0), 0);
+    const totalEstimatedMinutes = laborItems.reduce((sum: number, item: any) => sum + Number(item.estimatedMinutes || 0), 0);
 
     return {
-      totalHours,
-      totalCost,
+      totalMinutes,
+      totalEstimatedMinutes,
       laborItems,
     };
   }
@@ -565,12 +569,12 @@ export class LaborService {
       },
     });
 
-    const totalHours = laborItems.reduce((sum, item) => sum + Number(item.hours), 0);
-    const totalCost = laborItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const totalMinutes = laborItems.reduce((sum, item) => sum + Number(item.actualMinutes || 0), 0);
+    const totalEstimatedMinutes = laborItems.reduce((sum, item) => sum + Number(item.estimatedMinutes || 0), 0);
 
     return {
-      totalHours,
-      totalCost,
+      totalMinutes,
+      totalEstimatedMinutes,
       laborItems,
     };
   }

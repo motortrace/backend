@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { authSupabaseService } from './authSupabase.service';
 import { AuthenticatedRequest } from '../../../shared/types/auth.types';
+import prisma from '../../../infrastructure/database/prisma';
 
 /**
- * ✅ JWT Token Authentication Middleware
+ *  JWT Token Authentication Middleware
  * 
  * PURPOSE: Validates JWT access tokens from Supabase Auth and attaches user info to request
  * 
@@ -65,14 +66,40 @@ export const authenticateSupabaseToken = async (
       });
     }
 
-    console.log('✅ User authenticated:', { id: user.id, email: user.email, role: user.user_metadata?.role });
+    console.log(' User authenticated:', { id: user.id, email: user.email, role: user.user_metadata?.role });
 
-    // ✅ Attach user info to req.user (from JWT token claims)
-    // Role is read from token, not from database - much faster!
+    // Prefer role from database-backed UserProfile. This keeps authoritative role data
+    // in PostgreSQL (Prisma) instead of relying on Supabase user_metadata which we
+    // don't always populate for staff users.
+    let resolvedRole: string = 'customer';
+    try {
+      const userProfile = await prisma.userProfile.findUnique({
+        where: { supabaseUserId: user.id },
+        select: { role: true }
+      });
+      if (userProfile && userProfile.role) {
+        // Prisma enum values are uppercase (e.g. 'CUSTOMER'). Convert to expected
+        // lowercase/underscore format used across the app (e.g. 'service_advisor').
+        // Convert e.g. 'SERVICE_ADVISOR' -> 'service_advisor'
+        resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+      } else {
+        // Fallback to token metadata if profile doesn't exist
+        resolvedRole = user.user_metadata?.role || 'customer';
+      }
+    } catch (dbErr) {
+      console.warn('Could not resolve role from UserProfile, falling back to token metadata:', dbErr);
+      resolvedRole = user.user_metadata?.role || 'customer';
+    }
+
+    // Attach user info to req.user (id, email, role)
+    // Ensure resolvedRole matches the UserRole union defined in types
+    const allowedRoles = ['customer','admin','manager','service_advisor','inventory_manager','technician'];
+    const finalRole = allowedRoles.includes(resolvedRole) ? (resolvedRole as any) : (user.user_metadata?.role || 'customer');
+
     req.user = {
       id: user.id,
       email: user.email || undefined,
-      role: user.user_metadata?.role || 'customer',
+      role: finalRole,
     };
 
     next();

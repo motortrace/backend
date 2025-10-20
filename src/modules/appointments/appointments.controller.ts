@@ -7,6 +7,7 @@ import {
   DailyCapacityRequest,
   IAppointmentsService,
 } from './appointments.types';
+import { AppointmentStatus } from '@prisma/client';
 
 export class AppointmentController {
   constructor(private readonly appointmentService: IAppointmentsService) {}
@@ -198,7 +199,7 @@ export class AppointmentController {
     }
   }
 
-  // Get confirmed appointments without active work orders
+  // Get assigned appointments without active work orders
   async getConfirmedAppointmentsWithoutWorkOrders(req: Request, res: Response) {
     try {
       const appointments = await this.appointmentService.getConfirmedAppointmentsWithoutWorkOrders();
@@ -207,6 +208,50 @@ export class AppointmentController {
         success: true,
         data: appointments,
         message: 'Confirmed appointments without active work orders retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Get appointments for calendar view
+  async getCalendarAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getCalendarAppointments();
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Get service advisors availability for a specific date/time
+  async getAdvisorsAvailability(req: Request, res: Response) {
+    try {
+      const dateTime = new Date(req.query.dateTime as string);
+
+      if (!dateTime || isNaN(dateTime.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid dateTime parameter. Please provide a valid ISO date string.',
+        });
+      }
+
+      const availability = await this.appointmentService.getAdvisorsAvailability(dateTime);
+
+      res.json({
+        success: true,
+        data: availability,
+        message: 'Advisor availability retrieved successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -227,6 +272,55 @@ export class AppointmentController {
         success: true,
         data: appointment,
         message: 'Appointment assigned successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Status-specific appointment getters
+  async getPendingAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.PENDING });
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getConfirmedAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.CONFIRMED });
+
+      res.json({
+        success: true,
+        data: appointments,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getCompletedAppointments(req: Request, res: Response) {
+    try {
+      const appointments = await this.appointmentService.getAppointments({ status: AppointmentStatus.COMPLETED });
+
+      res.json({
+        success: true,
+        data: appointments,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -304,4 +398,4 @@ export class AppointmentController {
       });
     }
   }
-} 
+}

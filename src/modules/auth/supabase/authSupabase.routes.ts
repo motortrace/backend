@@ -414,4 +414,9 @@ router.post('/change-password', authenticateSupabaseToken, authController.change
 
 router.post('/verify-reset-token', authController.verifyResetToken.bind(authController));
 
+// Session management routes
+// router.get('/login-activity', authenticateSupabaseToken, getLoginActivity);
+// router.get('/active-sessions', authenticateSupabaseToken, getActiveSessions);
+// router.post('/logout-session', authenticateSupabaseToken, logoutSession);
+
 export default router;

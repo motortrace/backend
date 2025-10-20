@@ -8,7 +8,14 @@ import {
   IInvoicesService,
 } from './invoices.types';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/custom-errors';
-import { PDFInvoice } from '@h1dd3nsn1p3r/pdf-invoice';
+import * as pdfMake from 'pdfmake/build/pdfmake';
+import { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
+
+// Load fonts for pdfMake
+const pdfFonts = require('pdfmake/build/vfs_fonts');
+if (pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
+  (pdfMake as any).vfs = pdfFonts.pdfMake.vfs;
+}
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -112,16 +119,28 @@ export class InvoicesService implements IInvoicesService {
     }
 
     // Calculate totals
+    // NOTE: Labor is tracking-only, NOT billable - only services and parts are invoiced
     const subtotalServices = workOrder.services.reduce((sum, s) => sum + Number(s.subtotal), 0);
-    const subtotalLabor = workOrder.laborItems.reduce((sum, l) => sum + Number(l.subtotal), 0);
     const subtotalParts = workOrder.partsUsed.reduce((sum, p) => sum + Number(p.subtotal), 0);
-    const subtotal = subtotalServices + subtotalLabor + subtotalParts;
+    const subtotal = subtotalServices + subtotalParts;
     
-    // Calculate tax on the final subtotal (not on individual services)
-    const taxRate = 0.18; // 18% tax rate - you can make this configurable
-    const taxAmount = subtotal * taxRate;
-    const discountAmount = Number(workOrder.discountAmount || 0);
-    const totalAmount = subtotal + taxAmount - discountAmount;
+    // Calculate discount amount (handles both FIXED and PERCENTAGE)
+    let discountAmount = 0;
+    if (workOrder.discountAmount && Number(workOrder.discountAmount) > 0) {
+      if (workOrder.discountType === 'PERCENTAGE') {
+        // Calculate percentage discount
+        discountAmount = subtotal * (Number(workOrder.discountAmount) / 100);
+      } else {
+        // Fixed discount amount (default if discountType not set or is 'FIXED')
+        discountAmount = Number(workOrder.discountAmount);
+      }
+    }
+    
+    // Calculate tax AFTER discount is applied (standard practice)
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxRate = 0.18; // 18% VAT - you can make this configurable
+    const taxAmount = subtotalAfterDiscount * taxRate;
+    const totalAmount = subtotalAfterDiscount + taxAmount;
 
     // Create invoice
     const invoice = await this.prisma.invoice.create({
@@ -130,7 +149,7 @@ export class InvoicesService implements IInvoicesService {
         workOrderId: data.workOrderId,
         dueDate: data.dueDate,
         subtotalServices,
-        subtotalLabor,
+        subtotalLabor: 0, // Labor is tracking-only, not billable
         subtotalParts,
         subtotal,
         taxAmount,
@@ -147,7 +166,7 @@ export class InvoicesService implements IInvoicesService {
         data: {
           invoiceId: invoice.id,
           type: LineItemType.SERVICE,
-          description: service.description || service.cannedService.name,
+          description: service.description || service.cannedService?.name || 'Service',
           quantity: service.quantity,
           unitPrice: service.unitPrice,
           subtotal: service.subtotal,
@@ -157,23 +176,8 @@ export class InvoicesService implements IInvoicesService {
       });
     }
 
-    // Create line items ONLY for standalone labor (not part of a canned service)
-    // Labor items that belong to a service (have cannedServiceId) are already included in the service price
-    const standaloneLabor = workOrder.laborItems.filter(labor => !labor.cannedServiceId);
-    for (const labor of standaloneLabor) {
-      await this.prisma.invoiceLineItem.create({
-        data: {
-          invoiceId: invoice.id,
-          type: LineItemType.LABOR,
-          description: labor.description,
-          quantity: 1,
-          unitPrice: labor.subtotal, // Flat rate
-          subtotal: labor.subtotal,
-          workOrderLaborId: labor.id,
-          notes: labor.notes,
-        },
-      });
-    }
+    // NOTE: Labor items are NOT invoiced separately - they are for tracking work only
+    // Customer pays for SERVICES (which may include labor operations), not individual labor items
 
     // Create line items for parts
     for (const part of workOrder.partsUsed) {
@@ -220,6 +224,13 @@ export class InvoicesService implements IInvoicesService {
       });
     }
 
+    // Update work order status to INVOICED
+    await this.prisma.workOrder.update({
+      where: { id: data.workOrderId },
+      data: { status: 'INVOICED' as any }, // Cast to avoid TypeScript enum issues
+    });
+    console.log(`✅ Work order ${data.workOrderId} status updated to INVOICED`);
+
     // Automatically generate PDF and store in Supabase Storage
     let pdfUrl: string | null = null;
     try {
@@ -233,7 +244,7 @@ export class InvoicesService implements IInvoicesService {
       });
       console.log(`✅ Invoice PDF URL saved to database`);
     } catch (pdfError) {
-      console.error('⚠️ Failed to generate PDF during invoice creation:', pdfError);
+      console.error('❌ Failed to generate PDF during invoice creation:', pdfError);
       // Don't fail invoice creation if PDF generation fails
       // PDF can be regenerated later via GET endpoint
     }
@@ -585,48 +596,13 @@ export class InvoicesService implements IInvoicesService {
       throw new NotFoundError('Invoice', invoiceId);
     }
 
-    // Create temporary directory if it doesn't exist
-    const tempDir = path.join(process.cwd(), 'temp');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Generate file path
+    // Generate file name for storage
     const fileName = `invoice-${invoice.invoiceNumber}-${Date.now()}.pdf`;
-    const tempFilePath = path.join(tempDir, fileName);
 
-    // Separate line items by type (exclude TAX and DISCOUNT as they're handled separately)
-    const serviceItems = invoice.lineItems.filter(item => item.type === 'SERVICE');
-    const laborItems = invoice.lineItems.filter(item => item.type === 'LABOR');
-    const partItems = invoice.lineItems.filter(item => item.type === 'PART');
-    const taxItem = invoice.lineItems.find(item => item.type === 'TAX');
-    const discountItem = invoice.lineItems.find(item => item.type === 'DISCOUNT');
-
-    // Map line items - USE SUBTOTAL AS PRICE (that's what we actually charge)
-    // The library displays 'price' field, so we pass subtotal there
-    const allItems = [
-      ...serviceItems.map(item => {
-        return {
-          name: item.description,
-          quantity: Number(item.quantity),
-          price: Number(item.subtotal) / Number(item.quantity), // Price per unit after discount
-        };
-      }),
-      ...laborItems.map(item => {
-        return {
-          name: item.description,
-          quantity: Number(item.quantity),
-          price: Number(item.subtotal) / Number(item.quantity),
-        };
-      }),
-      ...partItems.map(item => {
-        return {
-          name: item.description,
-          quantity: Number(item.quantity),
-          price: Number(item.subtotal) / Number(item.quantity),
-        };
-      }),
-    ];
+    // Format currency for Sri Lanka
+    const formatCurrency = (amount: number) => {
+      return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
     // Format dates for Sri Lanka
     const formatDate = (date: Date) => {
@@ -637,84 +613,214 @@ export class InvoicesService implements IInvoicesService {
       });
     };
 
-    // Build vehicle header for top of invoice
-    let vehicleHeader = `Work Order: ${invoice.workOrder.workOrderNumber}\n`;
-    vehicleHeader += `Vehicle: ${invoice.workOrder.vehicle.year} ${invoice.workOrder.vehicle.make} ${invoice.workOrder.vehicle.model}\n`;
-    if (invoice.workOrder.vehicle.licensePlate) {
-      vehicleHeader += `License Plate: ${invoice.workOrder.vehicle.licensePlate}\n`;
-    }
-    if (invoice.workOrder.vehicle.vin) {
-      vehicleHeader += `VIN: ${invoice.workOrder.vehicle.vin}\n`;
-    }
-    if (invoice.workOrder.odometerReading) {
-      vehicleHeader += `Odometer: ${invoice.workOrder.odometerReading.toLocaleString()} km`;
-    }
+    // Filter out TAX and DISCOUNT items (handled separately in totals)
+    const displayItems = invoice.lineItems.filter(item => 
+      item.type !== 'TAX' && item.type !== 'DISCOUNT'
+    );
 
-    // Build detailed notes for footer
-    let detailedNotes = invoice.notes || "Thank you for your business!";
-    if (invoice.terms) {
-      detailedNotes += `\n\nTerms: ${invoice.terms}`;
-    }
+    // Build table rows with custom columns: Type | Name | Qty | Unit Price | Total
+    // Note: subtotal is the final amount charged (not unitPrice - discount)
+    // subtotal can be manually adjusted, negotiated price, special rate, etc.
+    const tableBody: any[][] = [
+      // Header row
+      [
+        { text: 'Type', style: 'tableHeader', bold: true },
+        { text: 'Description', style: 'tableHeader', bold: true },
+        { text: 'Qty', style: 'tableHeader', bold: true, alignment: 'center' },
+        { text: 'Unit Price', style: 'tableHeader', bold: true, alignment: 'right' },
+        { text: 'Total', style: 'tableHeader', bold: true, alignment: 'right' },
+      ],
+    ];
 
-    // Transform data to PDF invoice format - USE INVOICE TABLE VALUES DIRECTLY
-    const payload: any = {
-      company: {
-        name: "MotorTrace Auto Service",
-        address: `${vehicleHeader}\n\n` + "No. 123, Service Center Road\nColombo 00500\nSri Lanka",
-        phone: "Tel: +94 11 234 5678",
-        email: "Email: service@motortrace.lk",
-        website: "Web: https://www.motortrace.lk",
-        taxId: "VAT Reg No: 123456789-7000",
+    // Add data rows
+    displayItems.forEach(item => {
+      const unitPrice = Number(item.unitPrice);
+      const quantity = Number(item.quantity);
+      const subtotal = Number(item.subtotal);
+
+      tableBody.push([
+        { text: item.type, style: 'tableCell' },
+        { text: item.description, style: 'tableCell' },
+        { text: quantity.toString(), style: 'tableCell', alignment: 'center' },
+        { text: formatCurrency(unitPrice), style: 'tableCell', alignment: 'right' },
+        { text: formatCurrency(subtotal), style: 'tableCell', alignment: 'right' },
+      ]);
+    });
+
+    // Vehicle information
+    const vehicle = invoice.workOrder.vehicle;
+    const vehicleInfo = [
+      `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+      vehicle.licensePlate ? `License: ${vehicle.licensePlate}` : '',
+      vehicle.vin ? `VIN: ${vehicle.vin}` : '',
+      invoice.workOrder.odometerReading ? `Odometer: ${invoice.workOrder.odometerReading.toLocaleString()} km` : '',
+    ].filter(line => line).join('\n');
+
+    // Build PDF document definition
+    const docDefinition: TDocumentDefinitions = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 60],
+      content: [
+        // Company header
+        {
+          columns: [
+            {
+              width: '*',
+              stack: [
+                { text: 'MotorTrace Auto Service', style: 'companyName', fontSize: 20, bold: true },
+                { text: 'No. 123, Service Center Road', style: 'companyInfo' },
+                { text: 'Colombo 00500, Sri Lanka', style: 'companyInfo' },
+                { text: 'Tel: +94 11 234 5678', style: 'companyInfo' },
+                { text: 'Email: service@motortrace.lk', style: 'companyInfo' },
+                { text: 'VAT Reg No: 123456789-7000', style: 'companyInfo' },
+              ],
+            },
+            {
+              width: 'auto',
+              stack: [
+                { text: 'INVOICE', style: 'invoiceTitle', fontSize: 24, bold: true, alignment: 'right' },
+                { text: `#${invoice.invoiceNumber}`, style: 'invoiceNumber', fontSize: 14, alignment: 'right' },
+                { text: `Date: ${formatDate(invoice.createdAt)}`, style: 'invoiceInfo', alignment: 'right' },
+                { text: `Due: ${invoice.dueDate ? formatDate(invoice.dueDate) : formatDate(new Date())}`, style: 'invoiceInfo', alignment: 'right' },
+                { text: `Status: ${this.getInvoiceStatusLabel(invoice.status)}`, style: 'invoiceInfo', alignment: 'right' },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+
+        // Customer and Vehicle info
+        {
+          columns: [
+            {
+              width: '50%',
+              stack: [
+                { text: 'BILL TO:', style: 'sectionTitle', bold: true, fontSize: 11 },
+                { text: invoice.workOrder.customer.name, style: 'customerInfo', bold: true },
+                ...(invoice.workOrder.customer.email ? [{ text: invoice.workOrder.customer.email, style: 'customerInfo' }] : []),
+                ...(invoice.workOrder.customer.phone ? [{ text: invoice.workOrder.customer.phone, style: 'customerInfo' }] : []),
+              ],
+            },
+            {
+              width: '50%',
+              stack: [
+                { text: 'VEHICLE:', style: 'sectionTitle', bold: true, fontSize: 11 },
+                { text: vehicleInfo, style: 'customerInfo' },
+                { text: `Work Order: ${invoice.workOrder.workOrderNumber}`, style: 'customerInfo', marginTop: 5 },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+
+        // Items table
+        {
+          table: {
+            headerRows: 1,
+            widths: ['auto', '*', 'auto', 'auto', 'auto'],
+            body: tableBody,
+          },
+          layout: {
+            fillColor: (rowIndex: number) => (rowIndex === 0 ? '#0066cc' : null),
+            hLineWidth: () => 0.5,
+            vLineWidth: () => 0.5,
+            hLineColor: () => '#cccccc',
+            vLineColor: () => '#cccccc',
+          },
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+
+        // Totals section
+        {
+          columns: [
+            { width: '*', text: '' },
+            {
+              width: 200,
+              stack: [
+                {
+                  columns: [
+                    { width: '*', text: 'Subtotal:', alignment: 'right' as const, bold: true },
+                    { width: 100, text: formatCurrency(Number(invoice.subtotal)), alignment: 'right' as const },
+                  ],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
+                },
+                ...(Number(invoice.discountAmount || 0) > 0 ? [{
+                  columns: [
+                    { 
+                      width: '*' as const, 
+                      text: `Discount${(invoice.workOrder as any).discountReason ? ` (${(invoice.workOrder as any).discountReason})` : ''}:`, 
+                      alignment: 'right' as const, 
+                      bold: true 
+                    },
+                    { width: 100, text: `-${formatCurrency(Number(invoice.discountAmount))}`, alignment: 'right' as const, color: '#cc0000' },
+                  ],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
+                }] : []),
+                {
+                  columns: [
+                    { width: '*', text: 'VAT (18%):', alignment: 'right' as const, bold: true },
+                    { width: 100, text: formatCurrency(Number(invoice.taxAmount)), alignment: 'right' as const },
+                  ],
+                  margin: [0, 0, 0, 5] as [number, number, number, number],
+                },
+                {
+                  canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }],
+                  margin: [0, 5, 0, 5] as [number, number, number, number],
+                },
+                {
+                  columns: [
+                    { width: '*', text: 'TOTAL:', alignment: 'right' as const, bold: true, fontSize: 14 },
+                    { width: 100, text: formatCurrency(Number(invoice.totalAmount)), alignment: 'right' as const, bold: true, fontSize: 14 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { text: '', margin: [0, 20, 0, 0] },
+
+        // Notes section
+        ...(invoice.notes ? [{
+          stack: [
+            { text: 'NOTES:', style: 'sectionTitle', bold: true, fontSize: 11 },
+            { text: invoice.notes, style: 'notes' },
+          ],
+        }] : []),
+        ...(invoice.terms ? [{
+          stack: [
+            { text: 'TERMS:', style: 'sectionTitle', bold: true, fontSize: 11, marginTop: 10 },
+            { text: invoice.terms, style: 'notes' },
+          ],
+        }] : []),
+      ],
+      styles: {
+        companyName: { fontSize: 20, bold: true, color: '#0066cc' },
+        companyInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        invoiceTitle: { fontSize: 24, bold: true, color: '#0066cc' },
+        invoiceNumber: { fontSize: 14, marginTop: 5 },
+        invoiceInfo: { fontSize: 9, color: '#666666', marginTop: 2 },
+        sectionTitle: { fontSize: 11, bold: true, marginBottom: 5 },
+        customerInfo: { fontSize: 10, marginTop: 2 },
+        tableHeader: { fontSize: 10, bold: true, color: 'white', fillColor: '#0066cc', margin: [5, 5, 5, 5] },
+        tableCell: { fontSize: 9, margin: [5, 5, 5, 5] },
+        notes: { fontSize: 9, color: '#666666', marginTop: 5 },
       },
-      customer: {
-        name: invoice.workOrder.customer.name,
-        email: invoice.workOrder.customer.email || undefined,
-        phone: invoice.workOrder.customer.phone || undefined,
-        address: undefined,
-      },
-      invoice: {
-        number: invoice.invoiceNumber,
-        date: formatDate(invoice.createdAt),
-        dueDate: invoice.dueDate ? formatDate(invoice.dueDate) : formatDate(new Date()),
-        status: this.getInvoiceStatusLabel(invoice.status),
-        locale: "en-LK",
-        currency: "LKR",
-        path: tempFilePath,
-      },
-      items: allItems,
-      // USE EXACT VALUES FROM INVOICE TABLE
-      subtotal: Number(invoice.subtotal),
-      tax: Number(invoice.taxAmount),
-      taxLabel: "VAT (18%)",
-      discount: Number(invoice.discountAmount || 0),
-      total: Number(invoice.totalAmount),
-      note: {
-        text: detailedNotes,
-        italic: false,
+      defaultStyle: {
+        font: 'Roboto',
       },
     };
 
-    // Generate PDF
-    const pdfInvoice = new PDFInvoice(payload);
-    const generatedPath = await pdfInvoice.create();
+    // Generate PDF buffer using pdfMake
+    const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+    
+    // Generate PDF to buffer
+    const pdfBuffer: Buffer = await new Promise((resolve, reject) => {
+      pdfDocGenerator.getBuffer((buffer: Buffer) => {
+        resolve(buffer);
+      });
+    });
 
-    // Wait a bit to ensure file is fully written
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Verify the file exists and has content
-    if (!fs.existsSync(generatedPath)) {
-      throw new Error('PDF file was not generated');
-    }
-
-    const stats = fs.statSync(generatedPath);
-    if (stats.size === 0) {
-      throw new Error('Generated PDF is empty');
-    }
-
-    console.log(`PDF generated at: ${generatedPath}, size: ${stats.size} bytes`);
-
-    // Read the generated PDF file
-    const pdfBuffer = fs.readFileSync(generatedPath);
+    console.log(`PDF generated in memory, size: ${pdfBuffer.length} bytes`);
 
     // Upload to Supabase Storage
     const { StorageService } = require('../storage/storage.service');
@@ -723,9 +829,6 @@ export class InvoicesService implements IInvoicesService {
       fileName,
       invoiceId
     );
-
-    // Delete the temporary file
-    fs.unlinkSync(generatedPath);
 
     if (!uploadResult.success) {
       throw new Error(uploadResult.error || 'Failed to upload PDF to storage');

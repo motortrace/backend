@@ -55,7 +55,7 @@ export class StorageController {
         return;
       }
 
-      console.log('✅ Profile image uploaded successfully:', result.url);
+      console.log(' Profile image uploaded successfully:', result.url);
 
       res.json({
         success: true,
@@ -140,7 +140,7 @@ export class StorageController {
         return;
       }
 
-      console.log('✅ Profile image deleted successfully');
+      console.log(' Profile image deleted successfully');
 
       res.json({
         success: true,
@@ -193,5 +193,132 @@ export class StorageController {
         message: error.message 
       });
     }
+  }
+}
+
+/**
+ * Get upload configuration for frontend
+ */
+export async function getUploadConfig(req: Request, res: Response) {
+  try {
+    res.json({
+      success: true,
+      data: {
+        maxFileSize: 5 * 1024 * 1024, // 5MB
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp']
+      },
+      message: 'Upload configuration retrieved successfully'
+    });
+  } catch (error: any) {
+    console.error('❌ Upload config error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+}
+
+/**
+ * Test storage functionality
+ */
+export async function testStorage(req: Request, res: Response) {
+  try {
+    console.log('🧪 Testing storage functionality...');
+
+    const serviceClient = StorageService.getServiceClientInstance();
+
+    // List buckets
+    const { data: buckets, error: listError } = await serviceClient.storage.listBuckets();
+
+    if (listError) {
+      console.error('❌ Error listing buckets:', listError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to list buckets',
+        details: listError
+      });
+    }
+
+    console.log('📦 Available buckets:', buckets?.map(b => b.name));
+
+    // Check car-images bucket
+    const carBucket = buckets?.find(b => b.name === 'car-images');
+    if (!carBucket) {
+      console.error('❌ car-images bucket not found');
+      return res.status(500).json({
+        success: false,
+        error: 'car-images bucket not found',
+        availableBuckets: buckets?.map(b => b.name)
+      });
+    }
+
+    console.log('🔒 car-images bucket public status:', carBucket.public);
+
+    // Make sure bucket is public
+    if (!carBucket.public) {
+      console.log('🔓 Making car-images bucket public...');
+      const { error: updateError } = await serviceClient.storage.updateBucket(
+        'car-images',
+        { public: true }
+      );
+
+      if (updateError) {
+        console.error('❌ Failed to make bucket public:', updateError);
+      } else {
+        console.log('✅ Bucket made public successfully');
+      }
+    }
+
+    // Test public URL generation
+    const testFileName = 'test-file.jpg';
+    const { data: urlData } = StorageService.getServiceClientInstance().storage
+      .from('car-images')
+      .getPublicUrl(testFileName);
+
+    console.log('🔗 Test public URL:', urlData?.publicUrl);
+
+    res.json({
+      success: true,
+      data: {
+        buckets: buckets?.map(b => ({ name: b.name, public: b.public })),
+        carImagesBucket: {
+          exists: true,
+          public: carBucket.public,
+          testUrl: urlData?.publicUrl
+        }
+      },
+      message: 'Storage test completed'
+    });
+
+  } catch (error: any) {
+    console.error('❌ Storage test error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Storage test failed',
+      message: error.message
+    });
+  }
+}
+
+/**
+ * Initialize storage bucket (for manual testing/debugging)
+ */
+export async function initializeStorage(req: Request, res: Response) {
+  try {
+    console.log('🔄 Manually initializing storage...');
+    
+    await StorageService.initializeStorage();
+    
+    res.json({
+      success: true,
+      message: 'Storage bucket initialized successfully'
+    });
+  } catch (error: any) {
+    console.error('❌ Storage initialization error:', error);
+    res.status(500).json({ 
+      error: 'Failed to initialize storage',
+      message: error.message 
+    });
   }
 }

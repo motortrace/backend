@@ -12,6 +12,8 @@ import {
   DailyCapacityRequest,
   DailyCapacity,
   IAppointmentsService,
+  CalendarAppointment,
+  AdvisorAvailability,
 } from './appointments.types';
 import { PrismaClient } from '@prisma/client';
 
@@ -20,23 +22,28 @@ export class AppointmentService implements IAppointmentsService {
 
   // Create a new appointment with ShopMonkey-style booking logic
   async createAppointment(data: CreateAppointmentRequest): Promise<AppointmentWithServices> {
-    const { cannedServiceIds, serviceNotes = [], ...appointmentData } = data;
+    const { cannedServiceIds = [], serviceNotes = [], ...appointmentData } = data;
 
     // Convert string dates to Date objects
     const startTime = new Date(appointmentData.startTime);
     const endTime = appointmentData.endTime ? new Date(appointmentData.endTime) : undefined;
     const requestedAt = new Date(appointmentData.requestedAt);
 
-    // Validate that all canned services exist and are available
-    const cannedServices = await this.prisma.cannedService.findMany({
-      where: {
-        id: { in: cannedServiceIds },
-        isAvailable: true,
-      },
-    });
+    let cannedServices: any[] = [];
 
-    if (cannedServices.length !== cannedServiceIds.length) {
-      throw new Error('One or more selected services are not available');
+    // Only validate canned services if they are provided
+    if (cannedServiceIds.length > 0) {
+      // Validate that all canned services exist and are available
+      cannedServices = await this.prisma.cannedService.findMany({
+        where: {
+          id: { in: cannedServiceIds },
+          isAvailable: true,
+        },
+      });
+
+      if (cannedServices.length !== cannedServiceIds.length) {
+        throw new Error('One or more selected services are not available');
+      }
     }
 
     // ShopMonkey Booking Logic: Check daily limit first
@@ -95,14 +102,16 @@ export class AppointmentService implements IAppointmentsService {
         endTime: endTime,
         notes: appointmentData.notes,
         status: AppointmentStatus.PENDING, // All appointments start as unassigned
-        cannedServices: {
-          create: cannedServiceIds.map((serviceId, index) => ({
-            cannedServiceId: serviceId,
-            quantity: 1,
-            price: cannedServices.find(s => s.id === serviceId)?.price || 0,
-            notes: serviceNotes[index],
-          })),
-        },
+        ...(cannedServiceIds.length > 0 && {
+          cannedServices: {
+            create: cannedServiceIds.map((serviceId, index) => ({
+              cannedServiceId: serviceId,
+              quantity: 1,
+              price: cannedServices.find(s => s.id === serviceId)?.price || 0,
+              notes: serviceNotes[index],
+            })),
+          },
+        }),
       },
       include: {
         cannedServices: {
@@ -124,6 +133,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -378,6 +389,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -414,7 +427,9 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
-                profileImage: true
+                name: true,
+                phone: true,
+                profileImage: true,
               }
             }
           }
@@ -450,6 +465,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -473,7 +490,7 @@ export class AppointmentService implements IAppointmentsService {
     const appointments = await this.prisma.appointment.findMany({
       where: {
         assignedToId: null,
-        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+        status: AppointmentStatus.PENDING,
       },
       include: {
         cannedServices: {
@@ -495,6 +512,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -511,7 +530,7 @@ export class AppointmentService implements IAppointmentsService {
   async getConfirmedAppointmentsWithoutWorkOrders(): Promise<AppointmentWithServices[]> {
     const appointments = await this.prisma.appointment.findMany({
       where: {
-        status: AppointmentStatus.CONFIRMED,
+        assignedToId: { not: null },
         // Exclude appointments that have active work orders
         workOrder: {
           is: null // No work order exists for this appointment
@@ -537,6 +556,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -550,11 +571,137 @@ export class AppointmentService implements IAppointmentsService {
     return appointments.map(appointment => this.formatAppointmentWithServices(appointment));
   }
 
+  // Get appointments for calendar view (PENDING, CONFIRMED, and COMPLETED)
+  async getCalendarAppointments(): Promise<CalendarAppointment[]> {
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        status: {
+          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED]
+        }
+      },
+      include: {
+        cannedServices: {
+          include: {
+            cannedService: true,
+          },
+        },
+        customer: true,
+        vehicle: true,
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    return appointments.map(appointment => {
+      // Create title: "Customer Name – Service Name"
+      const serviceName = appointment.cannedServices.length > 0 
+        ? appointment.cannedServices[0].cannedService.name 
+        : 'Appointment';
+      const title = `${appointment.customer.name} – ${serviceName}`;
+
+      return {
+        id: appointment.id,
+        title,
+        startTime: appointment.startTime!,
+        status: appointment.status,
+        priority: appointment.priority,
+        customer: {
+          id: appointment.customer.id,
+          name: appointment.customer.name,
+        },
+        vehicle: {
+          make: appointment.vehicle.make,
+          model: appointment.vehicle.model,
+          licensePlate: appointment.vehicle.licensePlate,
+        },
+      };
+    });
+  }
+
+  // Get service advisors availability for a specific date/time
+  async getAdvisorsAvailability(dateTime: Date): Promise<AdvisorAvailability[]> {
+    // Get all service advisors
+    const advisors = await this.prisma.serviceAdvisor.findMany({
+      include: {
+        userProfile: {
+          select: {
+            name: true,
+            phone: true,
+            profileImage: true,
+          },
+        },
+        assignedAppointments: {
+          where: {
+            status: {
+              in: [AppointmentStatus.CONFIRMED, AppointmentStatus.IN_PROGRESS],
+            },
+            OR: [
+              {
+                startTime: {
+                  lte: dateTime,
+                },
+                endTime: {
+                  gte: dateTime,
+                },
+              },
+            ],
+          },
+          select: {
+            id: true,
+            startTime: true,
+            endTime: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    // For each advisor, check availability and get last assignment
+    const availabilityPromises = advisors.map(async (advisor) => {
+      // Check if advisor is busy at the given time
+      const isBusy = advisor.assignedAppointments.length > 0;
+
+      // Get the last appointment assignment
+      const lastAppointment = await this.prisma.appointment.findFirst({
+        where: {
+          assignedToId: advisor.id,
+          status: {
+            in: [AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED, AppointmentStatus.IN_PROGRESS],
+          },
+        },
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      });
+
+      return {
+        advisorId: advisor.id,
+        employeeId: advisor.employeeId,
+        name: advisor.userProfile?.name || 'Unknown',
+        phone: advisor.userProfile?.phone || null,
+        profileImage: advisor.userProfile?.profileImage || null,
+        isAvailable: !isBusy,
+        currentAppointment: isBusy ? advisor.assignedAppointments[0] : null,
+        lastAssignedAt: lastAppointment?.updatedAt || null,
+        lastAppointmentStatus: lastAppointment?.status || null,
+        hasNeverBeenAssigned: !lastAppointment,
+      };
+    });
+
+    return Promise.all(availabilityPromises);
+  }
+
   // Assign appointment to service advisor
   async assignAppointment(appointmentId: string, assignedToId: string): Promise<AppointmentWithServices> {
     const appointment = await this.prisma.appointment.update({
       where: { id: appointmentId },
-      data: { assignedToId },
+      data: { assignedToId, status: AppointmentStatus.CONFIRMED },
       include: {
         cannedServices: {
           include: {
@@ -575,6 +722,8 @@ export class AppointmentService implements IAppointmentsService {
           include: {
             userProfile: {
               select: {
+                name: true,
+                phone: true,
                 profileImage: true
               }
             }
@@ -647,6 +796,7 @@ export class AppointmentService implements IAppointmentsService {
         email: appointment.customer.email,
         phone: appointment.customer.phone,
         profileImage: appointment.customer.userProfile?.profileImage || null,
+        userProfileId: appointment.customer.userProfileId,
       },
       vehicle: {
         id: appointment.vehicle.id,
@@ -654,11 +804,15 @@ export class AppointmentService implements IAppointmentsService {
         model: appointment.vehicle.model,
         year: appointment.vehicle.year,
         licensePlate: appointment.vehicle.licensePlate,
+        imageUrl: appointment.vehicle.imageUrl,
       },
 
       assignedTo: appointment.assignedTo ? {
         id: appointment.assignedTo.id,
+        employeeId: appointment.assignedTo.employeeId,
         supabaseUserId: appointment.assignedTo.supabaseUserId,
+        name: appointment.assignedTo.userProfile?.name || 'Unknown',
+        phone: appointment.assignedTo.userProfile?.phone || null,
         profileImage: appointment.assignedTo.userProfile?.profileImage || null,
       } : undefined,
     };
@@ -740,4 +894,4 @@ export class AppointmentService implements IAppointmentsService {
 
     return suggestions;
   }
-} 
+}

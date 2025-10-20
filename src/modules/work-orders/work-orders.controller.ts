@@ -23,25 +23,67 @@ export class WorkOrderController {
 
   constructor(private readonly workOrderService: IWorkOrderService) {}
 
+    // Generate estimate PDF and create WorkOrderApproval entry
+    async generateEstimate(req: any, res: Response) {
+      try {
+        const { workOrderId } = req.params;
+        const supabaseUserId = req.user?.id;
+        if (!supabaseUserId) {
+          return res.status(401).json({ success: false, error: 'User not authenticated' });
+        }
+
+        // Find user profile
+        const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+        if (!userProfile) {
+          return res.status(404).json({ success: false, error: 'User profile not found' });
+        }
+
+        // Change all PENDING and REJECTED services to ESTIMATED (locks them from editing)
+        await this.workOrderService.lockServicesForEstimate(workOrderId);
+
+        // Generate estimate PDF
+        const pdfUrl = await this.workOrderService.generateEstimatePDF(workOrderId);
+
+        // Expire previous WorkOrderApproval entries for this work order
+        await this.workOrderService.expirePreviousApprovals(workOrderId);
+
+        // Create new WorkOrderApproval entry
+        const approval = await this.workOrderService.createWorkOrderApproval({
+          workOrderId,
+          status: 'PENDING',
+          approvedById: userProfile.id,
+          pdfUrl,
+        });
+
+        res.status(201).json({
+          success: true,
+          pdfUrl,
+          approval,
+          message: 'Estimate generated and approval entry created',
+        });
+      } catch (error: any) {
+        res.status(400).json({ success: false, error: error.message });
+      }
+    }
+
   // Work Order Management
   async createWorkOrder(req: any, res: Response) {
     try {
       const workOrderData: CreateWorkOrderRequest = req.body;
-
-      const workOrder = await this.workOrderService.createWorkOrder(workOrderData);
-
+      const workOrderId = await this.workOrderService.createWorkOrder(workOrderData);
       res.status(201).json({
         success: true,
-        data: workOrder,
+        workOrderId,
         message: 'Work order created successfully',
       });
     } catch (error: any) {
       res.status(400).json({
         success: false,
-        error: error.message,
+        message: error.message || 'Something went wrong',
       });
     }
   }
+
 
   async getWorkOrders(req: Request, res: Response) {
     try {
@@ -135,40 +177,40 @@ export class WorkOrderController {
     }
   }
 
-  async restoreWorkOrder(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
+  // async restoreWorkOrder(req: Request, res: Response) {
+  //   try {
+  //     const { id } = req.params;
+  //     const restoredWorkOrder = await this.workOrderService.restoreWorkOrder(id);
 
-      res.json({
-        success: true,
-        data: restoredWorkOrder,
-        message: 'Work order restored successfully',
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: restoredWorkOrder,
+  //       message: 'Work order restored successfully',
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
-  async getCancelledWorkOrders(req: Request, res: Response) {
-    try {
-      const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
+  // async getCancelledWorkOrders(req: Request, res: Response) {
+  //   try {
+  //     const cancelledWorkOrders = await this.workOrderService.getCancelledWorkOrders();
 
-      res.json({
-        success: true,
-        data: cancelledWorkOrders,
-        message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
-      });
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       data: cancelledWorkOrders,
+  //       message: `Found ${cancelledWorkOrders.length} cancelled work orders`,
+  //     });
+  //   } catch (error: any) {
+  //     res.status(400).json({
+  //       success: false,
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
   // Work Order Services
   async createWorkOrderService(req: Request, res: Response) {
@@ -200,6 +242,70 @@ export class WorkOrderController {
       res.json({
         success: true,
         data: services,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async createWorkOrderPart(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const { inventoryItemId, quantity, technicianId } = req.body;
+
+      if (!inventoryItemId || !quantity) {
+        return res.status(400).json({
+          success: false,
+          error: 'inventoryItemId and quantity are required',
+        });
+      }
+
+      const part = await this.workOrderService.createWorkOrderPart(workOrderId, {
+        inventoryItemId,
+        quantity,
+        technicianId,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: part,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getWorkOrderParts(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const parts = await this.workOrderService.getWorkOrderParts(workOrderId);
+
+      res.json({
+        success: true,
+        data: parts,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteWorkOrderService(req: Request, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      await this.workOrderService.deleteWorkOrderService(serviceId);
+
+      res.json({
+        success: true,
+        message: 'Work order service deleted successfully',
       });
     } catch (error: any) {
       res.status(400).json({
@@ -269,6 +375,25 @@ export class WorkOrderController {
     }
   }
 
+  async updateWorkOrderWorkflowStep(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { workflowStep } = req.body;
+
+      const workOrder = await this.workOrderService.updateWorkOrderWorkflowStep(id, workflowStep);
+
+      res.json({
+        success: true,
+        message: 'Workflow step updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   async assignServiceAdvisor(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -300,6 +425,26 @@ export class WorkOrderController {
         success: true,
         data: laborItem,
         message: 'Technician assigned to labor item successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async assignTechnicianToServiceLabor(req: Request, res: Response) {
+    try {
+      const { serviceId } = req.params;
+      const { technicianId } = req.body;
+
+      const result = await this.workOrderService.assignTechnicianToServiceLabor(serviceId, technicianId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Technician assigned to ${result.assignedCount} labor item(s) successfully`,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -362,6 +507,40 @@ export class WorkOrderController {
       res.json({
         success: true,
         data: statistics,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Work Order Creation Statistics
+  async getWorkOrderCreationStats(req: Request, res: Response) {
+    try {
+      const stats = await this.workOrderService.getWorkOrderCreationStats();
+
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // General Statistics
+  async getGeneralStats(req: Request, res: Response) {
+    try {
+      const stats = await this.workOrderService.getGeneralStats();
+
+      res.json({
+        success: true,
+        data: stats,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -521,6 +700,43 @@ export class WorkOrderController {
     }
   }
 
+  async deleteWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      await this.workOrderService.deleteWorkOrderInspection(inspectionId);
+
+      res.json({
+        success: true,
+        message: 'Work order inspection deleted successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateWorkOrderInspection(req: Request, res: Response) {
+    try {
+      const { inspectionId } = req.params;
+      const updateData = req.body;
+
+      const inspection = await this.workOrderService.updateWorkOrderInspection(inspectionId, updateData);
+
+      res.json({
+        success: true,
+        data: inspection,
+        message: 'Work order inspection updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
   // Work Order QC
   async createWorkOrderQC(req: Request, res: Response) {
     try {
@@ -568,12 +784,111 @@ export class WorkOrderController {
     }
   }
 
-  // Generate estimate from labor and parts
-  async generateEstimateFromLaborAndParts(req: Request, res: Response) {
+  // Misc Charges Endpoints
+
+  async createWorkOrderMiscCharge(req: Request, res: Response) {
     try {
       const { workOrderId } = req.params;
-      const supabaseUserId = (req as any).user?.id; // Get Supabase user ID from auth middleware
+      const data = req.body;
+      data.workOrderId = workOrderId;
 
+      const miscCharge = await this.workOrderService.createWorkOrderMiscCharge(data);
+
+      res.status(201).json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge created successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getWorkOrderMiscCharges(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const miscCharges = await this.workOrderService.getWorkOrderMiscCharges(workOrderId);
+
+      res.json({
+        success: true,
+        data: miscCharges,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async updateWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const data = req.body;
+
+      const miscCharge = await this.workOrderService.updateWorkOrderMiscCharge(miscChargeId, data);
+
+      res.json({
+        success: true,
+        data: miscCharge,
+        message: 'Misc charge updated successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async deleteWorkOrderMiscCharge(req: Request, res: Response) {
+    try {
+      const { miscChargeId } = req.params;
+      const result = await this.workOrderService.deleteWorkOrderMiscCharge(miscChargeId);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Part Installation Endpoints
+
+  async assignTechnicianToPart(req: Request, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { technicianId } = req.body;
+
+      const part = await this.workOrderService.assignTechnicianToPart(partId, technicianId);
+
+      res.json({
+        success: true,
+        data: part,
+        message: 'Technician assigned to part successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async startPartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
       if (!supabaseUserId) {
         return res.status(401).json({
           success: false,
@@ -581,22 +896,335 @@ export class WorkOrderController {
         });
       }
 
-      // Find the ServiceAdvisor ID that corresponds to this Supabase user
-      const serviceAdvisor = await this.workOrderService.findServiceAdvisorBySupabaseUserId(supabaseUserId);
-      
-      if (!serviceAdvisor) {
-        return res.status(403).json({
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
           success: false,
-          error: 'Service advisor not found for this user'
+          error: 'Technician profile not found'
         });
       }
 
-      const result = await this.workOrderService.generateEstimateFromLaborAndParts(workOrderId, serviceAdvisor.id);
+      const result = await this.workOrderService.startPartInstallation(partId, technician.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async completePartInstallation(req: any, res: Response) {
+    try {
+      const { partId } = req.params;
+      const { notes, warrantyInfo } = req.body;
+      
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.completePartInstallation(partId, technician.id, { notes, warrantyInfo });
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async getTechnicianActiveWork(req: any, res: Response) {
+    try {
+      // Get technician ID from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find technician by Supabase user ID
+      const technician = await this.workOrderService.findTechnicianBySupabaseUserId(supabaseUserId);
+      if (!technician) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician profile not found'
+        });
+      }
+
+      const activeWork = await this.workOrderService.getTechnicianActiveWork(technician.id);
+
+      res.json({
+        success: true,
+        data: activeWork,
+        message: `Found ${activeWork.totalActiveTasks} active task(s)`,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Service Advisor checks specific technician's active work
+  async checkTechnicianActiveWork(req: Request, res: Response) {
+    try {
+      const { technicianId } = req.params;
+
+      const activeWork = await this.workOrderService.getTechnicianActiveWork(technicianId);
+
+      res.json({
+        success: true,
+        data: activeWork,
+        message: `Found ${activeWork.totalActiveTasks} active task(s) for technician`,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Work Order Approvals
+  async getWorkOrderApprovals(req: Request, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+      const approvals = await this.workOrderService.getWorkOrderApprovals(workOrderId);
+
+      res.json({
+        success: true,
+        data: approvals,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async approveWorkOrderApproval(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+      const { notes } = req.body;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Check if user is a customer, service advisor, or manager
+      let approvedById: string | null = null;
+
+      // Try to find customer profile first
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (customer) {
+        // User is a customer - use their UserProfile ID for approval
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can approve manually - use their UserProfile ID
+        approvedById = userProfile.id;
+      } else if (req.user?.role === 'manager') {
+        // Manager can approve on behalf of customers
+        approvedById = null;
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Only customers, service advisors, or managers can approve work order approvals'
+        });
+      }
+
+      const result = await this.workOrderService.approveWorkOrderApproval(approvalId, approvedById, notes);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async rejectWorkOrderApproval(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+      const { reason } = req.body;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      // Check if user is a customer, service advisor, or manager
+      let approvedById: string | null = null;
+
+      // Try to find customer profile first
+      const customer = await (this.workOrderService as any).prisma.customer.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      // Try to find service advisor profile
+      const serviceAdvisor = await (this.workOrderService as any).prisma.serviceAdvisor.findUnique({
+        where: { userProfileId: userProfile.id }
+      });
+
+      if (customer) {
+        // User is a customer - use their UserProfile ID for rejection
+        approvedById = userProfile.id;
+      } else if (serviceAdvisor) {
+        // Service advisor can reject manually - use their UserProfile ID
+        approvedById = userProfile.id;
+      } else if (req.user?.role === 'manager') {
+        // Manager can reject on behalf of customers
+        approvedById = null;
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Only customers, service advisors, or managers can reject work order approvals'
+        });
+      }
+
+      const result = await this.workOrderService.rejectWorkOrderApproval(approvalId, approvedById, reason);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async finalizeEstimate(req: any, res: Response) {
+    try {
+      const { approvalId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.finalizeEstimate(approvalId, userProfile.id);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async generateInvoice(req: any, res: Response) {
+    try {
+      const { workOrderId } = req.params;
+
+      // Get user profile from authenticated user
+      const supabaseUserId = req.user?.id;
+      if (!supabaseUserId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+
+      // Find UserProfile
+      const userProfile = await this.workOrderService.getUserProfileBySupabaseId(supabaseUserId);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          error: 'User profile not found'
+        });
+      }
+
+      const result = await this.workOrderService.generateInvoice(workOrderId, userProfile.id);
 
       res.json({
         success: true,
         data: result,
-        message: 'Estimate generated successfully and work order status updated to APPROVAL',
+        message: result.message,
       });
     } catch (error: any) {
       res.status(400).json({
@@ -606,3 +1234,4 @@ export class WorkOrderController {
     }
   }
 }
+

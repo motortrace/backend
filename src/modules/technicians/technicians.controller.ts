@@ -199,6 +199,65 @@ export class TechnicianController {
     }
   }
 
+  // Get currently working technicians
+  async getCurrentlyWorkingTechnicians(req: Request, res: Response) {
+    try {
+      const workingTechnicians = await this.technicianService.getCurrentlyWorkingTechnicians();
+
+      res.json({
+        success: true,
+        data: workingTechnicians,
+        count: workingTechnicians.length,
+        message: 'Currently working technicians retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get currently working technicians',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get simplified currently working technicians endpoint
+  async getWorkingTechniciansSimple(req: Request, res: Response) {
+    try {
+      const simpleTechnicians = await this.technicianService.getWorkingTechniciansSimple();
+      res.json({
+        success: true,
+        data: simpleTechnicians,
+        count: simpleTechnicians.length,
+        message: 'Simple currently working technicians retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get simple currently working technicians',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get technician monthly performance data
+  async getTechnicianMonthlyPerformance(req: Request, res: Response) {
+    try {
+      const performanceData = await this.technicianService.getTechnicianMonthlyPerformance();
+      res.json({
+        success: true,
+        data: performanceData,
+        count: performanceData.length,
+        period: 'last_60_days',
+        message: 'Technician monthly performance data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get technician monthly performance',
+        message: error.message,
+      });
+    }
+  }
+
   // Search technicians
   async searchTechnicians(req: Request, res: Response) {
     try {
@@ -266,6 +325,52 @@ export class TechnicianController {
       res.status(500).json({
         success: false,
         error: 'Failed to get technician work orders',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get technician working status counts
+  async getTechnicianWorkingStatusCounts(req: Request, res: Response) {
+    try {
+      const statusCounts = await this.technicianService.getTechnicianWorkingStatusCounts();
+
+      res.json({
+        success: true,
+        data: statusCounts,
+        message: 'Technician working status counts retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get technician working status counts',
+        message: error.message,
+      });
+    }
+  }
+
+  // Get detailed technician information
+  async getTechnicianDetailedInfo(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const detailedInfo = await this.technicianService.getTechnicianDetailedInfo(id);
+
+      if (!detailedInfo) {
+        return res.status(404).json({
+          success: false,
+          error: 'Technician not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        data: detailedInfo,
+        message: 'Detailed technician information retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get detailed technician information',
         message: error.message,
       });
     }

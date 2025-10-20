@@ -26,7 +26,7 @@ export class AuthSupabaseController {
         return;
       }
       
-      // ✅ CUSTOMER ONLY: Mobile app signup is for customers only
+      //  CUSTOMER ONLY: Mobile app signup is for customers only
       // Staff users are created manually by admins via separate endpoint
       const userRole = role || 'customer';
       
@@ -53,6 +53,33 @@ export class AuthSupabaseController {
       // Debug: Log what the service returned
       console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
       
+      // Resolve user role and customerId from the database-backed UserProfile where possible.
+      let customerId = null;
+      let resolvedRole = 'customer';
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+
+        if (userProfile) {
+          // Prisma enum is uppercase (e.g. CUSTOMER) so convert to lowercase/underscore
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          // Fallback to token metadata
+          resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+          isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
+        }
+      } catch (dbError) {
+        console.warn('Could not fetch user profile during signIn:', dbError);
+        resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+        isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
+      }
+      
       // Return user data with flattened metadata used by mobile app
       res.status(200).json({ 
         message: 'Login successful', 
@@ -60,8 +87,9 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: (data.user as any)?.user_metadata?.role || 'customer',
-            isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true
+            role: resolvedRole,
+            customerId: customerId, // Include customerId for mobile async storage
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,
@@ -207,7 +235,7 @@ export class AuthSupabaseController {
         return;
       }
 
-      // ✅ CUSTOMER ONLY: Only customers go through onboarding
+      //  CUSTOMER ONLY: Only customers go through onboarding
       // Staff users are created complete by admins
       if (req.user.role !== 'customer') {
         res.status(403).json({ 
@@ -249,7 +277,7 @@ export class AuthSupabaseController {
           }
         });
 
-        console.log('✅ User profile saved:', userProfile);
+        console.log(' User profile saved:', userProfile);
 
         // Create customer record (linked to UserProfile)
         const customer = await this.prisma.customer.upsert({
@@ -267,9 +295,9 @@ export class AuthSupabaseController {
           }
         });
 
-        console.log('✅ Customer record saved:', customer);
+        console.log(' Customer record saved:', customer);
 
-        // ✅ OPTIMIZED: Only store completion flag in Supabase metadata
+        //  OPTIMIZED: Only store completion flag in Supabase metadata
         // Profile data (name, phone, image) is stored ONLY in PostgreSQL
         try {
           await this.supabaseAdmin.auth.admin.updateUserById(req.user.id, {
@@ -278,9 +306,9 @@ export class AuthSupabaseController {
               isRegistrationComplete: true
             }
           });
-          console.log('✅ Supabase user metadata updated with registration completion flag');
+          console.log(' Supabase user metadata updated with registration completion flag');
         } catch (metaErr) {
-          console.warn('⚠️ Failed to update Supabase user metadata:', metaErr);
+          console.warn(' Failed to update Supabase user metadata:', metaErr);
         }
 
         const response = {
@@ -296,7 +324,7 @@ export class AuthSupabaseController {
           }
         };
 
-        console.log('✅ Sending onboarding response:', response);
+        console.log(' Sending onboarding response:', response);
         res.json(response);
       } catch (dbError: any) {
         console.error('❌ Database error:', dbError);
@@ -381,6 +409,7 @@ export class AuthSupabaseController {
       const userProfile = await this.prisma.userProfile.findUnique({
         where: { supabaseUserId: req.user.id },
         select: {
+          id: true,
           name: true,
           phone: true,
           profileImage: true,
@@ -406,6 +435,7 @@ export class AuthSupabaseController {
       res.json({
         success: true,
         profile: {
+          id: userProfile.id,
           fullName: userProfile.name || '',
           phoneNumber: userProfile.phone || '',
           profileImageUrl: normalizeImageUrl(userProfile.profileImage),
@@ -480,11 +510,35 @@ export class AuthSupabaseController {
       // Use Supabase to verify the Google ID token
       const data = await this.authService.googleSignIn(idToken, role);
       
-      console.log('✅ Google auth successful:', { 
+      console.log(' Google auth successful:', { 
         userId: data.user?.id, 
         email: data.user?.email,
         hasSession: !!data.session 
       });
+
+      // Try to resolve role and customerId from the UserProfile table
+      let customerId = null;
+      let resolvedRole = role;
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+        if (userProfile) {
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          resolvedRole = data.user?.user_metadata?.role || role;
+          isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
+        }
+      } catch (err) {
+        console.warn('Could not fetch user profile for Google auth response:', err);
+        resolvedRole = data.user?.user_metadata?.role || role;
+        isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
+      }
 
       res.json({
         message: 'Google authentication successful',
@@ -492,8 +546,9 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: data.user?.user_metadata?.role || role,
-            isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false
+            role: resolvedRole,
+            customerId: customerId, // Include customerId for mobile async storage
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,
@@ -544,9 +599,9 @@ export class AuthSupabaseController {
               await prismaTransaction.appointment.deleteMany({
                 where: { customerId: userProfile.customer.id }
               });
-              console.log('✅ Appointments deleted');
+              console.log(' Appointments deleted');
             } catch (error) {
-              console.warn('⚠️ No appointments to delete or table does not exist');
+              console.warn(' No appointments to delete or table does not exist');
             }
 
             // Delete customer vehicles first (due to foreign key constraints)
@@ -554,38 +609,38 @@ export class AuthSupabaseController {
               await prismaTransaction.vehicle.deleteMany({
                 where: { customerId: userProfile.customer.id }
               });
-              console.log('✅ Customer vehicles deleted');
+              console.log(' Customer vehicles deleted');
             } catch (error) {
-              console.warn('⚠️ No vehicles to delete or error occurred:', error);
+              console.warn(' No vehicles to delete or error occurred:', error);
             }
 
             // Delete customer record
             await prismaTransaction.customer.delete({
               where: { id: userProfile.customer.id }
             });
-            console.log('✅ Customer record deleted');
+            console.log(' Customer record deleted');
           }
 
           // 4. Delete user profile
           await prismaTransaction.userProfile.delete({
             where: { id: userProfile.id }
           });
-          console.log('✅ User profile deleted');
+          console.log(' User profile deleted');
         } else {
-          console.log('⚠️ No user profile found, proceeding with auth deletion only');
+          console.log(' No user profile found, proceeding with auth deletion only');
         }
       });
 
       // 5. Delete user from Supabase Auth (this should be done last)
       try {
         await this.authService.deleteUser(userId);
-        console.log('✅ User deleted from Supabase Auth');
+        console.log(' User deleted from Supabase Auth');
       } catch (authError: any) {
         console.error('❌ Failed to delete user from Supabase Auth:', authError);
-        console.warn('⚠️ Database cleanup completed but Supabase Auth deletion failed');
+        console.warn(' Database cleanup completed but Supabase Auth deletion failed');
       }
 
-      console.log('✅ Account deletion completed successfully');
+      console.log(' Account deletion completed successfully');
 
       res.json({
         success: true,
@@ -669,7 +724,7 @@ export class AuthSupabaseController {
           text: emailText
         });
 
-        console.log('✅ Password reset email sent to:', email);
+        console.log(' Password reset email sent to:', email);
 
         res.json({
           success: true,
@@ -760,7 +815,7 @@ export class AuthSupabaseController {
           throw new Error(updateError.message);
         }
 
-        console.log('✅ Password reset successfully for:', email);
+        console.log(' Password reset successfully for:', email);
 
         res.json({
           success: true,

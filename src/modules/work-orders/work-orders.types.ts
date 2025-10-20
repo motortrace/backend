@@ -13,7 +13,8 @@ import {
   ApprovalMethod,
   ChecklistStatus,
   TirePosition,
-  AttachmentCategory
+  AttachmentCategory,
+  MiscChargeCategory
 } from '@prisma/client';
 
 export interface CreateWorkOrderRequest {
@@ -37,6 +38,12 @@ export interface CreateWorkOrderRequest {
   quantities?: number[];
   prices?: number[];
   serviceNotes?: string[];
+}
+
+export interface CreateWorkOrderPartRequest {
+  inventoryItemId: string;
+  quantity: number;
+  technicianId?: string;
 }
 
 export interface UpdateWorkOrderRequest {
@@ -119,6 +126,7 @@ export interface WorkOrderWithDetails {
   servicePackageId?: string;
   customerSignature?: string;
   customerFeedback?: string;
+  inspectionPdfUrl?: string;
   
   // Relations
   customer: {
@@ -199,8 +207,8 @@ export interface WorkOrderWithDetails {
       id: string;
       code: string;
       name: string;
-      estimatedHours: number;
-      hourlyRate: number;
+      estimatedMinutes: number;
+      skillLevel?: string;
     };
     technician?: {
       id: string;
@@ -224,6 +232,9 @@ export interface WorkOrderWithDetails {
     notes?: string;
     installedAt?: Date;
     installedById?: string;
+    status: ServiceStatus;
+    startTime?: Date;
+    endTime?: Date;
     part: {
       id: string;
       name: string;
@@ -284,11 +295,8 @@ export interface WorkOrderWithDetails {
     };
     approvedBy?: {
       id: string;
-      employeeId?: string;
-      userProfile: {
-        id: string;
-        name?: string;
-      };
+      name?: string;
+      profileImage?: string;
     };
   }[];
   attachments: {
@@ -310,6 +318,26 @@ export interface WorkOrderWithDetails {
       };
     };
   }[];
+  approvals: {
+    id: string;
+    workOrderId: string;
+    status: ApprovalStatus;
+    requestedAt: Date;
+    approvedAt?: Date;
+    approvedById?: string;
+    method?: ApprovalMethod;
+    notes?: string;
+    customerSignature?: string;
+    pdfUrl?: string;
+    inspectionPdfUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    approvedBy?: {
+      id: string;
+      name?: string;
+      profileImage?: string;
+    };
+  }[];
 }
 
 
@@ -317,9 +345,9 @@ export interface WorkOrderWithDetails {
 export interface CreateWorkOrderServiceRequest {
   workOrderId: string;
   cannedServiceId: string;
-  description?: string;
+  description?: string;  // Optional - defaults to canned service name
   quantity?: number;
-  unitPrice?: number;
+  unitPrice?: number;  // Optional - defaults to canned service price
   notes?: string;
 }
 
@@ -344,6 +372,23 @@ export interface CreatePaymentRequest {
   processedById?: string;
 }
 
+export interface CreateWorkOrderMiscChargeRequest {
+  workOrderId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  category: MiscChargeCategory;
+  notes?: string;
+}
+
+export interface UpdateWorkOrderMiscChargeRequest {
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  category?: MiscChargeCategory;
+  notes?: string;
+}
+
 export interface WorkOrderStatistics {
   totalWorkOrders: number;
   pendingWorkOrders: number;
@@ -366,6 +411,22 @@ export interface WorkOrderStatistics {
   }[];
 }
 
+export interface WorkOrderCreationStats {
+  totalWorkOrders: number;
+  averageDaily: number;
+  peakDaily: number;
+  dailyBreakdown: {
+    date: string;
+    count: number;
+  }[];
+}
+
+export interface GeneralStats {
+  totalCustomers: number;
+  totalVehicles: number;
+  totalTechnicians: number;
+}
+
 // Service Interface (for Dependency Injection)
 export interface IWorkOrderService {
   getUserProfileBySupabaseId(supabaseUserId: string): Promise<any>;
@@ -374,15 +435,19 @@ export interface IWorkOrderService {
   getWorkOrderById(id: string): Promise<any>;
   updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<any>;
   deleteWorkOrder(id: string): Promise<any>;
-  restoreWorkOrder(id: string): Promise<any>;
-  getCancelledWorkOrders(): Promise<any[]>;
+  // restoreWorkOrder and getCancelledWorkOrders are commented out in service
   createWorkOrderService(data: CreateWorkOrderServiceRequest): Promise<any>;
   getWorkOrderServices(workOrderId: string): Promise<any>;
+  createWorkOrderPart(workOrderId: string, data: CreateWorkOrderPartRequest): Promise<any>;
+  getWorkOrderParts(workOrderId: string): Promise<any>;
+  deleteWorkOrderService(serviceId: string): Promise<any>;
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
+  updateWorkOrderWorkflowStep(id: string, workflowStep: WorkflowStep): Promise<any>;
   assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
   assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
+  assignTechnicianToServiceLabor(serviceId: string, technicianId: string): Promise<any>;
   updateWorkOrderLabor(laborId: string, data: UpdateWorkOrderLaborRequest): Promise<any>;
   resetWorkOrderLaborSubtotal(laborId: string): Promise<any>;
   getWorkOrderStatistics(filters: { startDate?: Date; endDate?: Date }): Promise<WorkOrderStatistics>;
@@ -391,8 +456,37 @@ export interface IWorkOrderService {
   getWorkOrderAttachments(workOrderId: string, category?: string): Promise<any>;
   createWorkOrderInspection(workOrderId: string, inspectorId: string, notes?: string): Promise<any>;
   getWorkOrderInspections(workOrderId: string): Promise<any>;
+  updateWorkOrderInspection(inspectionId: string, data: any): Promise<any>;
+  deleteWorkOrderInspection(inspectionId: string): Promise<any>;
   createWorkOrderQC(workOrderId: string, data: any): Promise<any>;
   getWorkOrderQC(workOrderId: string): Promise<any>;
   findServiceAdvisorBySupabaseUserId(supabaseUserId: string): Promise<any>;
-  generateEstimateFromLaborAndParts(workOrderId: string, serviceAdvisorId: string): Promise<any>;
+  
+  // Misc charges methods
+  createWorkOrderMiscCharge(data: CreateWorkOrderMiscChargeRequest): Promise<any>;
+  getWorkOrderMiscCharges(workOrderId: string): Promise<any>;
+  updateWorkOrderMiscCharge(id: string, data: UpdateWorkOrderMiscChargeRequest): Promise<any>;
+  deleteWorkOrderMiscCharge(id: string): Promise<any>;
+  
+  // Part installation methods
+  assignTechnicianToPart(partId: string, technicianId: string): Promise<any>;
+  startPartInstallation(partId: string, technicianId: string): Promise<any>;
+  completePartInstallation(partId: string, technicianId: string, data: { notes?: string; warrantyInfo?: string }): Promise<any>;
+  findTechnicianBySupabaseUserId(supabaseUserId: string): Promise<any>;
+  
+  // Technician active work
+  getTechnicianActiveWork(technicianId: string): Promise<any>;
+
+    // Estimate PDF and approval helpers
+    generateEstimatePDF(workOrderId: string): Promise<string>;
+    lockServicesForEstimate(workOrderId: string): Promise<void>;
+    expirePreviousApprovals(workOrderId: string): Promise<void>;
+    createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
+    getWorkOrderApprovals(workOrderId: string): Promise<any>;
+    approveWorkOrderApproval(approvalId: string, approvedById: string | null, notes?: string): Promise<any>;
+    rejectWorkOrderApproval(approvalId: string, approvedById: string | null, reason?: string): Promise<any>;
+    finalizeEstimate(approvalId: string, finalizedById: string): Promise<any>;
+    generateInvoice(workOrderId: string, userId: string): Promise<any>;
+    getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
+    getGeneralStats(): Promise<GeneralStats>;
 }

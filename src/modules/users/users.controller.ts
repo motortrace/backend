@@ -146,7 +146,7 @@ export class UsersController {
   }
 
   /**
-   * ✅ ADMIN ONLY: Create staff user (Service Advisor, Technician, Manager, etc.)
+   *  ADMIN ONLY: Create staff user (Service Advisor, Technician, Manager, etc.)
    * Staff users are created complete - NO onboarding required
    * They can login and access the system immediately
    */
@@ -174,7 +174,7 @@ export class UsersController {
         return;
       }
 
-      console.log('🔧 Creating staff user:', { email, role, name });
+      console.log(' Creating staff user:', { email, role, name });
 
       // 1. Create user in Supabase Auth
       const { data: authData, error: authError } = await this.supabaseAdmin.auth.admin.createUser({
@@ -191,7 +191,7 @@ export class UsersController {
         throw new Error(authError?.message || 'Failed to create user in Supabase Auth');
       }
 
-      console.log('✅ Supabase Auth user created:', authData.user.id);
+      console.log(' Supabase Auth user created:', authData.user.id);
 
       // 2. Create UserProfile in PostgreSQL
       const userProfile = await this.usersService.createUser({
@@ -202,7 +202,7 @@ export class UsersController {
         isRegistrationComplete: true
       });
 
-      console.log('✅ UserProfile created:', userProfile.id);
+      console.log(' UserProfile created:', userProfile.id);
 
       // 3. Create role-specific record (ServiceAdvisor, Technician, etc.)
       let roleSpecificRecord = null;
@@ -226,9 +226,9 @@ export class UsersController {
             break;
         }
 
-        console.log('✅ Role-specific record created:', roleSpecificRecord);
+        console.log(' Role-specific record created:', roleSpecificRecord);
       } catch (roleError: any) {
-        console.warn('⚠️ Failed to create role-specific record:', roleError.message);
+        console.warn(' Failed to create role-specific record:', roleError.message);
       }
 
       res.status(201).json({

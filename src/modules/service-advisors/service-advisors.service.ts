@@ -110,7 +110,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -144,7 +144,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -179,7 +179,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -232,7 +232,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -366,7 +366,7 @@ export class ServiceAdvisorService {
             select: {
               advisorWorkOrders: true,
               assignedAppointments: true,
-              createdEstimates: true,
+              
             },
           },
         },
@@ -528,5 +528,15 @@ export class ServiceAdvisorService {
       estimatesCount: advisor._count?.createdEstimates || 0,
     };
   }
+
+  // Get service advisor count
+  async getServiceAdvisorCount(): Promise<number> {
+    try {
+      return await this.prisma.serviceAdvisor.count();
+    } catch (error: any) {
+      throw new Error(`Failed to get service advisor count: ${error.message}`);
+    }
+  }
 }
+
 

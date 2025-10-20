@@ -104,20 +104,60 @@ export interface AppointmentWithServices {
     email?: string;
     phone?: string;
     profileImage?: string | null;
+    userProfileId?: string;
   };
   vehicle: {
     id: string;
     make: string;
     model: string;
     year?: number;
-    licensePlate?: string;
+    licensePlate?: string | null;
+    imageUrl?: string | null;
   };
 
   assignedTo?: {
     id: string;
+    employeeId: string | null;
     supabaseUserId: string;
+    name: string;
+    phone?: string | null;
     profileImage?: string | null;
   };
+}
+
+export interface CalendarAppointment {
+  id: string;
+  title: string;
+  startTime: Date;
+  status: AppointmentStatus;
+  priority: AppointmentPriority;
+  customer: {
+    id: string;
+    name: string;
+  };
+  vehicle: {
+    make: string;
+    model: string;
+    licensePlate?: string | null;
+  };
+}
+
+export interface AdvisorAvailability {
+  advisorId: string;
+  employeeId: string | null;
+  name: string;
+  phone?: string | null;
+  profileImage?: string | null;
+  isAvailable: boolean;
+  currentAppointment: {
+    id: string;
+    startTime: Date | null;
+    endTime: Date | null;
+    status: AppointmentStatus;
+  } | null;
+  lastAssignedAt: Date | null;
+  lastAppointmentStatus: AppointmentStatus | null;
+  hasNeverBeenAssigned: boolean;
 }
 
 // Service Interface (for Dependency Injection)
@@ -133,6 +173,8 @@ export interface IAppointmentsService {
   checkDailyCapacity(request: DailyCapacityRequest): Promise<DailyCapacity>;
   getUnassignedAppointments(): Promise<any>;
   getConfirmedAppointmentsWithoutWorkOrders(): Promise<any>;
+  getCalendarAppointments(): Promise<CalendarAppointment[]>;
+  getAdvisorsAvailability(dateTime: Date): Promise<AdvisorAvailability[]>;
   updateOperatingHours(data: ShopOperatingHoursRequest): Promise<any>;
   getOperatingHours(): Promise<any>;
   updateCapacitySettings(data: ShopCapacitySettingsRequest): Promise<any>;

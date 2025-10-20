@@ -4,8 +4,8 @@ export const createLaborCatalogSchema = Joi.object({
   code: Joi.string().required(),
   name: Joi.string().required(),
   description: Joi.string().optional(),
-  estimatedHours: Joi.number().min(0.1).max(100).required(),
-  hourlyRate: Joi.number().min(0).required(),
+  estimatedMinutes: Joi.number().min(1).max(10000).required(),
+  skillLevel: Joi.string().optional(),
   category: Joi.string().optional(),
   isActive: Joi.boolean().default(true),
 });
@@ -14,19 +14,18 @@ export const updateLaborCatalogSchema = Joi.object({
   code: Joi.string().optional(),
   name: Joi.string().optional(),
   description: Joi.string().optional(),
-  estimatedHours: Joi.number().min(0.1).max(100).optional(),
-  hourlyRate: Joi.number().min(0).optional(),
+  estimatedMinutes: Joi.number().min(1).max(10000).optional(),
+  skillLevel: Joi.string().optional(),
   category: Joi.string().optional(),
   isActive: Joi.boolean().optional(),
 });
 
 export const createWorkOrderLaborSchema = Joi.object({
   workOrderId: Joi.string().required(),
-  cannedServiceId: Joi.string().optional(),
+  serviceId: Joi.string().required(),  // Labor must belong to a service
   laborCatalogId: Joi.string().optional(),
   description: Joi.string().required(),
-  hours: Joi.number().min(0.1).max(100).required(),
-  rate: Joi.number().min(0).required(),
+  estimatedMinutes: Joi.number().min(1).max(10000).optional(),
   technicianId: Joi.string().optional(),
   startTime: Joi.date().optional(),
   endTime: Joi.date().optional(),
@@ -34,11 +33,11 @@ export const createWorkOrderLaborSchema = Joi.object({
 });
 
 export const updateWorkOrderLaborSchema = Joi.object({
-  cannedServiceId: Joi.string().optional(),
+  serviceId: Joi.string().optional(),
   laborCatalogId: Joi.string().optional(),
   description: Joi.string().optional(),
-  hours: Joi.number().min(0.1).max(100).optional(),
-  rate: Joi.number().min(0).optional(),
+  estimatedMinutes: Joi.number().min(1).max(10000).optional(),
+  actualMinutes: Joi.number().min(1).max(10000).optional(),
   technicianId: Joi.string().optional(),
   startTime: Joi.date().optional(),
   endTime: Joi.date().optional(),

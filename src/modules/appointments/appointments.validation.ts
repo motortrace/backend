@@ -8,7 +8,7 @@ export const createAppointmentSchema = Joi.object({
   startTime: Joi.date().required(), // Now required for time block booking
   endTime: Joi.date().optional(),
   notes: Joi.string().optional(),
-  cannedServiceIds: Joi.array().items(Joi.string()).min(1).required(),
+  cannedServiceIds: Joi.array().items(Joi.string()).min(1).optional(), // Made optional for diagnostic appointments
   serviceNotes: Joi.array().items(Joi.string()).optional(),
 });
 
@@ -30,6 +30,11 @@ export const appointmentSlotRequestSchema = Joi.object({
 export const timeBlockAvailabilitySchema = Joi.object({
   date: Joi.date().required(),
   timeBlock: Joi.string().pattern(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).required(), // Format: "08:00", "08:30", etc.
+});
+
+// New schema for advisor availability check
+export const advisorAvailabilitySchema = Joi.object({
+  dateTime: Joi.date().required(),
 });
 
 export const assignAppointmentSchema = Joi.object({
@@ -100,6 +105,22 @@ export const validateTimeBlockAvailability = (req: any, res: any, next: any) => 
   };
   
   const { error } = timeBlockAvailabilitySchema.validate(timeBlockRequest);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+// New validation for advisor availability
+export const validateAdvisorAvailability = (req: any, res: any, next: any) => {
+  const advisorRequest = {
+    dateTime: new Date(req.query.dateTime as string),
+  };
+  
+  const { error } = advisorAvailabilitySchema.validate(advisorRequest);
   if (error) {
     return res.status(400).json({
       success: false,

@@ -4,7 +4,7 @@
 
 Your system now has built-in endpoints to track inspection completion and determine when you can proceed to the **ESTIMATE** phase.
 
-## 📊 **Key Endpoints for Tracking Completion**
+##  **Key Endpoints for Tracking Completion**
 
 ### **1. Check Inspection Status**
 **GET** `/inspection-templates/work-orders/{workOrderId}/inspection-status`
@@ -171,7 +171,7 @@ When `canProceed` is `true`, you can safely move to the estimate phase.
 
 ## 🚦 **Completion Rules**
 
-### **✅ Can Proceed to Estimate When:**
+### ** Can Proceed to Estimate When:**
 1. **All inspections are completed** (`isCompleted: true`)
 2. **No items require follow-up** (`requiresFollowUp: false`)
 
@@ -239,10 +239,10 @@ socket.on('inspection-updated', (data) => {
 
 Your system now provides:
 
-✅ **Real-time tracking** of inspection completion  
-✅ **Automatic validation** for estimate readiness  
-✅ **Detailed status reporting** with reasons  
-✅ **Follow-up item tracking**  
-✅ **Multiple inspection support** per work order  
+ **Real-time tracking** of inspection completion  
+ **Automatic validation** for estimate readiness  
+ **Detailed status reporting** with reasons  
+ **Follow-up item tracking**  
+ **Multiple inspection support** per work order  
 
 **The key endpoint is `/can-proceed-to-estimate`** - use this to determine when to enable the estimate phase button in your UI.

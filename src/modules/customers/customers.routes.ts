@@ -259,4 +259,154 @@ router.get('/:customerId/work-orders', customerController.getCustomerWorkOrders.
  */
 router.get('/:customerId/appointments', customerController.getCustomerAppointments.bind(customerController));
 
+/**
+ * @swagger
+ * /customers/{customerId}/statistics:
+ *   get:
+ *     summary: Get customer statistics and analytics
+ *     description: Returns comprehensive analytics including financials, visit patterns, loyalty metrics, and predictive insights
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Customer ID
+ *     responses:
+ *       200:
+ *         description: Customer statistics and metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     customer:
+ *                       type: object
+ *                       description: Basic customer info
+ *                     financials:
+ *                       type: object
+ *                       description: Financial metrics
+ *                     visits:
+ *                       type: object
+ *                       description: Visit frequency and patterns
+ *                     vehicles:
+ *                       type: object
+ *                       description: Vehicle statistics
+ *                     appointments:
+ *                       type: object
+ *                       description: Appointment metrics
+ *                     customerProfile:
+ *                       type: object
+ *                       description: Customer loyalty and risk indicators
+ *       404:
+ *         description: Customer not found
+ */
+router.get('/:customerId/statistics', customerController.getCustomerStatistics.bind(customerController));
+
+/**
+ * @swagger
+ * /customers/{customerId}/service-history:
+ *   get:
+ *     summary: Get customer's past services and inspections
+ *     description: Returns a comprehensive history of all completed services and inspections for a specific customer, organized by work order
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Customer ID
+ *     responses:
+ *       200:
+ *         description: Customer service history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       workOrderId:
+ *                         type: string
+ *                         description: Work order ID
+ *                       workOrderNumber:
+ *                         type: string
+ *                         description: Work order number
+ *                       vehicle:
+ *                         type: object
+ *                         description: Vehicle information
+ *                       completedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: When the work order was completed
+ *                       services:
+ *                         type: array
+ *                         description: Services performed
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             name:
+ *                               type: string
+ *                             code:
+ *                               type: string
+ *                             description:
+ *                               type: string
+ *                             duration:
+ *                               type: integer
+ *                             quantity:
+ *                               type: number
+ *                             unitPrice:
+ *                               type: number
+ *                             subtotal:
+ *                               type: number
+                             completedAt:
+                               type: string
+                               format: date-time
+ *                       inspections:
+ *                         type: array
+ *                         description: Inspections performed
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             templateName:
+ *                               type: string
+ *                             templateCategory:
+ *                               type: string
+ *                             inspector:
+ *                               type: string
+ *                             date:
+ *                               type: string
+ *                               format: date-time
+                             notes:
+                               type: string
+                             tireChecks:
+                               type: array
+ *       404:
+ *         description: Customer not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/:customerId/service-history', customerController.getCustomerServiceHistory.bind(customerController));
+
 export default router;

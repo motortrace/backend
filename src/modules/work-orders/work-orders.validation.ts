@@ -75,6 +75,11 @@ export const updateWorkOrderStatusSchema = Joi.object({
   workflowStep: Joi.string().valid(...Object.values(WorkflowStep)).optional(),
 });
 
+// Workflow Step Update Schema
+export const updateWorkflowStepSchema = Joi.object({
+  workflowStep: Joi.string().valid(...Object.values(WorkflowStep)).required(),
+});
+
 // Service Advisor Assignment Schema
 export const assignServiceAdvisorSchema = Joi.object({
   advisorId: Joi.string().required(),
@@ -199,6 +204,17 @@ export const validateUpdateWorkOrder = (req: any, res: any, next: any) => {
 
 export const validateUpdateWorkOrderStatus = (req: any, res: any, next: any) => {
   const { error } = updateWorkOrderStatusSchema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details[0].message,
+    });
+  }
+  next();
+};
+
+export const validateUpdateWorkflowStep = (req: any, res: any, next: any) => {
+  const { error } = updateWorkflowStepSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,

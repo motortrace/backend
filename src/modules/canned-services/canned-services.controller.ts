@@ -127,7 +127,7 @@ export class CannedServiceController {
         res.status(404).json({
           success: false,
           error: 'Canned service not found',
-          message: 'The requested canned service code does not exist',
+          message: 'The requested canned service does not exist',
         });
         return;
       }
@@ -319,6 +319,97 @@ export class CannedServiceController {
         success: false,
         error: error.message,
         message: 'Failed to bulk update prices',
+      });
+    }
+  }
+
+  // Analytics: Get service popularity data
+  async getServicePopularity(req: Request, res: Response): Promise<void> {
+    try {
+      const popularityData = await this.cannedServiceService.getServicePopularity();
+
+      res.status(200).json({
+        success: true,
+        data: popularityData,
+        count: popularityData.length,
+        message: 'Service popularity data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve service popularity data',
+      });
+    }
+  }
+
+  // Analytics: Get revenue by service data
+  async getRevenueByService(req: Request, res: Response): Promise<void> {
+    try {
+      const revenueData = await this.cannedServiceService.getRevenueByService();
+
+      res.status(200).json({
+        success: true,
+        data: revenueData,
+        count: revenueData.length,
+        message: 'Revenue by service data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve revenue by service data',
+      });
+    }
+  }
+
+  // Analytics: Get service categories data
+  async getServiceCategories(req: Request, res: Response): Promise<void> {
+    try {
+      const categoriesData = await this.cannedServiceService.getServiceCategories();
+
+      res.status(200).json({
+        success: true,
+        data: categoriesData,
+        count: categoriesData.length,
+        message: 'Service categories data retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve service categories data',
+      });
+    }
+  }
+
+  // Get inspection template recommendations for work order services
+  async getInspectionTemplatesForWorkOrder(req: Request, res: Response): Promise<void> {
+    try {
+      const { workOrderId } = req.params;
+
+      if (!workOrderId) {
+        res.status(400).json({
+          success: false,
+          error: 'Work order ID is required',
+          message: 'Please provide a valid work order ID',
+        });
+        return;
+      }
+
+      const inspectionTemplates = await this.cannedServiceService.getInspectionTemplatesForWorkOrder(workOrderId);
+
+      res.status(200).json({
+        success: true,
+        data: inspectionTemplates,
+        count: inspectionTemplates.length,
+        message: 'Inspection template recommendations retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to retrieve inspection template recommendations',
       });
     }
   }

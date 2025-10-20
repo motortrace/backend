@@ -52,4 +52,26 @@ router.delete('/attachments/:attachmentId', controller.deleteInspectionAttachmen
 router.get('/work-orders/:workOrderId/inspection-status', controller.getWorkOrderInspectionStatus.bind(controller));
 router.get('/work-orders/:workOrderId/can-proceed-to-estimate', controller.canProceedToEstimate.bind(controller));
 
+// Inspection Status Transition Routes
+router.patch('/inspections/:id/start', 
+  authenticateSupabaseToken, 
+  requireTechnician,
+  controller.startInspectionController.bind(controller)
+);
+router.patch('/inspections/:id/complete', 
+  authenticateSupabaseToken, 
+  requireTechnician,
+  controller.completeInspectionController.bind(controller)
+);
+router.patch('/inspections/:id/cancel', 
+  authenticateSupabaseToken, 
+  requireTechnician,
+  controller.cancelInspectionController.bind(controller)
+);
+router.delete('/inspections/:id', 
+  authenticateSupabaseToken, 
+  requireTechnician,
+  controller.deleteInspectionController.bind(controller)
+);
+
 export default router;
