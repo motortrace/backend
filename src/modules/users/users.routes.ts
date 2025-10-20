@@ -13,6 +13,10 @@ const usersController = new UsersController(usersService);
 // All routes require authentication
 router.use(authenticateSupabaseToken);
 
+//  ADMIN ONLY: Create customer user
+// Customer users go through onboarding process
+router.post('/customer', requireAdmin, usersController.createCustomerUser.bind(usersController));
+
 //  ADMIN ONLY: Create staff user (Service Advisor, Technician, Manager, etc.)
 // Staff users bypass onboarding - they're created complete and ready to use
 router.post('/staff', requireAdmin, usersController.createStaffUser.bind(usersController));

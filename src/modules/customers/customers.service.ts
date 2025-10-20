@@ -96,6 +96,7 @@ export class CustomerService implements ICustomerService {
                     select: {
                       name: true,
                       phone: true,
+                      profileImage: true,
                     },
                   },
                 },
@@ -450,6 +451,32 @@ export class CustomerService implements ICustomerService {
     try {
       const workOrders = await this.prisma.workOrder.findMany({
         where: { customerId },
+        include: {
+          vehicle: {
+            select: {
+              id: true,
+              make: true,
+              model: true,
+              year: true,
+              vin: true,
+              licensePlate: true,
+              color: true,
+              imageUrl: true,
+            },
+          },
+          serviceAdvisor: {
+            select: {
+              id: true,
+              userProfile: {
+                select: {
+                  name: true,
+                  phone: true,
+                  profileImage: true,
+                },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -748,5 +775,142 @@ export class CustomerService implements ICustomerService {
     score += (params.paymentCompletionRate / 100) * 20;
 
     return Math.min(100, Math.round(score));
+  }
+
+  async getCustomerServiceHistory(customerId: string) {
+    try {
+      // Get completed work orders for this customer
+      const completedWorkOrders = await this.prisma.workOrder.findMany({
+        where: {
+          customerId,
+          status: 'COMPLETED',
+        },
+        include: {
+          vehicle: {
+            select: {
+              id: true,
+              make: true,
+              model: true,
+              year: true,
+              licensePlate: true,
+              vin: true,
+            },
+          },
+          services: {
+            where: {
+              status: 'COMPLETED',
+            },
+            include: {
+              cannedService: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  description: true,
+                  duration: true,
+                },
+              },
+              laborItems: {
+                where: {
+                  status: 'COMPLETED',
+                },
+                include: {
+                  technician: {
+                    select: {
+                      id: true,
+                      userProfile: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          inspections: {
+            where: {
+              isCompleted: true,
+            },
+            include: {
+              template: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  category: true,
+                },
+              },
+              inspector: {
+                select: {
+                  id: true,
+                  userProfile: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+              checklistItems: {
+                select: {
+                  id: true,
+                  item: true,
+                  status: true,
+                  notes: true,
+                  requiresFollowUp: true,
+                },
+              },
+              tireChecks: {
+                select: {
+                  id: true,
+                  position: true,
+                  brand: true,
+                  model: true,
+                  psi: true,
+                  treadDepth: true,
+                  damageNotes: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          closedAt: 'desc',
+        },
+      });
+
+      // Transform the data to group services and inspections by work order
+      const serviceHistory = completedWorkOrders.map(workOrder => ({
+        workOrderId: workOrder.id,
+        workOrderNumber: workOrder.workOrderNumber,
+        vehicle: workOrder.vehicle,
+        completedAt: workOrder.closedAt,
+        services: workOrder.services.map(service => ({
+          id: service.id,
+          name: service.cannedService?.name || service.description,
+          code: service.cannedService?.code,
+          description: service.cannedService?.description,
+          duration: service.cannedService?.duration,
+          quantity: service.quantity,
+          unitPrice: service.unitPrice,
+          subtotal: service.subtotal,
+          completedAt: service.updatedAt, // Assuming updatedAt reflects completion
+        })),
+        inspections: workOrder.inspections.map(inspection => ({
+          id: inspection.id,
+          templateName: inspection.template?.name,
+          templateCategory: inspection.template?.category,
+          inspector: inspection.inspector?.userProfile?.name,
+          date: inspection.date,
+          notes: inspection.notes,
+          tireChecks: inspection.tireChecks,
+        })),
+      }));
+
+      return serviceHistory;
+    } catch (error: any) {
+      throw new Error(`Failed to get customer service history: ${error.message}`);
+    }
   }
 }

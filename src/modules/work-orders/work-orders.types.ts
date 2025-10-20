@@ -119,6 +119,7 @@ export interface WorkOrderWithDetails {
   servicePackageId?: string;
   customerSignature?: string;
   customerFeedback?: string;
+  inspectionPdfUrl?: string;
   
   // Relations
   customer: {
@@ -307,6 +308,26 @@ export interface WorkOrderWithDetails {
       };
     };
   }[];
+  approvals: {
+    id: string;
+    workOrderId: string;
+    status: ApprovalStatus;
+    requestedAt: Date;
+    approvedAt?: Date;
+    approvedById?: string;
+    method?: ApprovalMethod;
+    notes?: string;
+    customerSignature?: string;
+    pdfUrl?: string;
+    inspectionPdfUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    approvedBy?: {
+      id: string;
+      name?: string;
+      profileImage?: string;
+    };
+  }[];
 }
 
 
@@ -393,6 +414,7 @@ export interface IWorkOrderService {
   createPayment(data: CreatePaymentRequest): Promise<any>;
   getWorkOrderPayments(workOrderId: string): Promise<any>;
   updateWorkOrderStatus(id: string, status: any, workflowStep?: any): Promise<any>;
+  updateWorkOrderWorkflowStep(id: string, workflowStep: WorkflowStep): Promise<any>;
   assignServiceAdvisor(id: string, advisorId: string): Promise<any>;
   assignTechnicianToLabor(laborId: string, technicianId: string): Promise<any>;
   assignTechnicianToServiceLabor(serviceId: string, technicianId: string): Promise<any>;
@@ -430,6 +452,8 @@ export interface IWorkOrderService {
     expirePreviousApprovals(workOrderId: string, status: string): Promise<void>;
     createWorkOrderApproval(data: { workOrderId: string; status: string; approvedById: string; pdfUrl: string }): Promise<any>;
     getWorkOrderApprovals(workOrderId: string): Promise<any>;
+    approveWorkOrderApproval(approvalId: string, customerId: string | null, notes?: string): Promise<any>;
+    rejectWorkOrderApproval(approvalId: string, customerId: string | null, reason?: string): Promise<any>;
     getWorkOrderCreationStats(): Promise<WorkOrderCreationStats>;
     getGeneralStats(): Promise<GeneralStats>;
 }

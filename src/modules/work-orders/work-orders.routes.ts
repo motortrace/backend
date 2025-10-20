@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { WorkOrderController } from './work-orders.controller';
 import { WorkOrderService } from './work-orders.service';
 import { authenticateSupabaseToken, requireServiceAdvisor, requireTechnician, requireManager } from '../auth/supabase/authSupabase.middleware';
-import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, validateRequest } from './work-orders.validation';
+import { assignServiceAdvisorSchema, assignTechnicianToLaborSchema, updateWorkOrderLaborSchema, updateWorkflowStepSchema, validateRequest } from './work-orders.validation';
 import prisma from '../../infrastructure/database/prisma';
 
 const router = Router();
@@ -21,6 +21,7 @@ router.put('/:id', authenticateSupabaseToken, requireServiceAdvisor, workOrderCo
 
 // Work Order Status Management Routes
 router.put('/:id/status', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.updateWorkOrderStatus.bind(workOrderController));
+router.put('/:id/workflow-step', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(updateWorkflowStepSchema, 'body'), workOrderController.updateWorkOrderWorkflowStep.bind(workOrderController));
 router.put('/:id/assign-advisor', authenticateSupabaseToken, requireServiceAdvisor, validateRequest(assignServiceAdvisorSchema, 'body'), workOrderController.assignServiceAdvisor.bind(workOrderController));
 
 // Labor Assignment Routes
@@ -63,6 +64,11 @@ router.get('/:workOrderId/pending-approvals', authenticateSupabaseToken, workOrd
 // Generate estimate PDF and approval entry
 router.post('/:workOrderId/generate-estimate', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.generateEstimate.bind(workOrderController));
 router.get('/:workOrderId/approvals', workOrderController.getWorkOrderApprovals.bind(workOrderController));
+
+// WorkOrderApproval approval routes (customer accessible)
+router.post('/approvals/:approvalId/approve', authenticateSupabaseToken, workOrderController.approveWorkOrderApproval.bind(workOrderController));
+router.post('/approvals/:approvalId/reject', authenticateSupabaseToken, workOrderController.rejectWorkOrderApproval.bind(workOrderController));
+
 router.put('/parts/:partId/assign-technician', authenticateSupabaseToken, requireServiceAdvisor, workOrderController.assignTechnicianToPart.bind(workOrderController));
 router.put('/parts/:partId/start', authenticateSupabaseToken, requireTechnician, workOrderController.startPartInstallation.bind(workOrderController));
 router.put('/parts/:partId/complete', authenticateSupabaseToken, requireTechnician, workOrderController.completePartInstallation.bind(workOrderController));

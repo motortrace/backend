@@ -53,6 +53,33 @@ export class AuthSupabaseController {
       // Debug: Log what the service returned
       console.log('🔍 Service returned:', JSON.stringify(data, null, 2));
       
+      // Resolve user role and customerId from the database-backed UserProfile where possible.
+      let customerId = null;
+      let resolvedRole = 'customer';
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+
+        if (userProfile) {
+          // Prisma enum is uppercase (e.g. CUSTOMER) so convert to lowercase/underscore
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          // Fallback to token metadata
+          resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+          isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
+        }
+      } catch (dbError) {
+        console.warn('Could not fetch user profile during signIn:', dbError);
+        resolvedRole = (data.user as any)?.user_metadata?.role || 'customer';
+        isRegistrationComplete = (data.user as any)?.user_metadata?.isRegistrationComplete === true;
+      }
+      
       // Return user data with flattened metadata used by mobile app
       res.status(200).json({ 
         message: 'Login successful', 
@@ -60,8 +87,9 @@ export class AuthSupabaseController {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: (data.user as any)?.user_metadata?.role || 'customer',
-            isRegistrationComplete: (data.user as any)?.user_metadata?.isRegistrationComplete === true
+            role: resolvedRole,
+            customerId: customerId, // Include customerId for mobile async storage
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,
@@ -381,6 +409,7 @@ export class AuthSupabaseController {
       const userProfile = await this.prisma.userProfile.findUnique({
         where: { supabaseUserId: req.user.id },
         select: {
+          id: true,
           name: true,
           phone: true,
           profileImage: true,
@@ -406,6 +435,7 @@ export class AuthSupabaseController {
       res.json({
         success: true,
         profile: {
+          id: userProfile.id,
           fullName: userProfile.name || '',
           phoneNumber: userProfile.phone || '',
           profileImageUrl: normalizeImageUrl(userProfile.profileImage),
@@ -486,14 +516,39 @@ export class AuthSupabaseController {
         hasSession: !!data.session 
       });
 
+      // Try to resolve role and customerId from the UserProfile table
+      let customerId = null;
+      let resolvedRole = role;
+      let isRegistrationComplete = false;
+
+      try {
+        const userProfile = await this.prisma.userProfile.findUnique({
+          where: { supabaseUserId: data.user?.id },
+          include: { customer: true }
+        });
+        if (userProfile) {
+          resolvedRole = String(userProfile.role).toLowerCase().replace(/\s+/g, '_');
+          isRegistrationComplete = !!userProfile.isRegistrationComplete;
+          if (userProfile.customer) customerId = userProfile.customer.id;
+        } else {
+          resolvedRole = data.user?.user_metadata?.role || role;
+          isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
+        }
+      } catch (err) {
+        console.warn('Could not fetch user profile for Google auth response:', err);
+        resolvedRole = data.user?.user_metadata?.role || role;
+        isRegistrationComplete = data.user?.user_metadata?.isRegistrationComplete || false;
+      }
+
       res.json({
         message: 'Google authentication successful',
         data: {
           user: {
             id: data.user?.id,
             email: data.user?.email,
-            role: data.user?.user_metadata?.role || role,
-            isRegistrationComplete: data.user?.user_metadata?.isRegistrationComplete || false
+            role: resolvedRole,
+            customerId: customerId, // Include customerId for mobile async storage
+            isRegistrationComplete: isRegistrationComplete
           },
           access_token: data.session?.access_token,
           refresh_token: data.session?.refresh_token,

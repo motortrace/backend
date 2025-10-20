@@ -311,4 +311,143 @@ router.get('/:customerId/appointments', customerController.getCustomerAppointmen
  */
 router.get('/:customerId/statistics', customerController.getCustomerStatistics.bind(customerController));
 
+/**
+ * @swagger
+ * /customers/{customerId}/service-history:
+ *   get:
+ *     summary: Get customer's past services and inspections
+ *     description: Returns a comprehensive history of all completed services and inspections for a specific customer, organized by work order
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Customer ID
+ *     responses:
+ *       200:
+ *         description: Customer service history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       workOrderId:
+ *                         type: string
+ *                         description: Work order ID
+ *                       workOrderNumber:
+ *                         type: string
+ *                         description: Work order number
+ *                       vehicle:
+ *                         type: object
+ *                         description: Vehicle information
+ *                       completedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: When the work order was completed
+ *                       services:
+ *                         type: array
+ *                         description: Services performed
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             name:
+ *                               type: string
+ *                             code:
+ *                               type: string
+ *                             description:
+ *                               type: string
+ *                             duration:
+ *                               type: integer
+ *                             quantity:
+ *                               type: number
+ *                             unitPrice:
+ *                               type: number
+ *                             subtotal:
+ *                               type: number
+                             completedAt:
+                               type: string
+                               format: date-time
+ *                       inspections:
+ *                         type: array
+ *                         description: Inspections performed
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             templateName:
+ *                               type: string
+ *                             templateCategory:
+ *                               type: string
+ *                             inspector:
+ *                               type: string
+ *                             date:
+ *                               type: string
+ *                               format: date-time
+                             notes:
+                               type: string
+                             tireChecks:
+                               type: array
+ *       404:
+ *         description: Customer not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/:customerId/service-history', customerController.getCustomerServiceHistory.bind(customerController));
+
+/**
+ * @swagger
+ * /customers/create-without-auth:
+ *   post:
+ *     summary: Create customer without authentication (for admin panel)
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Customer created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Customer'
+ *       400:
+ *         description: Invalid input
+ */
+router.post('/create-without-auth', customerController.createCustomerWithoutAuth.bind(customerController));
+
 export default router;

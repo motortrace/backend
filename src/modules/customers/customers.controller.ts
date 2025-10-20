@@ -234,4 +234,58 @@ export class CustomerController {
       });
     }
   }
+
+  // Get customer service history (past services and inspections)
+  async getCustomerServiceHistory(req: Request, res: Response) {
+    try {
+      const { customerId } = req.params;
+      const serviceHistory = await this.customerService.getCustomerServiceHistory(customerId);
+
+      res.json({
+        success: true,
+        data: serviceHistory,
+        message: 'Customer service history retrieved successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get customer service history',
+        message: error.message,
+      });
+    }
+  }
+
+  // Create customer without authentication (for admin panel)
+  async createCustomerWithoutAuth(req: Request, res: Response) {
+    try {
+      const { name, email, phone } = req.body;
+
+      // Validate required fields
+      if (!name) {
+        res.status(400).json({
+          success: false,
+          error: 'Name is required'
+        });
+        return;
+      }
+
+      const customer = await this.customerService.createCustomer({
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: customer,
+        message: 'Customer created successfully',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        error: 'Failed to create customer',
+        message: error.message,
+      });
+    }
+  }
 }

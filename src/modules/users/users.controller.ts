@@ -146,6 +146,91 @@ export class UsersController {
   }
 
   /**
+   *  ADMIN ONLY: Create customer user
+   * Customer users go through onboarding process
+   */
+  async createCustomerUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { email, password, name, phone } = req.body;
+
+      // Validate required fields
+      if (!email || !password || !name) {
+        res.status(400).json({
+          success: false,
+          error: 'Email, password, and name are required'
+        });
+        return;
+      }
+
+      console.log(' Creating customer user:', { email, name });
+
+      // 1. Create user in Supabase Auth
+      const { data: authData, error: authError } = await this.supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm email for customer users
+        user_metadata: {
+          role: 'customer',
+          isRegistrationComplete: false // Customer users need onboarding
+        }
+      });
+
+      if (authError || !authData.user) {
+        throw new Error(authError?.message || 'Failed to create user in Supabase Auth');
+      }
+
+      console.log(' Supabase Auth user created:', authData.user.id);
+
+      // 2. Create UserProfile in PostgreSQL
+      const userProfile = await this.usersService.createUser({
+        supabaseUserId: authData.user.id,
+        name,
+        phone: phone || undefined,
+        profileImage: undefined,
+        isRegistrationComplete: false // Customer users need onboarding
+      });
+
+      console.log(' UserProfile created:', userProfile.id);
+
+      // 3. Create Customer record
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const customer = await prisma.customer.create({
+        data: {
+          userProfileId: userProfile.id,
+          name,
+          email,
+          phone: phone || undefined,
+        }
+      });
+
+      console.log(' Customer record created:', customer.id);
+
+      res.status(201).json({
+        success: true,
+        message: `Customer user created successfully. User needs to complete onboarding.`,
+        createdBy: req.user?.email,
+        data: {
+          authUserId: authData.user.id,
+          email: authData.user.email,
+          role: 'customer',
+          profile: userProfile,
+          customer
+        }
+      });
+
+    } catch (error: any) {
+      console.error('❌ Failed to create customer user:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create customer user',
+        message: error.message
+      });
+    }
+  }
+
+  /**
    *  ADMIN ONLY: Create staff user (Service Advisor, Technician, Manager, etc.)
    * Staff users are created complete - NO onboarding required
    * They can login and access the system immediately
