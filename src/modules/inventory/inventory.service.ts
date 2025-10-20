@@ -197,6 +197,12 @@ export class InventoryService {
       this.prisma.inventoryItem.findMany({
         where,
         include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           _count: {
             select: {
               workOrderParts: true,
